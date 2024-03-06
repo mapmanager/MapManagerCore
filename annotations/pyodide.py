@@ -2,9 +2,8 @@ from io import StringIO
 from typing import Tuple
 import pandas as pd
 
-from ..store.image.base import ArrayImageLoader
+from ..image.base import ArrayImageLoader
 from .types import AnnotationsOptions, ImageSlice
-from ..store.image.pyodide import PyodideImageLoader
 from ..utils import toGeoData
 from .base import Annotations
 from pyodide.http import pyfetch
@@ -12,6 +11,9 @@ from pyodide.ffi import to_js
 
 
 class PyodideAnnotations(Annotations):
+    """ PyodideAnnotations contains pyodide specific helper methods to allow JS to use Annotations.
+    """
+
     async def load(url: str):
         lineSegments = await loadGeoCsv(url + "/line_segments.csv", ['segment'], index_col="segmentID", dtype={'segmentID': str})
         points = await loadGeoCsv(url + "/points.csv", ['point', 'anchor'], index_col="spineID", dtype={'spineID': str, 'segmentID': str})

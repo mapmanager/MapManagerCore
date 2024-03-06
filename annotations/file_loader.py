@@ -1,16 +1,17 @@
 from typing import Union
 import numpy as np
 import pandas as pd
-
-from ..store.image.base import ArrayImageLoader, ImageLoader, ImageLoaderBuilder
+from ..image.base import ArrayImageLoader, ImageLoader, ImageLoaderBuilder
 from ..utils import toGeoData
 from .base.interactions import AnnotationsInteractions
 
 
 class MapAnnotations(AnnotationsInteractions):
+    """
+    A class to load annotations from a files directly.
+    """
 
     def __init__(self, lineSegmentsPath: Union[str, pd.DataFrame], pointsPath: Union[str, pd.DataFrame], imagePath: str = None, loader: Union[ImageLoader, ImageLoaderBuilder] = None):
-
         if isinstance(lineSegmentsPath, str):
             lineSegments = pd.read_csv(
                 lineSegmentsPath, index_col="segmentID", dtype={'segmentID': str})

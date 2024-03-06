@@ -1,7 +1,7 @@
 import unittest
 import geopandas as gp
 from ..annotations.base.base_mutation import AnnotationsBaseMut
-from ..store.image.base import ImageLoader
+from ..image.base import ImageLoader
 
 
 class NilLoader(ImageLoader):

@@ -1,5 +1,4 @@
 from typing import List, TypedDict, Tuple
-
 import numpy as np
 
 SpineId = str

@@ -5,7 +5,7 @@ import asyncio
 
 import pandas as pd
 
-from ...utils import sync, polygonIndexes
+from ..utils import sync, polygonIndexes
 import geopandas as gp
 
 
@@ -93,6 +93,17 @@ class ImageLoader:
         return slices[x[0]:x[1], y[0]:y[1]]
 
     async def getPolygons(self, polygons: gp.GeoDataFrame, zExpand: int = 0, channel: int = 0):
+        """
+        Retrieve image slices corresponding to the given polygons.
+
+        Args:
+            polygons (gp.GeoDataFrame): GeoDataFrame containing the polygons under the column polygon, along with `z` and time `t`.
+            zExpand (int, optional): Number of slices to expand in the z-direction. Defaults to 0.
+            channel (int, optional): Channel index. Defaults to 0.
+
+        Returns:
+            pd.Series: Series containing the image slices corresponding to the polygons.
+        """
         results = []
         indexes = []
 
@@ -125,7 +136,7 @@ class ImageLoaderBuilder:
 
 class ArrayImageLoaderBuilder(ImageLoaderBuilder):
     """
-    Class for building images into a 5D array.
+    Class for building an ArrayImageLoader.
     """
 
     def __init__(self):
@@ -160,7 +171,7 @@ class ArrayImageLoaderBuilder(ImageLoaderBuilder):
 @sync
 class ArrayImageLoader(ImageLoader):
     """
-    A loader class for loading from tifs.
+    A loader class for loading from imageio supported formats.
     """
 
     def __init__(self, images: np.ndarray):

@@ -1,10 +1,10 @@
 import asyncio
-from typing import List, Tuple
+from typing import List
 import numpy as np
 from pyodide.http import pyfetch
 from async_lru import alru_cache
 from .base import ImageLoader, ArrayImageLoader
-from tifffile import imread, imwrite
+from tifffile import imread
 from io import BytesIO
 
 

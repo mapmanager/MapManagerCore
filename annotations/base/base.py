@@ -2,7 +2,7 @@ from typing import Tuple
 import geopandas as gp
 from ..types import ImageSlice
 from ...utils import sync
-from ...store.image.base import ImageLoader
+from ...image.base import ImageLoader
 
 
 @sync
