@@ -91,4 +91,3 @@ async def loadTiffsFromUrl(urls: List[List[List[str]]]) -> ArrayImageLoader:
 
     return ArrayImageLoader(np.array(images))
 
-ArrayImageLoader.loadTiffsFromUrl = loadTiffsFromUrl
