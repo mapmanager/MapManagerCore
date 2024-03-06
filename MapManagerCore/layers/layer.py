@@ -101,7 +101,11 @@ class Layer:
             **self._encodeBin(),
             "properties": self.properties
         }
-
+        
+    def normalize(self) -> Self:
+        self.series = gp.GeoSeries(self.series)
+        return self
+    
     @timer
     def translate(self, translate: gp.GeoSeries = None) -> Self:
         self.series = self.series.combine(

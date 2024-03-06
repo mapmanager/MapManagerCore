@@ -28,6 +28,21 @@ class MultiLineLayer(Layer):
         ("implemented by decorator", outline)
         return self
 
+    def normalize(self) -> Self:
+        if "offset" in self.properties:
+            distance = self.properties["offset"]
+            distance = self.series.index.map(
+                lambda x: distance(x) if callable(distance) else distance)
+            self.series = shapely.offset_curve(self.series, distance=distance)
+
+        if "outline" in self.properties:
+            distance = self.properties["outline"]
+            distance = self.series.index.map(
+                lambda x: distance(x) if callable(distance) else distance)
+            shapely.buffer(self.series, distance=distance, cap_style=2)
+
+        return super().normalize()
+
     def _encodeBin(self):
         coords = self.series.apply(getCoords)
         featureId = coords.index
@@ -81,7 +96,6 @@ class LineLayer(MultiLineLayer):
         points = PointLayer(self)
         points.series = points.series.apply(lambda x: Point(x.coords[-1]))
         return points
-
 
 
 def getTail(d):
