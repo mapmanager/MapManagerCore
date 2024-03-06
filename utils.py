@@ -19,7 +19,7 @@ except ImportError as e:
     pass
 
 
-def isCoreMapManager():
+def isMapManagerCore():
     """
     Returns true if the caller is in the MapManagerCore module.
     """
@@ -33,8 +33,8 @@ def isCoreMapManager():
 def wrapAsync(method):
     def wrapped(self, *args, **kwargs):
         result = method(self, *args, **kwargs)
-        if isCoreMapManager():
-            # If the caller is in the coreMapManager module, then we return the
+        if isMapManagerCore():
+            # If the caller is in the MapManagerCore module, then we return the
             # async version for the module ot await.
             return result
         return asyncio.run(result)
