@@ -27,7 +27,7 @@ def isMapManagerCore():
     mod = inspect.getmodule(frm[0])
     if mod == None:
         return False
-    return "MapManagerCore" in mod.__name__
+    return "mapmanagercore" in mod.__name__
 
 
 def wrapAsync(method):
