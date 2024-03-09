@@ -36,7 +36,7 @@ foundPackages = find_packages(include=['mapmanagercore', 'mapmanagercore.*'])
 setup(
     name='mapmanagercore',  # the package name (on PyPi), still use 'import mapmanagercore'
     #version=VERSION,
-    description='todo: add some description.',
+    description='MapManagerCore is a Python library that provides the core functionality for MapManager.',
     long_description=long_description,
     long_description_content_type = 'text/markdown',
     # TODO: assign to url of mapmanagercore
