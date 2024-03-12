@@ -106,6 +106,10 @@ class Layer:
         self.series = gp.GeoSeries(self.series)
         return self
     
+    def coordinates(self) -> Tuple[pd.DataFrame, dict]:
+        normalize = self.normalize()
+        return [normalize.series.get_coordinates(), normalize.properties]
+    
     @timer
     def translate(self, translate: gp.GeoSeries = None) -> Self:
         self.series = self.series.combine(

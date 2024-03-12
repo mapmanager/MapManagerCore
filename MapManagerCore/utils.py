@@ -1,5 +1,3 @@
-import asyncio
-import inspect
 from typing import List
 import numpy as np
 import pandas as pd
@@ -7,60 +5,6 @@ from shapely import wkt
 import geopandas as gp
 from shapely.geometry import Polygon
 import skimage.draw
-
-USE_ASYNC = False
-
-try:
-    import pyodide
-    USE_ASYNC = True
-except ImportError as e:
-    import nest_asyncio
-    nest_asyncio.apply()
-    pass
-
-
-def isMapManagerCore():
-    """
-    Returns true if the caller is in the MapManagerCore module.
-    """
-    frm = inspect.stack()[2]
-    mod = inspect.getmodule(frm[0])
-    if mod == None:
-        return False
-    return "MapManagerCore" in mod.__name__
-
-
-def wrapAsync(method):
-    def wrapped(self, *args, **kwargs):
-        result = method(self, *args, **kwargs)
-        if isMapManagerCore():
-            # If the caller is in the MapManagerCore module, then we return the
-            # async version for the module ot await.
-            return result
-        return asyncio.run(result)
-    return wrapped
-
-
-def sync(cls):
-    """
-    Converts all async methods in the given class to sync methods.
-    If the async flag is false
-    """
-
-    if USE_ASYNC:
-        return cls
-
-    for name, method in cls.__dict__.items():
-        if not asyncio.iscoroutinefunction(method):
-            continue
-
-        wrapped = wrapAsync(method)
-
-        # Replace the async method with the sync method
-        setattr(cls, name, wrapped)
-
-    return cls
-
 
 def toGeoData(data: pd.DataFrame, geometryCols: List[str]):
     """
@@ -73,9 +17,14 @@ def toGeoData(data: pd.DataFrame, geometryCols: List[str]):
     Returns:
         gp.GeoDataFrame: The loaded CSV data as a geopandas GeoDataFrame.
     """
+    
     for column in geometryCols:
         data[column] = data[column].apply(wkt.loads)
-    return gp.GeoDataFrame(data, geometry=geometryCols[0])
+    df = gp.GeoDataFrame(data, geometry=geometryCols[0])
+    
+    for column in geometryCols:
+        df[column] = gp.GeoSeries(df[column])
+    return df
 
 
 def filterMask(d, index_filter):

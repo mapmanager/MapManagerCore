@@ -1,22 +1,20 @@
 from typing import Tuple
 import geopandas as gp
 from ..types import ImageSlice
-from ...utils import sync
-from ...image.base import ImageLoader
+from ...loader.base import ImageLoader, Loader
 
 
-@sync
 class AnnotationsBase:
-    loader: ImageLoader  # used for the brightest path
+    images: ImageLoader  # used for the brightest path
     _points: gp.GeoDataFrame
     _lineSegments: gp.GeoDataFrame
 
-    def __init__(self, loader: ImageLoader, lineSegments: gp.GeoDataFrame, points: gp.GeoDataFrame):
-        self._lineSegments = lineSegments
-        self._points = points
-        self.loader = loader
+    def __init__(self, loader: Loader):
+        self._lineSegments = loader.segments()
+        self._points = loader.points()
+        self.images = loader.images()
 
-    async def slices(self, time: int, channel: int, zRange: Tuple[int, int] = None) -> ImageSlice:
+    def slices(self, time: int, channel: int, zRange: Tuple[int, int] = None) -> ImageSlice:
         """
         Loads the image data for a slice.
 
@@ -33,11 +31,11 @@ class AnnotationsBase:
             zRange = (int(self._points["z"].min()),
                       int(self._points["z"].max()))
 
-        return ImageSlice(await self.loader.fetchSlices(time, channel, zRange))
+        return ImageSlice(self.images.fetchSlices(time, channel, zRange))
 
-    async def getPolygonPixels(self, polygons: gp.GeoSeries, channel: int = 0, zExpand: int = 0):
+    def getPolygonPixels(self, polygons: gp.GeoSeries, channel: int = 0, zExpand: int = 0):
         polygons = polygons.to_frame(name="polygon")
         polygons["z"] = self._points.loc[polygons.index, "z"]
         polygons["t"] = 0  # self._points.loc[polygons.index, "t"]
 
-        return await self.loader.getPolygons(polygons, channel=channel, zExpand=zExpand)
+        return self.images.getPolygons(polygons, channel=channel, zExpand=zExpand)

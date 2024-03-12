@@ -1,5 +1,5 @@
 {
-  "micropip": ["async-lru", "asyncio", "tifffile"],
+  "micropip": ["tifffile"],
   "loadPackage": [
     "numpy",
     "pandas",

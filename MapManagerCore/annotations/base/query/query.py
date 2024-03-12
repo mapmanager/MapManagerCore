@@ -2,20 +2,17 @@ from copy import copy
 import numpy as np
 import pandas as pd
 from typing import List
-
 from ....benchmark import timeAll
 from ....layers.line import calcSubLine, extend
 from .utils import PLOT_ABLE_QUERIES, QUERIES, Query, queryable
 from ..base_mutation import AnnotationsBaseMut
 from ...types import AnnotationsOptions
 from ....layers.utils import inRange
-from ....utils import filterMask, sync
+from ....utils import filterMask
 from shapely.geometry import LineString
 import shapely
-import traceback
 
 
-@sync
 class QueryAnnotations(AnnotationsBaseMut):
     def getSegmentsAndSpines(self, options: AnnotationsOptions):
         z_range = options['selection']['z']
@@ -51,17 +48,17 @@ class QueryAnnotations(AnnotationsBaseMut):
     def queries(self) -> List[Query]:
         return PLOT_ABLE_QUERIES
 
-    async def runQuery(self, query: Query) -> pd.Series:
-        return await query.runWith(self)
+    def runQuery(self, query: Query) -> pd.Series:
+        return query.runWith(self)
 
     @timeAll
-    async def table(self, queries: List[Query] = PLOT_ABLE_QUERIES) -> pd.DataFrame:
+    def table(self, queries: List[Query] = PLOT_ABLE_QUERIES) -> pd.DataFrame:
         return pd.DataFrame({
-            query.getTitle(): await query.runWith(self) for query in queries
+            query.getTitle(): query.runWith(self) for query in queries
         })
 
-    async def dataFrame(self, queries: List[Query] = QUERIES) -> pd.DataFrame:
-        return await self.table(queries)
+    def dataFrame(self, queries: List[Query] = QUERIES) -> pd.DataFrame:
+        return self.table(queries)
 
     @queryable(title="Spine ID", categorical=True)
     def spineID(self):
@@ -73,11 +70,11 @@ class QueryAnnotations(AnnotationsBaseMut):
 
     @queryable(title="x")
     def pointX(self):
-        return self._points["point"].apply(lambda p: p.x)
+        return self._points["point"].x
 
     @queryable(title="y")
-    def pointX(self):
-        return self._points["point"].apply(lambda p: p.y)
+    def pointY(self):
+        return self._points["point"].y
 
     @queryable(title="z")
     def pointZ(self):
@@ -85,11 +82,15 @@ class QueryAnnotations(AnnotationsBaseMut):
 
     @queryable(title="Anchor X")
     def anchorX(self):
-        return self._points["anchor"].apply(lambda p: p.x)
+        return self._points["anchor"].x
 
     @queryable(title="Anchor Y")
     def anchorY(self):
-        return self._points["anchor"].apply(lambda p: p.y)
+        return self._points["anchor"].y
+
+    @queryable(title="Anchor Z")
+    def anchorY(self):
+        return self._points["anchorZ"]
 
     @queryable(title="Spine Length")
     def spineLength(self):
@@ -174,42 +175,42 @@ class QueryAnnotations(AnnotationsBaseMut):
         return self.roiBaseBg().union(self.roiHeadBg())
 
     # Should cache?
-    async def roiPixels(self, channel: int = 0, zExpand: int = 0):
-        return await self.getPolygonPixels(self.roi(), channel, zExpand)
+    def roiPixels(self, channel: int = 0, zExpand: int = 0):
+        return self.getPolygonPixels(self.roi(), channel, zExpand)
 
-    async def roiBgPixels(self, channel: int = 0, zExpand: int = 0):
-        return await self.getPolygonPixels(self.roiBg(), channel, zExpand)
+    def roiBgPixels(self, channel: int = 0, zExpand: int = 0):
+        return self.getPolygonPixels(self.roiBg(), channel, zExpand)
 
     @queryable(titles=[
         "Roi Channel 0 (sum)",
         "Roi Channel 0 (mean)",
     ], dependencies=["roi"])
-    async def _roiChannel0Stats(self):
-        stats = (await self.roiPixels(channel=0)).apply(getStats)
+    def _roiChannel0Stats(self):
+        stats = (self.roiPixels(channel=0)).apply(getStats)
         return list(zip(*stats))
 
     @queryable(titles=[
         "Roi Channel 1 (sum)",
         "Roi Channel 1 (mean)",
     ], dependencies=["roi"])
-    async def _roiChannel1Stats(self):
-        stats = (await self.roiPixels(channel=1)).apply(getStats)
+    def _roiChannel1Stats(self):
+        stats = (self.roiPixels(channel=1)).apply(getStats)
         return list(zip(*stats))
 
     @queryable(titles=[
         "Bg Roi Channel 0 (sum)",
         "Bg Roi Channel 0 (mean)",
     ], dependencies=["roiBg"])
-    async def _roiBgChannel0Stats(self):
-        stats = (await self.roiBgPixels(channel=0)).apply(getStats)
+    def _roiBgChannel0Stats(self):
+        stats = (self.roiBgPixels(channel=0)).apply(getStats)
         return list(zip(*stats))
 
     @queryable(titles=[
         "Bg Roi Channel 1 (sum)",
         "Bg Roi Channel 1 (mean)",
     ], dependencies=["roiBg"])
-    async def _roiBgChannel1Stats(self):
-        stats = (await self.roiBgPixels(channel=1)).apply(getStats)
+    def _roiBgChannel1Stats(self):
+        stats = (self.roiBgPixels(channel=1)).apply(getStats)
         return list(zip(*stats))
 
 
