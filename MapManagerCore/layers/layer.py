@@ -10,6 +10,7 @@ Color = Tuple[int, int, int, int]
 
 
 class DragState:
+    MANUAL = -1
     START = 0
     DRAGGING = 1
     END = 2

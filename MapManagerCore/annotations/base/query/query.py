@@ -11,6 +11,7 @@ from ....layers.utils import inRange
 from ....utils import filterMask
 from shapely.geometry import LineString
 import shapely
+import geopandas as gp
 
 
 class QueryAnnotations(AnnotationsBaseMut):
@@ -70,11 +71,11 @@ class QueryAnnotations(AnnotationsBaseMut):
 
     @queryable(title="x")
     def pointX(self):
-        return self._points["point"].x
+        return gp.GeoSeries(self._points["point"]).x
 
     @queryable(title="y")
     def pointY(self):
-        return self._points["point"].y
+        return gp.GeoSeries(self._points["point"]).y
 
     @queryable(title="z")
     def pointZ(self):
@@ -82,11 +83,11 @@ class QueryAnnotations(AnnotationsBaseMut):
 
     @queryable(title="Anchor X")
     def anchorX(self):
-        return self._points["anchor"].x
+        return gp.GeoSeries(self._points["anchor"]).x
 
     @queryable(title="Anchor Y")
     def anchorY(self):
-        return self._points["anchor"].y
+        return gp.GeoSeries(self._points["anchor"]).y
 
     @queryable(title="Anchor Z")
     def anchorY(self):
@@ -175,11 +176,11 @@ class QueryAnnotations(AnnotationsBaseMut):
         return self.roiBaseBg().union(self.roiHeadBg())
 
     # Should cache?
-    def roiPixels(self, channel: int = 0, zExpand: int = 0):
-        return self.getPolygonPixels(self.roi(), channel, zExpand)
+    def roiPixels(self, channel: int = 0, zSpread: int = 0):
+        return self.getShapePixels(self.roi(), channel, zSpread)
 
-    def roiBgPixels(self, channel: int = 0, zExpand: int = 0):
-        return self.getPolygonPixels(self.roiBg(), channel, zExpand)
+    def roiBgPixels(self, channel: int = 0, zSpread: int = 0):
+        return self.getShapePixels(self.roiBg(), channel, zSpread)
 
     @queryable(titles=[
         "Roi Channel 0 (sum)",

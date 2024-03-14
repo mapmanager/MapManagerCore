@@ -1,10 +1,12 @@
-from typing import List
+from typing import List, Union
 import numpy as np
 import pandas as pd
 from shapely import wkt
 import geopandas as gp
-from shapely.geometry import Polygon
+from shapely.geometry import Polygon, LineString
+from shapely import force_2d
 import skimage.draw
+
 
 def toGeoData(data: pd.DataFrame, geometryCols: List[str]):
     """
@@ -17,11 +19,11 @@ def toGeoData(data: pd.DataFrame, geometryCols: List[str]):
     Returns:
         gp.GeoDataFrame: The loaded CSV data as a geopandas GeoDataFrame.
     """
-    
+
     for column in geometryCols:
         data[column] = data[column].apply(wkt.loads)
     df = gp.GeoDataFrame(data, geometry=geometryCols[0])
-    
+
     for column in geometryCols:
         df[column] = gp.GeoSeries(df[column])
     return df
@@ -33,6 +35,11 @@ def filterMask(d, index_filter):
     return ~d.isin(index_filter)
 
 
-def polygonIndexes(d: Polygon):
-    x, y = zip(*d.exterior.coords)
-    return skimage.draw.polygon(x, y)
+def shapeIndexes(d: Union[Polygon, LineString]):
+    d = force_2d(d)
+    if isinstance(d, Polygon):
+        x, y = zip(*d.exterior.coords)
+        return skimage.draw.polygon(x, y)
+
+    x, y = zip(*d.coords)
+    return skimage.draw.line(int(x[0]), int(y[0]), int(x[1]), int(y[1]))

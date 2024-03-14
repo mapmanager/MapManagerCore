@@ -2,6 +2,7 @@ import pandas as pd
 from MapManagerCore.loader.base import ImageLoader, Loader
 from typing import Tuple, Union
 import numpy as np
+import zarr
 
 
 class MultiImageLoader(Loader):
@@ -63,10 +64,16 @@ class _MultiImageLoader(ImageLoader):
 
         """
         super().__init__()
-        self.images = images
+        self._images = images
+
+    def shape(self) -> Tuple[int, int, int, int, int]:
+        return self._images.shape
+    
+    def saveTo(self, group: zarr.Group):
+        group.create_dataset("images", data=self._images, dtype=self._images.dtype)
 
     def loadSlice(self, time: int, channel: int, slice: int) -> np.ndarray:
-        return self.images[time][channel][slice]
+        return self._images[time][channel][slice]
 
     def fetchSlices(self, time: int, channel: int, sliceRange: Tuple[int, int]) -> np.ndarray:
-        return np.max(self.images[time][channel][sliceRange[0]:sliceRange[1]], axis=0)
+        return np.max(self._images[time][channel][sliceRange[0]:sliceRange[1]], axis=0)

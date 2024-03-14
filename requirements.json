@@ -1,11 +1,12 @@
 {
-  "micropip": ["tifffile"],
+  "micropip": ["imagecodecs"],
   "loadPackage": [
     "numpy",
     "pandas",
     "scikit-image",
     "geopandas",
     "shapely",
-    "scikit-image"
+    "scikit-image",
+    "zarr"
   ]
 }

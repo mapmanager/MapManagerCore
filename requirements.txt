@@ -1,6 +1,7 @@
-tifffile
 numpy
 pandas
 scikit-image
 geopandas
 shapely
+imagecodecs
+zarr

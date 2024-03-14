@@ -1,9 +1,10 @@
 from functools import lru_cache
-from typing import Tuple, Union
+from typing import Self, Tuple, Union
 import numpy as np
 import pandas as pd
-from ..utils import polygonIndexes, toGeoData
+from ..utils import shapeIndexes, toGeoData
 import geopandas as gp
+import zarr
 
 
 class ImageLoader:
@@ -25,6 +26,33 @@ class ImageLoader:
         """
         ("implemented by subclass", time, channel, slice)
 
+    def dtype(self) -> np.dtype:
+        """
+        Returns the data type of the image data.
+
+        Returns:
+          np.dtype: The data type of the image data.
+        """
+        np.dtype("uint16")
+
+    def shape(self) -> Tuple[int, int, int, int, int]:
+        """
+        Returns the shape of the image data.
+
+        Returns:
+          Tuple[int, int, int, int, int]: The shape of the image data, (t,c,z,x,y).
+        """
+        ("implemented by subclass")
+
+    def saveTo(self, store: zarr.Group):
+        """
+        Saves the image data to a store.
+
+        Args:
+          store: The store to save the data to.
+        """
+        ("implemented by subclass")
+
     def fetchSlices(self, time: int, channel: int, sliceRange: Tuple[int, int]) -> np.ndarray:
         """
         Fetches a range of slices for the given time, channel, and slice range.
@@ -45,12 +73,13 @@ class ImageLoader:
 
         return np.max(sls, axis=0)
 
-    def cached(self, maxsize=15):
+    def cached(self, maxsize=15) -> Self:
         """
         Adds a cache to a subset of methods method.
         """
         cache = lru_cache(maxsize=maxsize)
         self.fetchSlices = cache(self.fetchSlices)
+        return self
 
     def get(self, time: int, channel: int, z: Union[Tuple[int, int], int, np.ndarray], x: Union[Tuple[int, int, np.ndarray], int], y: Union[Tuple[int, int], int, np.ndarray]) -> np.array:
         """
@@ -92,32 +121,32 @@ class ImageLoader:
 
         return slices[x[0]:x[1], y[0]:y[1]]
 
-    def getPolygons(self, polygons: gp.GeoDataFrame, zExpand: int = 0, channel: int = 0):
+    def getShapePixels(self, shape: gp.GeoDataFrame, zSpread: int = 0, channel: int = 0):
         """
-        Retrieve image slices corresponding to the given polygons.
+        Retrieve image slices corresponding to the given shape.
 
         Args:
-            polygons (gp.GeoDataFrame): GeoDataFrame containing the polygons under the column polygon, along with `z` and time `t`.
-            zExpand (int, optional): Number of slices to expand in the z-direction. Defaults to 0.
+            shape (gp.GeoDataFrame): GeoDataFrame containing the shape under the column polygon, along with `z` and time `t`.
+            zSpread (int, optional): Number of slices to expand in the z-direction. Defaults to 0.
             channel (int, optional): Channel index. Defaults to 0.
 
         Returns:
-            pd.Series: Series containing the image slices corresponding to the polygons.
+            pd.Series: Series containing the image slices corresponding to the shape.
         """
         results = []
         indexes = []
 
-        polygons["z"] = polygons["z"].astype(int)
+        shape["z"] = shape["z"].astype(int)
 
-        for (t, z), group in polygons.groupby(by=["t", "z"]):
-            if zExpand == 0:
+        for (t, z), group in shape.groupby(by=["t", "z"]):
+            if zSpread == 0:
                 image = self.loadSlice(t, channel, z)
             else:
                 image = self.fetchSlices(
-                    t, channel, (z - zExpand, z + zExpand + 1))
+                    t, channel, (z - zSpread, z + zSpread + 1))
 
             for idx, row in group.iterrows():
-                xs, ys = polygonIndexes(row["polygon"])
+                xs, ys = shapeIndexes(row["shape"])
                 xLim, yLim = image.shape
 
                 results.append(
@@ -126,26 +155,28 @@ class ImageLoader:
 
         return pd.Series(results, indexes)
 
-
 class Loader:
     def __init__(self, lineSegments: Union[str, pd.DataFrame], points: Union[str, pd.DataFrame]):
-        if isinstance(lineSegments, str):
-            lineSegments = pd.read_csv(
-                lineSegments, index_col="segmentID", dtype={'segmentID': str})
-        else:
-            lineSegments = lineSegments.set_index('segmentID', drop=True)
-            lineSegments["segmentID"] = lineSegments["segmentID"].astype(str)
+        if not isinstance(lineSegments, gp.GeoDataFrame):
+            if isinstance(lineSegments, pd.DataFrame):
+                lineSegments = lineSegments.set_index('segmentID', drop=True)
+                lineSegments["segmentID"] = lineSegments["segmentID"].astype(str)
+            else:
+                lineSegments = pd.read_csv(
+                    lineSegments, index_col="segmentID", dtype={'segmentID': str})
 
-        if isinstance(points, str):
-            points = pd.read_csv(points, index_col="spineID", dtype={
-                'spineID': str, 'segmentID': str})
-        else:
-            points = points.set_index('spineID', drop=True)
-            points["spineID"] = points["spineID"].astype(str)
-            points["segmentID"] = points["segmentID"].astype(str)
+            lineSegments = toGeoData(lineSegments, ['segment'])
 
-        lineSegments = toGeoData(lineSegments, ['segment'])
-        points = toGeoData(points, ['point', 'anchor'])
+        if not isinstance(points, gp.GeoDataFrame):
+            if isinstance(points, pd.DataFrame):
+                points = points.set_index('spineID', drop=True)
+                points["spineID"] = points["spineID"].astype(str)
+                points["segmentID"] = points["segmentID"].astype(str)
+            else:
+                points = pd.read_csv(points, index_col="spineID", dtype={
+                    'spineID': str, 'segmentID': str})
+
+            points = toGeoData(points, ['point', 'anchor'])
 
         lineSegments["modified"] = lineSegments["modified"].astype(
             'datetime64[ns]')
