@@ -1,2 +1,3 @@
-from .annotations.file_loader import MapAnnotations
-from .image.base import ArrayImageLoaderBuilder
+from .annotations import Annotations as MapAnnotations
+from .loader.imageio import MultiImageLoader
+from .loader.mmap import MMapLoader

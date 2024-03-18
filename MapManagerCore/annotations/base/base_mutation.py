@@ -2,6 +2,8 @@ from typing import Union
 import geopandas as gp
 import numpy as np
 import pandas as pd
+
+from MapManagerCore.loader.base import Loader
 from ..types import SpineId
 from ...log import Op, RecordLog
 from enum import Enum
@@ -16,8 +18,8 @@ class AnnotationType(Enum):
 class AnnotationsBaseMut(AnnotationsBase):
     _log: RecordLog[AnnotationType]
 
-    def __init__(self, loader: gp.GeoDataFrame, points: gp.GeoDataFrame, lineSegments: gp.GeoDataFrame):
-        super().__init__(loader, points, lineSegments)
+    def __init__(self, loader: Loader):
+        super().__init__(loader)
         self._log = RecordLog()
 
     #  TODO: create from log: withLog(self, loader: ImageLoader, log: RecordLog):
@@ -131,7 +133,7 @@ class AnnotationsBaseMut(AnnotationsBase):
         if diff.empty:
             if replaceLog:
                 return
-            
+
             diff = pd.DataFrame({
                 "before": value,
                 "after": value,
@@ -140,6 +142,5 @@ class AnnotationsBaseMut(AnnotationsBase):
             if diff.empty:
                 self._log.createState()
                 return
-
 
         self._log.push(Op(id, type, diff), replace=replaceLog)

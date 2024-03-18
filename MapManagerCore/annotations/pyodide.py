@@ -1,10 +1,7 @@
-from io import StringIO
+from io import BytesIO, StringIO
 from typing import Tuple
-import pandas as pd
-
-from ..image.pyodide import loadTiffsFromUrl
+from MapManagerCore.loader.imageio import MultiImageLoader
 from .types import AnnotationsOptions, ImageSlice
-from ..utils import toGeoData
 from .base import Annotations
 from pyodide.http import pyfetch
 from pyodide.ffi import to_js
@@ -15,9 +12,15 @@ class PyodideAnnotations(Annotations):
     """
 
     async def load(url: str):
-        lineSegments = await loadGeoCsv(url + "/line_segments.csv", ['segment'], index_col="segmentID", dtype={'segmentID': str})
-        points = await loadGeoCsv(url + "/points.csv", ['point', 'anchor'], index_col="spineID", dtype={'spineID': str, 'segmentID': str})
-        loader = await loadTiffsFromUrl([[[url + "/t0/ch0.tif.br", url + "/t0/ch1.tif.br"]]])
+        lineSegments = await loadGeoCsv(url + "/line_segments.csv")
+        points = await loadGeoCsv(url + "/points.csv")
+
+        loader = MultiImageLoader(lineSegments=lineSegments, points=points)
+        loader.read(await fetchBytes(url + "/t0/ch0.tif.br"), channel=0, time=0)
+        loader.read(await fetchBytes(url + "/t0/ch1.tif.br"), channel=0, time=0)
+
+        # TODO: Create a concurrent async Loader (subclass imageio's loader).
+
         return PyodideAnnotations(loader, lineSegments, points)
 
     def getAnnotations_js(self, options: AnnotationsOptions):
@@ -28,7 +31,7 @@ class PyodideAnnotations(Annotations):
         layers = self.getAnnotations(options)
         return [layer.encodeBin() for layer in layers]
 
-    async def slices_js(self, time: int, channel: int, zRange: Tuple[int, int]) -> ImageSlice:
+    def slices_js(self, time: int, channel: int, zRange: Tuple[int, int]) -> ImageSlice:
         """
         Loads the image data for a slice.
 
@@ -53,5 +56,9 @@ class PyodideAnnotations(Annotations):
 async def loadGeoCsv(path, geometryCols, index_col=None, dtype=None):
     response = await pyfetch(path)
     csv_text = await response.text()
-    csv_text_io = StringIO(csv_text)
-    return toGeoData(pd.read_csv(csv_text_io, index_col=index_col, dtype=dtype), geometryCols)
+    return StringIO(csv_text)
+
+
+async def fetchBytes(url: str):
+    response = await pyfetch(url)
+    return BytesIO(await response.memoryview())

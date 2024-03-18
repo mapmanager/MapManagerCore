@@ -12,16 +12,12 @@ class Query:
     def __init__(self, title: str, func: Callable[[], pd.Series], categorical: bool = False, idx: int = None):
         self.title = title
         self.categorical = categorical
-        self.isAsync = inspect.iscoroutinefunction(func)
         self.func = func
         self.idx = idx
 
     @timer
-    async def runWith(self, annotations, insureCached=False) -> pd.Series:
-        if self.isAsync:
-            result = await self.func(annotations, insureCached=insureCached)
-        else:
-            result = self.func(annotations, insureCached=insureCached)
+    def runWith(self, annotations, insureCached=False) -> pd.Series:
+        result = self.func(annotations, insureCached=insureCached)
 
         if insureCached:
             return
@@ -48,73 +44,39 @@ def queryable(title: str = None, titles: List[str] = None, categorical: bool = F
         key = func.__name__
         depKey = key + ".deps"
         modKey = key + ".m"
-        isAsync = inspect.iscoroutinefunction(func)
 
         if dependencies is not None or segmentDependencies is not None:
             deps = dependencies or []
-            if isAsync:
-                async def callCached(self, insureCached=False):
-                    # Look for changes using the mod date (fast)
-                    [newModDate, invalid] = _invalidEntriesModDate(
-                        self, modKey, segmentDependencies)
+            def callCached(self, insureCached=False):
+                # Look for changes using the mod date (fast)
+                [newModDate, invalid] = _invalidEntriesModDate(
+                    self, modKey, segmentDependencies)
 
-                    # Fall back to comparing hashes (slow)
+                # Fall back to comparing hashes (slow)
+                if newModDate is not None:
+                    # insure dependencies are computed
+                    for dep in deps:
+                        if dep in QUERIES_MAP:
+                            QUERIES_MAP[dep].func(self, insureCached=True)
+
+                    [missing, newHashes] = _withInvalidEntriesHash(self,
+                                                                    depKey, invalid, deps, segmentDependencies)
+
+                    missingIndex = newHashes.index
+
+                    if missing is not None:
+                        # compute missing values
+                        results = func(missing)
+                        _updateMissingValues(
+                            self, key, titles, results, missingIndex, depKey, newHashes)
+
                     if newModDate is not None:
-                        # insure dependencies are computed
-                        for dep in deps:
-                            if dep in QUERIES_MAP:
-                                await QUERIES_MAP[dep].runWith(self, insureCached=True)
+                        self._points.loc[missingIndex, modKey] = newModDate
 
-                        [missing, newHashes] = _withInvalidEntriesHash(
-                            self, depKey, invalid, deps, segmentDependencies)
+                if insureCached:
+                    return
 
-                        missingIndex = newHashes.index
-
-                        if missing is not None:
-                            # compute missing values
-                            results = await func(missing)
-
-                            _updateMissingValues(
-                                self, key, titles, results, missingIndex, depKey, newHashes)
-
-                        if newModDate is not None:
-                            self._points.loc[missingIndex, modKey] = newModDate
-
-                    if insureCached:
-                        return
-
-                    return _getResults(self, key, titles)
-            else:
-                def callCached(self, insureCached=False):
-                    # Look for changes using the mod date (fast)
-                    [newModDate, invalid] = _invalidEntriesModDate(
-                        self, modKey, segmentDependencies)
-
-                    # Fall back to comparing hashes (slow)
-                    if newModDate is not None:
-                        # insure dependencies are computed
-                        for dep in deps:
-                            if dep in QUERIES_MAP:
-                                QUERIES_MAP[dep].func(self, insureCached=True)
-
-                        [missing, newHashes] = _withInvalidEntriesHash(self,
-                                                                       depKey, invalid, deps, segmentDependencies)
-
-                        missingIndex = newHashes.index
-
-                        if missing is not None:
-                            # compute missing values
-                            results = func(missing)
-                            _updateMissingValues(
-                                self, key, titles, results, missingIndex, depKey, newHashes)
-
-                        if newModDate is not None:
-                            self._points.loc[missingIndex, modKey] = newModDate
-
-                    if insureCached:
-                        return
-
-                    return _getResults(self, key, titles)
+                return _getResults(self, key, titles)
 
             finalFunc = callCached
         else:
@@ -139,6 +101,7 @@ def queryable(title: str = None, titles: List[str] = None, categorical: bool = F
         return finalFunc
     return wrapper
 
+
 @timer
 def _updateMissingValues(self, key, titles, results, missingIndex, depKey, newHashes):
     if titles is not None:
@@ -147,6 +110,7 @@ def _updateMissingValues(self, key, titles, results, missingIndex, depKey, newHa
     else:
         self._points.loc[missingIndex, key] = results
     self._points.loc[missingIndex, depKey] = newHashes
+
 
 @timer
 def _getResults(self, key, titles):
@@ -157,6 +121,7 @@ def _getResults(self, key, titles):
         return results
 
     return self._points[key]
+
 
 @timer
 def _invalidEntriesModDate(self, modKey: str, segmentDependencies: List[str] = None):
@@ -179,11 +144,12 @@ def _invalidEntriesModDate(self, modKey: str, segmentDependencies: List[str] = N
 @timer
 def _withInvalidEntriesHash(self, depKey: str, invalid, dependencies: List[str], segmentDependencies: List[str] = None):
     # check for changes using the hash of the dependencies
-    if invalid is not None:
-        df = df[invalid]
 
     df = self._points.loc[:, self._points.columns.intersection(
         dependencies).union(["segmentID"])]
+
+    if invalid is not None:
+        df = df[invalid]
 
     if segmentDependencies is not None:
         segmentsHash = hash_pandas_object(
@@ -196,7 +162,7 @@ def _withInvalidEntriesHash(self, depKey: str, invalid, dependencies: List[str],
         hash = hash[invalid]
 
     if hash.shape[0] == 0:
-        return [None, None]
+        return [None, hash]
 
     # create a copy of the annotations that needs to be updated
     selfCopy = copy(self)

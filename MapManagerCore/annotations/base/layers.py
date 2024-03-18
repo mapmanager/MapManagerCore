@@ -210,6 +210,7 @@ class AnnotationsLayers(AnnotationsInteractions):
         segment = (LineLayer(self._lineSegments["segment"])
                    .id("segment")
                    .clipZ(zRange)
+                   .on("select", "segmentID")
                    .on("edit", "segmentIDEditing")
                    .stroke(lambda id: COLORS["segmentSelected"] if id == selectedSegId else (COLORS["segmentEditing"] if id == editSegId else COLORS["segment"])))
 
