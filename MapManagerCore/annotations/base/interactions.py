@@ -1,31 +1,48 @@
 from typing import Union
+import numpy as np
 from shapely.geometry import Point
 from ...layers.layer import DragState
 from .query import QueryAnnotations
 from ...layers.utils import roundPoint
 from itertools import count
+from shapely.geometry import LineString
 
 
 class AnnotationsInteractions(QueryAnnotations):
-
-    def nearestAnchor(self, segmentID: str, point: Point, brightestPath=False):
+    def nearestAnchor(self, segmentID: str, point: Point, brightestPathDistance: int = None, channel: int = 0, zSpread: int = 0):
         """
         Finds the nearest anchor point on a given line segment to a given point.
 
         Args:
             segmentID (str): The ID of the line segment.
             point (Point): The point to find the nearest anchor to.
-            brightestPath (bool, optional): Flag indicating whether to find the brightest path should be used. Defaults to False.
+            brightestPathDistance (int): The distance to search for the brightest path. Defaults to None.
+            channel (int): The channel. Defaults to 0.
+            zSpread (int): The z spread. Defaults to 0.
 
         Returns:
             Point: The nearest anchor point.
         """
-        segment = self._lineSegments.loc[segmentID, "segment"]
-        anchor = segment.interpolate(segment.project(point))
+        segment: LineString = self._lineSegments.loc[segmentID, "segment"]
+        minProjection = segment.project(point)
+
+        if brightestPathDistance:
+            segmentLength = int(segment.length)
+            minProjection = int(minProjection)
+            range_ = range(
+                max(minProjection-brightestPathDistance, 0),
+                min(minProjection +
+                    brightestPathDistance + 1, segmentLength))
+
+            targets = [LineString([point, roundPoint(segment.interpolate(
+                minProjection + distance), 1)]) for distance in range_]
+
+            brightest = self.getShapePixels(
+                targets, channel=channel, zSpread=zSpread).apply(np.sum).idxmax()
+            return Point(targets[brightest].coords[1])
+
+        anchor = segment.interpolate(minProjection)
         anchor = roundPoint(anchor, 1)
-
-        # TODO: find brightest path, needs to be async
-
         return anchor
 
     def addSpine(self, segmentId: str, x: int, y: int, z: int) -> Union[str, None]:
@@ -68,7 +85,7 @@ class AnnotationsInteractions(QueryAnnotations):
             if uid not in self._points.index:
                 return uid
 
-    def moveSpine(self, spineId: str, x: int, y: int, z: int, state: DragState = DragState.START) -> bool:
+    def moveSpine(self, spineId: str, x: int, y: int, z: int, state: DragState = DragState.MANUAL) -> bool:
         """
         Moves the spine identified by `spineId` to the given `x` and `y` coordinates.
 
@@ -83,11 +100,11 @@ class AnnotationsInteractions(QueryAnnotations):
         self.updateSpine(spineId, {
             "point": Point(x, y),
             "z": z,
-        }, state != DragState.START)
+        }, state != DragState.START and state != DragState.MANUAL)
 
         return True
 
-    def moveAnchor(self, spineId: str, x: int, y: int, z: int, state: DragState = DragState.START) -> bool:
+    def moveAnchor(self, spineId: str, x: int, y: int, z: int, state: DragState = DragState.MANUAL) -> bool:
         """
         Moves the anchor point of a spine to the given x and y coordinates.
 
@@ -106,13 +123,13 @@ class AnnotationsInteractions(QueryAnnotations):
         self.updateSpine(spineId, {
             "anchorZ": anchor.z,
             "anchor": Point(anchor.x, anchor.y),
-        }, state != DragState.START)
+        }, state != DragState.START and state != DragState.MANUAL)
 
         return True
 
     pendingBackgroundRoiTranslation = None
 
-    def translateBackgroundRoi(self, spineId: str, x: int, y: int, z: int, state: DragState = DragState.START) -> bool:
+    def moveBackgroundRoi(self, spineId: str, x: int, y: int, z: int = 0, state: DragState = DragState.MANUAL) -> bool:
         """
         Translates the background ROI for a given spine ID by the specified x and y offsets.
 
@@ -125,6 +142,13 @@ class AnnotationsInteractions(QueryAnnotations):
         Returns:
             bool: True if the background ROI was successfully translated, False otherwise.
         """
+        if state == DragState.MANUAL:
+            self.updateSpine(spineId, {
+                "xBackgroundOffset": x,
+                "yBackgroundOffset": y,
+            })
+            return True
+
         point = self._points.loc[spineId]
 
         if self.pendingBackgroundRoiTranslation is None or state == DragState.START:
@@ -133,7 +157,7 @@ class AnnotationsInteractions(QueryAnnotations):
         self.updateSpine(spineId, {
             "xBackgroundOffset": point["xBackgroundOffset"] + x - self.pendingBackgroundRoiTranslation[0],
             "yBackgroundOffset": point["yBackgroundOffset"] + y - self.pendingBackgroundRoiTranslation[1],
-        }, state != DragState.START)
+        }, state != DragState.START and state != DragState.MANUAL)
 
         self.pendingBackgroundRoiTranslation = [x, y]
 
@@ -142,7 +166,7 @@ class AnnotationsInteractions(QueryAnnotations):
 
         return True
 
-    def moveRoiExtend(self, spineId: str, x: int, y: int, z: int, state: DragState = DragState.START) -> bool:
+    def moveRoiExtend(self, spineId: str, x: int, y: int, z: int = 0, state: DragState = DragState.MANUAL) -> bool:
         """
         Move the ROI extend for a given spine ID.
 
@@ -160,11 +184,11 @@ class AnnotationsInteractions(QueryAnnotations):
 
         self.updateSpine(spineId, {
             "roiExtend": point.distance(Point(x, y))
-        }, state != DragState.START)
+        }, state != DragState.START and state != DragState.MANUAL)
 
         return True
 
-    def moveSegmentRadius(self, segmentId: str, x: int, y: int, z: int, state: DragState = DragState.START) -> bool:
+    def moveSegmentRadius(self, segmentId: str, x: int, y: int, z: int = 0, state: DragState = DragState.MANUAL) -> bool:
         """
         Move the Radius of a segment by the given x and y coordinates.
 
@@ -181,6 +205,6 @@ class AnnotationsInteractions(QueryAnnotations):
         anchor = self.nearestAnchor(segmentId, Point(x, y), True)
         self.updateSegment(segmentId, {
             "radius": Point(anchor.x, anchor.y).distance(Point(x, y))
-        }, state != DragState.START)
+        }, state != DragState.START and state != DragState.MANUAL)
 
         return True

@@ -10,6 +10,7 @@ Color = Tuple[int, int, int, int]
 
 
 class DragState:
+    MANUAL = -1
     START = 0
     DRAGGING = 1
     END = 2
@@ -105,6 +106,10 @@ class Layer:
     def normalize(self) -> Self:
         self.series = gp.GeoSeries(self.series)
         return self
+    
+    def coordinates(self) -> Tuple[pd.DataFrame, dict]:
+        normalize = self.normalize()
+        return [normalize.series.get_coordinates(), normalize.properties]
     
     @timer
     def translate(self, translate: gp.GeoSeries = None) -> Self:
