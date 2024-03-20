@@ -43,6 +43,15 @@ class ImageLoader:
           Tuple[int, int, int, int, int]: The shape of the image data, (t,c,z,x,y).
         """
         ("implemented by subclass")
+        
+    def channels(self) -> int:
+        """
+        Returns the number of channels in the image data.
+
+        Returns:
+          int: The number of channels in the image data.
+        """
+        return self.shape()[1]
 
     def saveTo(self, store: zarr.Group):
         """
