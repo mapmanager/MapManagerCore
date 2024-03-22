@@ -1,6 +1,9 @@
-from typing import TypedDict, Tuple, Union
+from typing import Self, TypedDict, Tuple, Union
+import numpy as np
+from shapely.geometry import LineString, Point
 
 Color = Union[Tuple[int, int, int], Tuple[int, int, int, int]]
+
 
 class Colors(TypedDict):
     selectedSpine: Color
@@ -65,3 +68,35 @@ CONFIG: Config = {
 }
 
 COLORS = CONFIG["colors"]
+
+
+class LineSegment(TypedDict):
+    segmentID: str
+    segment: LineString
+    radius: int
+    modified: np.datetime64
+
+    def defaults() -> Self:
+        return {
+            "radius": 4.0,
+        }
+
+
+class Spine(TypedDict):
+    spineID: str
+    segmentID: str
+    point: Point
+    anchor: Point
+    xBackgroundOffset: float
+    yBackgroundOffset: float
+    z: int
+    anchorZ: int
+    roiExtend: float
+    roiRadius: float
+    modified: np.datetime64
+
+    def defaults() -> Self:
+        return {
+            "roiExtend": 4.0,
+            "roiRadius": 4.0
+        }

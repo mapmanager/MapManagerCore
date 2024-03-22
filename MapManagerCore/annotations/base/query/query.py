@@ -1,10 +1,8 @@
 from copy import copy
 import numpy as np
 import pandas as pd
-from typing import List
-from ....benchmark import timeAll
 from ....layers.line import calcSubLine, extend
-from .utils import PLOT_ABLE_QUERIES, QUERIES, Query, queryable
+from .utils import QueryableInterface, queryable
 from ..base_mutation import AnnotationsBaseMut
 from ...types import AnnotationsOptions
 from ....layers.utils import inRange
@@ -14,7 +12,7 @@ import shapely
 import geopandas as gp
 
 
-class QueryAnnotations(AnnotationsBaseMut):
+class QueryAnnotations(AnnotationsBaseMut, QueryableInterface):
     def getSegmentsAndSpines(self, options: AnnotationsOptions):
         z_range = options['selection']['z']
         index_filter = options["filters"]
@@ -39,27 +37,11 @@ class QueryAnnotations(AnnotationsBaseMut):
         filtered._points = filtered._points[index]
         return filtered
 
-    # ?
     def __getitem__(self, key):
         return self._points[key]
 
     def getSpinePosition(self, t: int, spineID: str):
         return list(self._points.loc[spineID, "point"].coords)[0]
-
-    def queries(self) -> List[Query]:
-        return PLOT_ABLE_QUERIES
-
-    def runQuery(self, query: Query) -> pd.Series:
-        return query.runWith(self)
-
-    @timeAll
-    def table(self, queries: List[Query] = PLOT_ABLE_QUERIES) -> pd.DataFrame:
-        return pd.DataFrame({
-            query.getTitle(): query.runWith(self) for query in queries
-        })
-
-    def dataFrame(self, queries: List[Query] = QUERIES) -> pd.DataFrame:
-        return self.table(queries)
 
     @queryable(title="Spine ID", categorical=True)
     def spineID(self):
@@ -175,45 +157,22 @@ class QueryAnnotations(AnnotationsBaseMut):
     def roiBg(self):
         return self.roiBaseBg().union(self.roiHeadBg())
 
-    # Should cache?
-    def roiPixels(self, channel: int = 0, zSpread: int = 0):
-        return self.getShapePixels(self.roi(), channel, zSpread)
+    def imageStats(self, shapes: gp.GeoSeries, channel: int = 0, zSpread: int = 0):
+        images = self.getShapePixels(shapes, channel, zSpread)
+        images = images.explode().astype(np.uint64)
+        images = images.groupby(level=0)
+        return images.aggregate(['sum', 'max'])
 
-    def roiBgPixels(self, channel: int = 0, zSpread: int = 0):
-        return self.getShapePixels(self.roiBg(), channel, zSpread)
+    def allChannelImageStats(self, shapes: gp.GeoSeries, zSpread: int = 0):
+        channels = self.images.channels()
+        return pd.concat([
+            self.imageStats(shapes, channel=channel, zSpread=zSpread).add_prefix(f"Channel {channel + 1} ") for channel in range(0, channels)
+        ], axis=1)
 
-    @queryable(titles=[
-        "Roi Channel 0 (sum)",
-        "Roi Channel 0 (mean)",
-    ], dependencies=["roi"])
-    def _roiChannel0Stats(self):
-        stats = (self.roiPixels(channel=0)).apply(getStats)
-        return list(zip(*stats))
+    @queryable(title="Roi", dependencies=["roi"])
+    def _roiStats(self):
+        return self.allChannelImageStats(self.roi())
 
-    @queryable(titles=[
-        "Roi Channel 1 (sum)",
-        "Roi Channel 1 (mean)",
-    ], dependencies=["roi"])
-    def _roiChannel1Stats(self):
-        stats = (self.roiPixels(channel=1)).apply(getStats)
-        return list(zip(*stats))
-
-    @queryable(titles=[
-        "Bg Roi Channel 0 (sum)",
-        "Bg Roi Channel 0 (mean)",
-    ], dependencies=["roiBg"])
-    def _roiBgChannel0Stats(self):
-        stats = (self.roiBgPixels(channel=0)).apply(getStats)
-        return list(zip(*stats))
-
-    @queryable(titles=[
-        "Bg Roi Channel 1 (sum)",
-        "Bg Roi Channel 1 (mean)",
-    ], dependencies=["roiBg"])
-    def _roiBgChannel1Stats(self):
-        stats = (self.roiBgPixels(channel=1)).apply(getStats)
-        return list(zip(*stats))
-
-
-def getStats(img):
-    return (np.sum(img), np.mean(img))
+    @queryable(title="Background Roi", dependencies=["roi"])
+    def _bgRoiStats(self):
+        return self.allChannelImageStats(self.roiBg())

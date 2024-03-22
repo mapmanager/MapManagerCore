@@ -1,26 +1,75 @@
 from __future__ import annotations
+import datetime
 from enum import Enum
 from typing import Generic, List, Union, TypeVar
+import numpy as np
 import pandas as pd
+import geopandas as gp
 
 T = TypeVar('T')
 
+
 class Op(Generic[T]):
     type: T
-    diff: pd.DataFrame
-    id: str
+    deleted: pd.DataFrame
+    added: pd.DataFrame
+    changed: pd.DataFrame
 
-    def __init__(self, id: str, type: T, diff: pd.DataFrame):
+    def __init__(self, type: T, before: gp.GeoDataFrame, after: gp.GeoDataFrame):
         self.type = type
-        self.diff = diff
-        self.id = id
+        commonIndexes = before.index.intersection(after.index)
+
+        self.changed = gp.GeoDataFrame(before.loc[commonIndexes]).compare(
+            gp.GeoDataFrame(after.loc[commonIndexes]), result_names=("before", "after"))
+
+        self.deleted = before.loc[before.index.difference(
+            commonIndexes).values]
+        self.added = after.loc[after.index.difference(commonIndexes).values]
+
+    def isEmpty(self) -> bool:
+        return self.deleted.empty and self.added.empty and self.changed.empty
 
     def update(self, operation: Op) -> bool:
-        if self.type != operation.type or self.id != operation.id:
+        if self.type != operation.type:
             return False
-        for key, val in operation.diff["after"].items():
-            self.diff["after"][key] = val
+        if self.changed.index != operation.changed.index:
+            return False
+        if self.deleted.index != operation.deleted.index:
+            return False
+        if self.added.index != operation.added.index:
+            return False
+
+        for key, state in operation.changed.columns.values:
+            if state == "after":
+                self.changed.loc[operation.changed.index, (key, "after")] = operation.changed[(key, "after")]
+
         return True
+
+    def reverse(self, df: gp.GeoDataFrame):
+        df.drop(self.added.index, inplace=True)
+        for key, operation in self.changed.columns:
+            if operation == "before":
+                df.loc[self.changed.index, key] = self.changed[(key, "before")]
+
+        for key, values in self.deleted.iterrows():
+            df.loc[key] = values
+
+        now = np.datetime64(datetime.datetime.now())
+        df.loc[self.changed.index.union(self.deleted.index).values,
+               "modified"] = now
+
+    def apply(self, df: gp.GeoDataFrame):
+        df.drop(self.deleted.index, inplace=True)
+        for key, operation in self.changed.columns.values:
+            if operation == "after":
+                df.loc[self.changed.index, key] = self.changed[(key, "after")]
+
+        for key, values in self.added.iterrows():
+            df.loc[key] = values
+
+        now = np.datetime64(datetime.datetime.now())
+        df.loc[self.changed.index.union(self.added.index).values,
+               "modified"] = now
 
 
 class RecordLog(Generic[T]):

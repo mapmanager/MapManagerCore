@@ -10,7 +10,7 @@ class MultiImageLoader(Loader):
     Class for building an MultiImageLoader.
     """
 
-    def __init__(self, lineSegments: Union[str, pd.DataFrame], points: Union[str, pd.DataFrame]):
+    def __init__(self, lineSegments: Union[str, pd.DataFrame] = pd.DataFrame(), points: Union[str, pd.DataFrame] = pd.DataFrame()):
         super().__init__(lineSegments, points)
         self._images = []
 
@@ -68,9 +68,10 @@ class _MultiImageLoader(ImageLoader):
 
     def shape(self) -> Tuple[int, int, int, int, int]:
         return self._images.shape
-    
+
     def saveTo(self, group: zarr.Group):
-        group.create_dataset("images", data=self._images, dtype=self._images.dtype)
+        group.create_dataset("images", data=self._images,
+                             dtype=self._images.dtype)
 
     def loadSlice(self, time: int, channel: int, slice: int) -> np.ndarray:
         return self._images[time][channel][slice]

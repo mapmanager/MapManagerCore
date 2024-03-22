@@ -66,7 +66,7 @@ class AnnotationsBase:
             return r.iloc[0]
         return r
 
-    def save(self, path: str, compression: zipfile.ZIP_STORED = 0):
+    def save(self, path: str, compression=zipfile.ZIP_STORED):
         if not path.endswith(".mmap"):
             raise ValueError(
                 "Invalid file format. Please provide a path ending with '.mmap'.")
