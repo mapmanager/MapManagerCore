@@ -15,7 +15,8 @@ install_requires = [
     'pandas',
     'shapely',
     'geopandas',
-    'scikit-image'
+    'scikit-image',
+    'zarr'
 ]
 
 testRequirements = [

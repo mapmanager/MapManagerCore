@@ -3,7 +3,7 @@ import geopandas as gp
 import numpy as np
 import pandas as pd
 
-from MapManagerCore.loader.base import Loader
+from mapmanagercore.loader.base import Loader
 from ..types import SpineId
 from ...log import Op, RecordLog
 from enum import Enum

@@ -5,7 +5,6 @@ import pandas as pd
 
 T = TypeVar('T')
 
-
 class Op(Generic[T]):
     type: T
     diff: pd.DataFrame
