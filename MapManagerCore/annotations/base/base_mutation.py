@@ -1,3 +1,4 @@
+import datetime
 from typing import Union
 import geopandas as gp
 import numpy as np
@@ -104,7 +105,7 @@ class AnnotationsBaseMut(AnnotationsBase):
             df.loc[id, value.index] = value
 
         op = Op(type, old, df.loc[ids])
-        df.loc[ids, "modified"] = np.datetime64("now")
+        df.loc[ids, "modified"] = np.datetime64(datetime.datetime.now())
 
         if skipLog:
             return

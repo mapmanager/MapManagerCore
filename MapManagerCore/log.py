@@ -1,4 +1,5 @@
 from __future__ import annotations
+import datetime
 from enum import Enum
 from typing import Generic, List, Union, TypeVar
 import numpy as np
@@ -53,7 +54,7 @@ class Op(Generic[T]):
         for key, values in self.deleted.iterrows():
             df.loc[key] = values
 
-        now = np.datetime64("now")
+        now = np.datetime64(datetime.datetime.now())
         df.loc[self.changed.index.union(self.deleted.index).values,
                "modified"] = now
 
@@ -66,7 +67,7 @@ class Op(Generic[T]):
         for key, values in self.added.iterrows():
             df.loc[key] = values
 
-        now = np.datetime64("now")
+        now = np.datetime64(datetime.datetime.now())
         df.loc[self.changed.index.union(self.added.index).values,
                "modified"] = now
 
