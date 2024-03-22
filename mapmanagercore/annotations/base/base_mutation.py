@@ -4,18 +4,17 @@ import geopandas as gp
 import numpy as np
 import pandas as pd
 
-from MapManagerCore.config import LineSegment, Spine
-from MapManagerCore.loader.base import Loader
-from MapManagerCore.utils import validateColumns
+from mapmanagercore.config import LineSegment, Spine
+from mapmanagercore.loader.base import Loader
+from mapmanagercore.utils import validateColumns
+from ..types import SpineId
 from ...log import Op, RecordLog
 from enum import Enum
 from .base import AnnotationsBase
 
-
 class AnnotationType(Enum):
     Point = 1
     LineSegment = 2
-
 
 class AnnotationsBaseMut(AnnotationsBase):
     _log: RecordLog[AnnotationType]

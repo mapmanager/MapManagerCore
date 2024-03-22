@@ -3,7 +3,7 @@ from typing import Self, Tuple, Union
 import numpy as np
 import pandas as pd
 
-from MapManagerCore.config import LineSegment, Spine
+from mapmanagercore.config import LineSegment, Spine
 from ..utils import shapeIndexes
 import geopandas as gp
 import zarr

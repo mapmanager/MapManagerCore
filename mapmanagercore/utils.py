@@ -4,8 +4,7 @@ from shapely.geometry import Polygon, LineString
 from shapely import force_2d
 import skimage.draw
 
-from MapManagerCore.config import LineSegment, Spine
-
+from mapmanagercore.config import LineSegment, Spine
 
 def filterMask(d, index_filter):
     if index_filter == None or len(index_filter) == 0:

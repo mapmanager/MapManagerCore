@@ -1,5 +1,5 @@
 import pandas as pd
-from MapManagerCore.loader.base import ImageLoader, Loader
+from mapmanagercore.loader.base import ImageLoader, Loader
 from typing import Tuple, Union
 import numpy as np
 import zarr

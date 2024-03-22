@@ -1,6 +1,6 @@
 from io import BytesIO, StringIO
 from typing import Tuple
-from MapManagerCore.loader.imageio import MultiImageLoader
+from mapmanagercore.loader.imageio import MultiImageLoader
 from .types import AnnotationsOptions, ImageSlice
 from .base import Annotations
 from pyodide.http import pyfetch

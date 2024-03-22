@@ -2,7 +2,7 @@ from typing import Union
 import numpy as np
 from shapely.geometry import Point
 
-from MapManagerCore.config import Spine
+from mapmanagercore.config import Spine
 from ...layers.layer import DragState
 from .query import QueryAnnotations
 from ...layers.utils import roundPoint
