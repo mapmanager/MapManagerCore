@@ -1,4 +1,4 @@
-from typing import TypedDict, Tuple, Union
+from typing import Self, TypedDict, Tuple, Union
 import numpy as np
 from shapely.geometry import LineString, Point
 
@@ -76,6 +76,11 @@ class LineSegment(TypedDict):
     radius: int
     modified: np.datetime64
 
+    def defaults() -> Self:
+        return {
+            "radius": 4.0,
+        }
+
 
 class Spine(TypedDict):
     spineID: str
@@ -89,3 +94,9 @@ class Spine(TypedDict):
     roiExtend: float
     roiRadius: float
     modified: np.datetime64
+
+    def defaults() -> Self:
+        return {
+            "roiExtend": 4.0,
+            "roiRadius": 4.0
+        }

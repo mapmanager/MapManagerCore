@@ -1,6 +1,8 @@
 from typing import Union
 import numpy as np
 from shapely.geometry import Point
+
+from MapManagerCore.config import Spine
 from ...layers.layer import DragState
 from .query import QueryAnnotations
 from ...layers.utils import roundPoint
@@ -59,6 +61,7 @@ class AnnotationsInteractions(QueryAnnotations):
         spineId = self.newUnassignedSpineId()
 
         self.updateSpine(spineId, {
+            **Spine.defaults(),
             "segmentID": segmentId,
             "point": Point(point.x, point.y),
             "z": int(z),
@@ -66,8 +69,6 @@ class AnnotationsInteractions(QueryAnnotations):
             "anchorZ": int(anchor.z),
             "xBackgroundOffset": 0.0,
             "yBackgroundOffset": 0.0,
-            "roiExtend": 4.0,
-            "roiRadius": 4.0
         })
 
         return spineId
