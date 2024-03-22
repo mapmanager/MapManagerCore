@@ -3,10 +3,9 @@ import geopandas as gp
 import numpy as np
 import pandas as pd
 
-from MapManagerCore.config import LINE_SEGMENT_COLUMNS, SPINE_COLUMNS
+from MapManagerCore.config import LineSegment, Spine
 from MapManagerCore.loader.base import Loader
 from MapManagerCore.utils import validateColumns
-from ..types import SpineId
 from ...log import Op, RecordLog
 from enum import Enum
 from .base import AnnotationsBase
@@ -34,7 +33,7 @@ class AnnotationsBaseMut(AnnotationsBase):
         if op is None:
             return
 
-        self._update(op.type, op.id, op.diff["before"], skipLog=True)
+        op.reverse(self._getDf(op.type))
 
     def redo(self):
         """
@@ -44,7 +43,7 @@ class AnnotationsBaseMut(AnnotationsBase):
         if op is None:
             return
 
-        self._update(op.type, op.id, op.diff["after"], skipLog=True)
+        op.apply(self._getDf(op.type))
 
     def _getDf(self, type: AnnotationType) -> gp.GeoDataFrame:
         return {
@@ -52,13 +51,13 @@ class AnnotationsBaseMut(AnnotationsBase):
             AnnotationType.LineSegment: self._lineSegments
         }[type]
 
-    def deleteSpine(self, spineId: SpineId, skipLog=False) -> None:
+    def deleteSpine(self, spineId: Union[str, list[str]], skipLog=False) -> None:
         self._delete(AnnotationType.Point, spineId, skipLog=skipLog)
 
-    def deleteSegment(self, segmentId: str, skipLog=False) -> None:
+    def deleteSegment(self, segmentId: Union[str, list[str]], skipLog=False) -> None:
         self._delete(AnnotationType.LineSegment, segmentId, skipLog=skipLog)
 
-    def _delete(self, type: AnnotationType, id: SpineId, skipLog=False) -> None:
+    def _delete(self, type: AnnotationType, id: Union[str, list[str]], skipLog=False) -> None:
         """
         Deletes a spine or segment.
 
@@ -66,15 +65,14 @@ class AnnotationsBaseMut(AnnotationsBase):
           Id (str): The ID of the spine or segment.
         """
         df = self._getDf(type)
+        id = [id] if isinstance(id, str) else id
         if not skipLog:
-            self._log.push(Op(id, type, pd.DataFrame({
-                "before": df.loc[id].copy(),
-                "after": pd.Series()
-            })))
+            self._log.push(
+                Op(type, df.loc[id], gp.GeoDataFrame(columns=df.columns)))
 
         df.drop(id, inplace=True)
 
-    def updateSpine(self, spineId: str, value: dict, replaceLog=False, skipLog=False):
+    def updateSpine(self, spineId: Union[str, list[str]], value: Spine, replaceLog=False, skipLog=False):
         """
         Set the spine with the given ID to the specified value.
 
@@ -82,10 +80,10 @@ class AnnotationsBaseMut(AnnotationsBase):
             spineId (str): The ID of the spine.
             value (Union[dict, gp.Series, pd.Series]): The value to set for the spine.
         """
-        validateColumns(value, SPINE_COLUMNS)
+        validateColumns(value, Spine)
         return self._update(AnnotationType.Point, spineId, value, replaceLog, skipLog)
 
-    def updateSegment(self, segmentId: str, value: dict, replaceLog=False, skipLog=False):
+    def updateSegment(self, segmentId: Union[str, list[str]], value: LineSegment, replaceLog=False, skipLog=False):
         """
         Set the segment with the given ID to the specified value.
 
@@ -93,58 +91,30 @@ class AnnotationsBaseMut(AnnotationsBase):
             segmentId (str): The ID of the spine.
             value (Union[dict, gp.Series, pd.Series]): The value to set for the spine.
         """
-        validateColumns(value, LINE_SEGMENT_COLUMNS)
+        validateColumns(value, LineSegment)
         return self._update(AnnotationType.LineSegment, segmentId, value, replaceLog, skipLog)
 
-    def _update(self, type: AnnotationType, id: str, value: Union[dict, gp.GeoSeries, pd.Series], replaceLog=False, skipLog=False):
+    def _update(self, type: AnnotationType, ids: Union[str, list[str]], value: Union[dict, gp.GeoSeries, pd.Series], replaceLog=False, skipLog=False):
         df = self._getDf(type)
+        ids = [ids] if isinstance(ids, str) else ids
 
-        if isinstance(value, dict):
-            value = pd.Series(value)
-
-        if id in df.index:
-            # merge the new value with the old one
-            original = df.loc[id]
-            updated = original.copy()
-
-            for key, val in value.items():
-                updated[key] = val
-
-            # delete if the value is empty
-            if updated.drop("modified").dropna().empty:
-                return self._delete(type, id, skipLog=skipLog)
-
-            df.loc[id] = updated
-
-            # create a diff of the changes
-            diff = original.compare(updated)
-            diff.rename(columns={"self": "before",
-                        "other": "after"}, inplace=True)
-        else:
-            # add a new value
+        old = df.loc[df.index.intersection(ids)].copy()
+        value = pd.Series(value)
+        for id in ids:
             df.loc[id, value.index] = value
-            diff = pd.DataFrame({
-                "before": pd.Series(),
-                "after": df.loc[id].copy()
-            })
 
-        df.loc[id, "modified"] = np.datetime64("now")
+        op = Op(type, old, df.loc[ids])
+        df.loc[ids, "modified"] = np.datetime64("now")
 
         if skipLog:
             return
 
         # Add the operation to the log
-        if diff.empty:
+        if op.isEmpty():
             if replaceLog:
                 return
 
-            diff = pd.DataFrame({
-                "before": value,
-                "after": value,
-            })
+            self._log.createState()
+            return
 
-            if diff.empty:
-                self._log.createState()
-                return
-
-        self._log.push(Op(id, type, diff), replace=replaceLog)
+        self._log.push(op, replace=replaceLog)

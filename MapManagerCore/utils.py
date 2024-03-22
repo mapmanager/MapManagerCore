@@ -4,6 +4,8 @@ from shapely.geometry import Polygon, LineString
 from shapely import force_2d
 import skimage.draw
 
+from MapManagerCore.config import LineSegment, Spine
+
 
 def filterMask(d, index_filter):
     if index_filter == None or len(index_filter) == 0:
@@ -21,16 +23,12 @@ def shapeIndexes(d: Union[Polygon, LineString]):
     return skimage.draw.line(int(x[0]), int(y[0]), int(x[1]), int(y[1]))
 
 
-def validateColumns(values: dict[str, any], typeColumns: dict[str, type]):
+def validateColumns(values: dict[str, any], typeColumns: Union[Spine, LineSegment]):
+    typeColumns = typeColumns.__annotations__
     for key, value in values.items():
         if not key in typeColumns:
             raise ValueError(f"Invalid column {key}")
         expectedType = typeColumns[key]
-        if isinstance(expectedType, str):
-            if "datetime64[ns]" == expectedType:
-                if not isinstance(value, np.datetime64):
-                    raise ValueError(
-                        f"Invalid type for column {key} expected {expectedType}")
         if not isinstance(value, expectedType):
             try:
                 values[key] = expectedType(value)

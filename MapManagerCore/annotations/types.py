@@ -41,6 +41,8 @@ class AnnotationsOptions(TypedDict):
       showLabels (bool): Flag indicating whether to show labels.
       showAnchors (bool): Flag indicating whether to show anchors.
       showSpines (bool): Flag indicating whether to show spines.
+      colorOn (str): The column to color the spines with.
+      shapeOn (str): The column to shape the spines with.
     """
     selection: ImageViewSelection
     annotationSelections: AnnotationsSelection
@@ -49,6 +51,9 @@ class AnnotationsOptions(TypedDict):
     showLabels: bool
     showAnchors: bool
     showSpines: bool
+
+    colorOn: str
+    shapeOn: str
 
 
 class ImageSlice:

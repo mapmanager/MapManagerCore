@@ -3,7 +3,7 @@ from typing import Self, Tuple, Union
 import numpy as np
 import pandas as pd
 
-from MapManagerCore.config import LINE_SEGMENT_COLUMNS, SPINE_COLUMNS
+from MapManagerCore.config import LineSegment, Spine
 from ..utils import shapeIndexes
 import geopandas as gp
 import zarr
@@ -175,9 +175,13 @@ def loadShape(shape: Union[str, BaseGeometry]):
     return wkt.loads(shape)
 
 
-def applyColumns(df: pd.DataFrame, types: dict[str, any]) -> gp.GeoDataFrame:
+def applyColumns(df: pd.DataFrame, types: Union[LineSegment, Spine]) -> gp.GeoDataFrame:
+    types = types.__annotations__
     df = gp.GeoDataFrame(df)
     for key, valueType in types.items():
+        if issubclass(valueType, np.datetime64):
+            valueType = "datetime64[ns]"
+
         if key in df.index.names:
             df.index = df.index.astype(valueType)
             continue
@@ -197,7 +201,7 @@ class Loader:
             if not isinstance(lineSegments, pd.DataFrame):
                 lineSegments = pd.read_csv(lineSegments, index_col=False)
 
-        lineSegments = applyColumns(lineSegments, LINE_SEGMENT_COLUMNS)
+        lineSegments = applyColumns(lineSegments, LineSegment)
         if lineSegments.index.name != "segmentID":
             lineSegments.set_index("segmentID", drop=True, inplace=True)
 
@@ -205,7 +209,7 @@ class Loader:
             if not isinstance(points, pd.DataFrame):
                 points = pd.read_csv(points, index_col=False)
 
-        points = applyColumns(points, SPINE_COLUMNS)
+        points = applyColumns(points, Spine)
         if points.index.name != "spineID":
             points.set_index("spineID", drop=True, inplace=True)
 
