@@ -1,6 +1,8 @@
 from typing import Union
 import numpy as np
 from shapely.geometry import Point
+
+from mapmanagercore.config import Spine
 from ...layers.layer import DragState
 from .query import QueryAnnotations
 from ...layers.utils import roundPoint
@@ -59,14 +61,14 @@ class AnnotationsInteractions(QueryAnnotations):
         spineId = self.newUnassignedSpineId()
 
         self.updateSpine(spineId, {
+            **Spine.defaults(),
             "segmentID": segmentId,
             "point": Point(point.x, point.y),
-            "z": z,
+            "z": int(z),
             "anchor": Point(anchor.x, anchor.y),
-            "anchorZ": anchor.z,
-            "xBackgroundOffset": 0,
-            "yBackgroundOffset": 0,
-            "roiExtend": 4,
+            "anchorZ": int(anchor.z),
+            "xBackgroundOffset": 0.0,
+            "yBackgroundOffset": 0.0,
         })
 
         return spineId
@@ -121,7 +123,7 @@ class AnnotationsInteractions(QueryAnnotations):
         anchor = self.nearestAnchor(point["segmentID"], Point(x, y))
 
         self.updateSpine(spineId, {
-            "anchorZ": anchor.z,
+            "anchorZ": int(anchor.z),
             "anchor": Point(anchor.x, anchor.y),
         }, state != DragState.START and state != DragState.MANUAL)
 
@@ -144,8 +146,8 @@ class AnnotationsInteractions(QueryAnnotations):
         """
         if state == DragState.MANUAL:
             self.updateSpine(spineId, {
-                "xBackgroundOffset": x,
-                "yBackgroundOffset": y,
+                "xBackgroundOffset": float(x),
+                "yBackgroundOffset": float(y),
             })
             return True
 
@@ -155,8 +157,8 @@ class AnnotationsInteractions(QueryAnnotations):
             self.pendingBackgroundRoiTranslation = [x, y]
 
         self.updateSpine(spineId, {
-            "xBackgroundOffset": point["xBackgroundOffset"] + x - self.pendingBackgroundRoiTranslation[0],
-            "yBackgroundOffset": point["yBackgroundOffset"] + y - self.pendingBackgroundRoiTranslation[1],
+            "xBackgroundOffset": float(point["xBackgroundOffset"] + x - self.pendingBackgroundRoiTranslation[0]),
+            "yBackgroundOffset": float(point["yBackgroundOffset"] + y - self.pendingBackgroundRoiTranslation[1]),
         }, state != DragState.START and state != DragState.MANUAL)
 
         self.pendingBackgroundRoiTranslation = [x, y]
@@ -183,7 +185,7 @@ class AnnotationsInteractions(QueryAnnotations):
         point = self._points.loc[spineId, "point"]
 
         self.updateSpine(spineId, {
-            "roiExtend": point.distance(Point(x, y))
+            "roiExtend": float(point.distance(Point(x, y)))
         }, state != DragState.START and state != DragState.MANUAL)
 
         return True
