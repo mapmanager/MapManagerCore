@@ -16,7 +16,6 @@ class AnnotationType(Enum):
     Point = 1
     LineSegment = 2
 
-
 class AnnotationsBaseMut(AnnotationsBase):
     _log: RecordLog[AnnotationType]
 

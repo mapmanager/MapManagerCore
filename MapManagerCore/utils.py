@@ -6,7 +6,6 @@ import skimage.draw
 
 from mapmanagercore.config import LineSegment, Spine
 
-
 def filterMask(d, index_filter):
     if index_filter == None or len(index_filter) == 0:
         return np.full(len(d), False)
