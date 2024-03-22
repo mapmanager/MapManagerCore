@@ -2,9 +2,13 @@ from functools import lru_cache
 from typing import Self, Tuple, Union
 import numpy as np
 import pandas as pd
-from ..utils import shapeIndexes, toGeoData
+
+from MapManagerCore.config import LINE_SEGMENT_COLUMNS, SPINE_COLUMNS
+from ..utils import shapeIndexes
 import geopandas as gp
 import zarr
+from shapely.geometry.base import BaseGeometry
+from shapely import wkt
 
 
 class ImageLoader:
@@ -43,7 +47,7 @@ class ImageLoader:
           Tuple[int, int, int, int, int]: The shape of the image data, (t,c,z,x,y).
         """
         ("implemented by subclass")
-        
+
     def channels(self) -> int:
         """
         Returns the number of channels in the image data.
@@ -164,28 +168,46 @@ class ImageLoader:
 
         return pd.Series(results, indexes)
 
-class Loader:
-    def __init__(self, lineSegments: Union[str, pd.DataFrame], points: Union[str, pd.DataFrame]):
-        if not isinstance(lineSegments, gp.GeoDataFrame):
-            if isinstance(lineSegments, pd.DataFrame):
-                lineSegments = lineSegments.set_index('segmentID', drop=True)
-                lineSegments["segmentID"] = lineSegments["segmentID"].astype(str)
-            else:
-                lineSegments = pd.read_csv(
-                    lineSegments, index_col="segmentID", dtype={'segmentID': str})
 
-            lineSegments = toGeoData(lineSegments, ['segment'])
+def loadShape(shape: Union[str, BaseGeometry]):
+    if isinstance(shape, BaseGeometry):
+        return shape
+    return wkt.loads(shape)
+
+
+def applyColumns(df: pd.DataFrame, types: dict[str, any]) -> gp.GeoDataFrame:
+    df = gp.GeoDataFrame(df)
+    for key, valueType in types.items():
+        if key in df.index.names:
+            df.index = df.index.astype(valueType)
+            continue
+        if not isinstance(valueType, str) and issubclass(valueType, BaseGeometry):
+            df[key] = gp.GeoSeries(df[key].apply(
+                loadShape)) if key in df.columns else gp.GeoSeries()
+        else:
+            df[key] = df[key].astype(
+                valueType) if key in df.columns else pd.Series(dtype=valueType)
+
+    return df
+
+
+class Loader:
+    def __init__(self, lineSegments: Union[str, pd.DataFrame] = pd.DataFrame(), points: Union[str, pd.DataFrame] = pd.DataFrame()):
+        if not isinstance(lineSegments, gp.GeoDataFrame):
+            if not isinstance(lineSegments, pd.DataFrame):
+                lineSegments = pd.read_csv(lineSegments, index_col=False)
+
+        lineSegments = applyColumns(lineSegments, LINE_SEGMENT_COLUMNS)
+        if lineSegments.index.name != "segmentID":
+            lineSegments.set_index("segmentID", drop=True, inplace=True)
 
         if not isinstance(points, gp.GeoDataFrame):
-            if isinstance(points, pd.DataFrame):
-                points = points.set_index('spineID', drop=True)
-                points["spineID"] = points["spineID"].astype(str)
-                points["segmentID"] = points["segmentID"].astype(str)
-            else:
-                points = pd.read_csv(points, index_col="spineID", dtype={
-                    'spineID': str, 'segmentID': str})
+            if not isinstance(points, pd.DataFrame):
+                points = pd.read_csv(points, index_col=False)
 
-            points = toGeoData(points, ['point', 'anchor'])
+        points = applyColumns(points, SPINE_COLUMNS)
+        if points.index.name != "spineID":
+            points.set_index("spineID", drop=True, inplace=True)
 
         lineSegments["modified"] = lineSegments["modified"].astype(
             'datetime64[ns]')

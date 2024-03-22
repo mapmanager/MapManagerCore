@@ -1,32 +1,8 @@
-from typing import List, Union
+from typing import Union
 import numpy as np
-import pandas as pd
-from shapely import wkt
-import geopandas as gp
 from shapely.geometry import Polygon, LineString
 from shapely import force_2d
 import skimage.draw
-
-
-def toGeoData(data: pd.DataFrame, geometryCols: List[str]):
-    """
-    Reads a CSV file with geometry columns from the given path into a geopandas GeoDataFrame.
-
-    Args:
-        path (str): The path to the CSV file.
-        geometryCols (list): The list of column names containing geometry data.
-
-    Returns:
-        gp.GeoDataFrame: The loaded CSV data as a geopandas GeoDataFrame.
-    """
-
-    for column in geometryCols:
-        data[column] = data[column].apply(wkt.loads)
-    df = gp.GeoDataFrame(data, geometry=geometryCols[0])
-
-    for column in geometryCols:
-        df[column] = gp.GeoSeries(df[column])
-    return df
 
 
 def filterMask(d, index_filter):
@@ -43,3 +19,21 @@ def shapeIndexes(d: Union[Polygon, LineString]):
 
     x, y = zip(*d.coords)
     return skimage.draw.line(int(x[0]), int(y[0]), int(x[1]), int(y[1]))
+
+
+def validateColumns(values: dict[str, any], typeColumns: dict[str, type]):
+    for key, value in values.items():
+        if not key in typeColumns:
+            raise ValueError(f"Invalid column {key}")
+        expectedType = typeColumns[key]
+        if isinstance(expectedType, str):
+            if "datetime64[ns]" == expectedType:
+                if not isinstance(value, np.datetime64):
+                    raise ValueError(
+                        f"Invalid type for column {key} expected {expectedType}")
+        if not isinstance(value, expectedType):
+            try:
+                values[key] = expectedType(value)
+                return
+            except:
+                raise ValueError(f"Invalid type for column {key}")

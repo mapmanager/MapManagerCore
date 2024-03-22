@@ -3,7 +3,9 @@ import geopandas as gp
 import numpy as np
 import pandas as pd
 
+from MapManagerCore.config import LINE_SEGMENT_COLUMNS, SPINE_COLUMNS
 from MapManagerCore.loader.base import Loader
+from MapManagerCore.utils import validateColumns
 from ..types import SpineId
 from ...log import Op, RecordLog
 from enum import Enum
@@ -72,7 +74,7 @@ class AnnotationsBaseMut(AnnotationsBase):
 
         df.drop(id, inplace=True)
 
-    def updateSpine(self, spineId: str, value: Union[dict, gp.GeoSeries, pd.Series], replaceLog=False, skipLog=False):
+    def updateSpine(self, spineId: str, value: dict, replaceLog=False, skipLog=False):
         """
         Set the spine with the given ID to the specified value.
 
@@ -80,9 +82,10 @@ class AnnotationsBaseMut(AnnotationsBase):
             spineId (str): The ID of the spine.
             value (Union[dict, gp.Series, pd.Series]): The value to set for the spine.
         """
+        validateColumns(value, SPINE_COLUMNS)
         return self._update(AnnotationType.Point, spineId, value, replaceLog, skipLog)
 
-    def updateSegment(self, segmentId: str, value: Union[dict, gp.GeoSeries, pd.Series], replaceLog=False, skipLog=False):
+    def updateSegment(self, segmentId: str, value: dict, replaceLog=False, skipLog=False):
         """
         Set the segment with the given ID to the specified value.
 
@@ -90,6 +93,7 @@ class AnnotationsBaseMut(AnnotationsBase):
             segmentId (str): The ID of the spine.
             value (Union[dict, gp.Series, pd.Series]): The value to set for the spine.
         """
+        validateColumns(value, LINE_SEGMENT_COLUMNS)
         return self._update(AnnotationType.LineSegment, segmentId, value, replaceLog, skipLog)
 
     def _update(self, type: AnnotationType, id: str, value: Union[dict, gp.GeoSeries, pd.Series], replaceLog=False, skipLog=False):
@@ -118,7 +122,7 @@ class AnnotationsBaseMut(AnnotationsBase):
                         "other": "after"}, inplace=True)
         else:
             # add a new value
-            df.loc[id] = value
+            df.loc[id, value.index] = value
             diff = pd.DataFrame({
                 "before": pd.Series(),
                 "after": df.loc[id].copy()

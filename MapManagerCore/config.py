@@ -1,4 +1,5 @@
 from typing import TypedDict, Tuple, Union
+from shapely.geometry import LineString, Point
 
 Color = Union[Tuple[int, int, int], Tuple[int, int, int, int]]
 
@@ -65,3 +66,24 @@ CONFIG: Config = {
 }
 
 COLORS = CONFIG["colors"]
+
+LINE_SEGMENT_COLUMNS = {
+    "segmentID": str,
+    "segment": LineString,
+    "radius": int,
+    "modified": "datetime64[ns]"
+}
+
+SPINE_COLUMNS = {
+    "spineID": str,
+    "segmentID": str,
+    "point": Point,
+    "anchor": Point,
+    "xBackgroundOffset": float,
+    "yBackgroundOffset": float,
+    "z": int,
+    "anchorZ": int,
+    "roiExtend": float,
+    "roiRadius": float,
+    "modified": "datetime64[ns]"
+}
