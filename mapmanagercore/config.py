@@ -77,9 +77,9 @@ class LineSegment(TypedDict):
     modified: np.datetime64
 
     def defaults() -> Self:
-        return {
+        return LineSegment({
             "radius": 4.0,
-        }
+        })
 
 
 class Spine(TypedDict):
@@ -96,7 +96,7 @@ class Spine(TypedDict):
     modified: np.datetime64
 
     def defaults() -> Self:
-        return {
+        return Spine({
             "roiExtend": 4.0,
             "roiRadius": 4.0
-        }
+        })

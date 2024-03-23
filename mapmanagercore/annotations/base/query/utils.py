@@ -27,6 +27,9 @@ class Query:
 
     def getTitle(self) -> str:
         return self.title
+    
+    def __str__(self):
+        return f"title: {self.title}, categorical: {self.categorical}"
 
 
 class QueryableInterface:

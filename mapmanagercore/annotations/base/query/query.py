@@ -45,7 +45,7 @@ class QueryAnnotations(AnnotationsBaseMut, QueryableInterface):
 
     @queryable(title="Spine ID", categorical=True)
     def spineID(self):
-        return self._points.index
+        return pd.Series(self._points.index)
 
     @queryable(title="Segment ID", categorical=True)
     def segmentID(self):
