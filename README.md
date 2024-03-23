@@ -8,7 +8,7 @@ An example notebook is located under `examples/example.ipynb`.
 
 Clone the repo, create a conda environment, install with pip, and run the tests.
 
-    git@github.com:mapmanager/MapManagerCore.git
+    git clone https://github.com/mapmanager/MapManagerCore.git
     cd MapManagerCore
 
     conda create -y -n mmc-env python=3.11
