@@ -175,7 +175,8 @@ def loadShape(shape: Union[str, BaseGeometry]):
     return wkt.loads(shape)
 
 
-def applyColumns(df: pd.DataFrame, types: Union[LineSegment, Spine]) -> gp.GeoDataFrame:
+def setColumnTypes(df: pd.DataFrame, types: Union[LineSegment, Spine]) -> gp.GeoDataFrame:
+    defaults = types.defaults()
     types = types.__annotations__
     df = gp.GeoDataFrame(df)
     for key, valueType in types.items():
@@ -192,6 +193,9 @@ def applyColumns(df: pd.DataFrame, types: Union[LineSegment, Spine]) -> gp.GeoDa
             df[key] = df[key].astype(
                 valueType) if key in df.columns else pd.Series(dtype=valueType)
 
+        if key in defaults:
+            df[key] = df[key].fillna(defaults[key])
+
     return df
 
 
@@ -201,7 +205,7 @@ class Loader:
             if not isinstance(lineSegments, pd.DataFrame):
                 lineSegments = pd.read_csv(lineSegments, index_col=False)
 
-        lineSegments = applyColumns(lineSegments, LineSegment)
+        lineSegments = setColumnTypes(lineSegments, LineSegment)
         if lineSegments.index.name != "segmentID":
             lineSegments.set_index("segmentID", drop=True, inplace=True)
 
@@ -209,7 +213,7 @@ class Loader:
             if not isinstance(points, pd.DataFrame):
                 points = pd.read_csv(points, index_col=False)
 
-        points = applyColumns(points, Spine)
+        points = setColumnTypes(points, Spine)
         if points.index.name != "spineID":
             points.set_index("spineID", drop=True, inplace=True)
 
