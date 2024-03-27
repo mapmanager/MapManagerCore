@@ -4,7 +4,7 @@ import numpy as np
 from ..layers.point import PointLayer
 from .layer import Layer
 from .utils import getCoords
-from shapely.geometry import LineString, MultiLineString, Point
+from shapely.geometry import LineString, MultiLineString, Point, Polygon
 from shapely.ops import substring
 import shapely
 import geopandas as gp
@@ -110,7 +110,7 @@ def calcSubLine(line: LineLayer, origin: Point, distance: int):
     return sub
 
 
-def extend(x: LineString, origin, distance):
+def extend(x: LineString, origin: Point, distance: float) -> Polygon:
     scale = 1 + distance / x.length
     # grow by scaler from one direction
     return shapely.affinity.scale(x, xfact=scale, yfact=scale, origin=origin)

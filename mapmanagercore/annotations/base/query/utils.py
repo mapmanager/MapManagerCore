@@ -1,64 +1,158 @@
 import numpy as np
 import shapely
 import pandas as pd
-from typing import Callable, Dict, List
+import geopandas as gp
+from typing import Callable, Dict, List, TypedDict, Unpack
 from pandas.util import hash_pandas_object
 from copy import copy
-from ....benchmark import timeAll, timer
+from ....benchmark import timer
+
+
+class ColumnAttributes(TypedDict):
+    title: str
+    categorical: bool
+    key: str
+    index: bool
+    plot: bool
+
+    def default():
+        return ColumnAttributes({
+            "categorical": False,
+            "index": False,
+            "plot": True,
+        })
 
 
 class Query:
-    def __init__(self, title: str, func: Callable[[], pd.Series], categorical: bool = False, idx: int = None):
-        self.title = title
-        self.categorical = categorical
+    def __init__(self, key: str, func: Callable[[], pd.Series], aggregate: List[str] = None, **kwargs):
         self.func = func
-        self.idx = idx
+        self.key = key
+        self.attr = ColumnAttributes(
+            {**ColumnAttributes.default(), **kwargs, "column": key})
+        self.aggregate = aggregate
 
     @timer
     def runWith(self, annotations, insureCached=False) -> pd.Series:
         result = self.func(annotations, insureCached=insureCached)
-
         if insureCached:
             return
-        return result if self.idx is None else result[self.idx]
-
-    def isCategorical(self) -> bool:
-        return self.categorical
-
-    def getTitle(self) -> str:
-        return self.title
-    
-    def __str__(self):
-        return f"title: {self.title}, categorical: {self.categorical}"
+        return result
 
 
 class QueryableInterface:
-    PLOT_ABLE_QUERIES: List[Query] = []
-    QUERIES: List[Query] = []
     QUERIES_MAP: Dict[str, Query] = {}
 
-    def queries(self) -> List[Query]:
-        return self.PLOT_ABLE_QUERIES
-
-    def runQuery(self, query: Query) -> pd.Series:
-        return query.runWith(self)
-
-    @timeAll
-    def table(self, queries: List[Query] = PLOT_ABLE_QUERIES) -> pd.DataFrame:
-        columns = {}
-
-        for query in queries:
-            data = query.runWith(self)
-            title = query.getTitle()
-            if isinstance(data, pd.DataFrame):
-                for column in data.columns:
-                    columns[f"{title} {column}"] = data[column]
+    @property
+    def columns(self) -> List[str]:
+        columns = []
+        for query in self.QUERIES_MAP.values():
+            if query.attr["index"]:
+                continue
+            if query.aggregate is None:
+                columns.append(query.key)
             else:
-                columns[title] = data
-        return pd.DataFrame(columns)
+                for agg in query.aggregate:
+                    for channel in range(0, self.images.channels()):
+                        columns.append(f"{query.key}_ch{channel}_{agg}")
 
-    def dataFrame(self, queries: List[Query] = QUERIES) -> pd.DataFrame:
-        return self.table(queries)
+        return columns
+    
+    def _ipython_key_completions_(self):
+        return self.columns
+
+    @property
+    def columnsAttributes(self) -> List[ColumnAttributes]:
+        attributes = []
+        for query in self.QUERIES_MAP.values():
+            if query.aggregate is None:
+                attributes.append(query.attr)
+            else:
+                for agg in query.aggregate:
+                    for channel in range(0, self.images.channels()):
+                        attributes.append({
+                            **query.attr,
+                            "column": f"{query.key}_ch{channel}_{agg}",
+                            "title": f"{query.attr['title']} Channel {channel} ({agg})"
+                        })
+
+        return attributes
+
+    def _table(self, columns: List[str]) -> pd.DataFrame:
+        result = {}
+
+        for column in columns:
+            aggregate = not column in self.QUERIES_MAP
+            if aggregate:
+                query = self.QUERIES_MAP[column.split("_")[0]]
+            else:
+                query = self.QUERIES_MAP[column]
+
+            if query.attr["index"]:
+                continue
+
+            data = query.runWith(self)
+            if isinstance(data, pd.DataFrame):
+                if aggregate:
+                    result[column] = data[column]
+                    continue
+
+                for column in data.columns:
+                    result[column] = data[column]
+            else:
+                result[query.key] = data
+
+        for column in columns:
+            if column not in result:
+                continue
+            if isinstance(result[column].iloc[0], shapely.geometry.base.BaseGeometry):
+                result[column] = gp.GeoSeries(result[column])
+
+        return gp.GeoDataFrame(result)
+
+    def _filter(self, index: pd.Index):
+        filtered = copy(self)
+
+        if isinstance(index, str):
+            index = [index]
+
+        filtered._points = filtered._points.loc[index]
+        return filtered
+
+    def __getitem__(self, items):
+        row = None
+        key = None
+        filtered = self
+
+        if isinstance(items, slice) or isinstance(items, pd.Index) or isinstance(items, pd.Series) or isinstance(items, np.ndarray):
+            row = items
+        elif isinstance(items, tuple):
+            row = items[0]
+            key = items[1]
+        elif isinstance(items, str):
+            key = items
+        elif isinstance(items, list) and len(items) > 0:
+            if isinstance(items[0], str):
+                key = items
+            elif isinstance(items[0], bool):
+                row = items
+        else:
+            raise ValueError("Invalid item type.", type(items))
+
+        if row is not None:
+            filtered = self._filter(row)
+            if key is None and not isinstance(row, slice):
+                return filtered
+
+        if isinstance(key, str):
+            df = filtered._table([key])
+            if df.shape[1] == 1:
+                return df.iloc[:, 0]
+            return df
+
+        if isinstance(key, list):
+            return filtered._table(key)
+
+        return filtered._table(list(self.QUERIES_MAP.keys()))
 
     @timer
     def _updateMissingValues(self, key, results, missingIndex, depKey, newHashes):
@@ -126,18 +220,24 @@ class QueryableInterface:
     def _updateModDate(self, modKey, missingIndex, newModDate):
         self._points.loc[missingIndex, modKey] = newModDate
 
+    def _channels(self):
+        return self.images.channels()
 
-def queryable(title: str = None, categorical: bool = False, dependencies: List[str] = None, segmentDependencies: List[str] = None, plotAble: bool = True):
+
+def queryable(dependencies: List[str] = None, segmentDependencies: List[str] = None, aggregate: List[str] = None, index=False, **kwargs: Unpack[ColumnAttributes]):
     # A queryable function can return either a pandas Series or DataFrame.
     # If multiple values can be computed more efficiently together
     # they should be implemented in a single function and returned as a DataFrame.
     # If it returns a DataFrame, the columns will be prefixed with the query name.
+    kwargs["index"] = index
+
     def wrapper(func):
-        fullTitle = title
+        fullTitle = kwargs["title"] if "title" in kwargs else None
         if fullTitle is None:
             fullTitle = func.__name__
 
         key = func.__name__
+        hasChannels = "channel" in func.__code__.co_varnames
 
         if dependencies is not None or segmentDependencies is not None:
             deps = dependencies or []
@@ -163,8 +263,21 @@ def queryable(title: str = None, categorical: bool = False, dependencies: List[s
                     missingIndex = newHashes.index
 
                     if missing is not None:
-                        # compute missing values
-                        results = func(missing)
+                        if hasChannels:
+                            channels = missing._channels()
+
+                            def aggregateFunc(missing, channel, aggregate):
+                                images = func(missing, channel=channel)
+                                images = images.explode().astype(np.uint64)
+                                images = images.groupby(level=0)
+                                return images.aggregate(aggregate)
+
+                            results = pd.concat([
+                                aggregateFunc(missing, channel, aggregate).add_prefix(f"{key}_ch{channel + 1}_") for channel in range(0, channels)
+                            ], axis=1)
+                        else:
+                            # compute missing values
+                            results = func(missing)
 
                         if isinstance(results, pd.DataFrame):
                             results = results.add_prefix(key + " ")
@@ -185,12 +298,8 @@ def queryable(title: str = None, categorical: bool = False, dependencies: List[s
             def finalFunc(self: QueryableInterface, insureCached=False):
                 return func(self)
 
-        query = Query(fullTitle, finalFunc, categorical)
+        query = Query(key, finalFunc, aggregate, **kwargs)
         QueryableInterface.QUERIES_MAP[key] = query
-
-        if plotAble:
-            QueryableInterface.PLOT_ABLE_QUERIES.append(query)
-        QueryableInterface.QUERIES.append(query)
 
         return finalFunc
     return wrapper
