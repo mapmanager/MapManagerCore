@@ -32,6 +32,10 @@ class QueryAnnotations(AnnotationsBaseMut, QueryableInterface):
     @queryable(title="z")
     def z(self):
         return self._points["z"]
+    
+    @queryable(title="Note", plot=False)
+    def note(self):
+        return self._points["note"]
 
     @queryable(title="Anchor X")
     def anchorX(self):

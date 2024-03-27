@@ -94,9 +94,11 @@ class Spine(TypedDict):
     roiExtend: float
     roiRadius: float
     modified: np.datetime64
+    note: str
 
     def defaults() -> Self:
         return Spine({
             "roiExtend": 4.0,
-            "roiRadius": 4.0
+            "roiRadius": 4.0,
+            "note": ""
         })
