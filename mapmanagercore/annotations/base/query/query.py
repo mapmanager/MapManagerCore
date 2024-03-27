@@ -36,6 +36,10 @@ class QueryAnnotations(AnnotationsBaseMut, QueryableInterface):
     @queryable(title="Note", plot=False)
     def note(self):
         return self._points["note"]
+    
+    @queryable(title="User Type", categorical=True)
+    def userType(self):
+        return self._points["userType"]
 
     @queryable(title="Anchor X")
     def anchorX(self):

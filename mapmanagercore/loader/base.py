@@ -190,6 +190,9 @@ def setColumnTypes(df: pd.DataFrame, types: Union[LineSegment, Spine]) -> gp.Geo
             df[key] = gp.GeoSeries(df[key].apply(
                 loadShape)) if key in df.columns else gp.GeoSeries()
         else:
+            if int == valueType:
+                valueType = 'Int64'
+
             df[key] = df[key].astype(
                 valueType) if key in df.columns else pd.Series(dtype=valueType)
 
