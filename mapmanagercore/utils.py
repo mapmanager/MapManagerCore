@@ -1,7 +1,8 @@
 from typing import Union
 import numpy as np
-from shapely.geometry import Polygon, LineString
+from shapely.geometry import Polygon, LineString, GeometryCollection
 from shapely import force_2d
+import shapely
 import skimage.draw
 
 from mapmanagercore.config import LineSegment, Spine
@@ -35,3 +36,10 @@ def validateColumns(values: dict[str, any], typeColumns: Union[Spine, LineSegmen
                 return
             except:
                 raise ValueError(f"Invalid type for column {key}")
+
+
+def polygonUnion(a: Polygon, b: Polygon) -> Polygon:
+    shape = shapely.union(a, b, grid_size=1)
+    if isinstance(shape, GeometryCollection):
+        return next(s for s in shape.geoms if isinstance(s, Polygon))
+    return shape
