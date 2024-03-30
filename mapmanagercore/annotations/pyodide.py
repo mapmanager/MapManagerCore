@@ -1,6 +1,8 @@
 from io import BytesIO, StringIO
 from typing import Tuple
+from mapmanagercore.layers.utils import inRange
 from mapmanagercore.loader.imageio import MultiImageLoader
+from mapmanagercore.utils import filterMask
 from .types import AnnotationsOptions, ImageSlice
 from .base import Annotations
 from pyodide.http import pyfetch
@@ -46,11 +48,27 @@ class PyodideAnnotations(Annotations):
         return self.slices(time, channel, (zRange[0], zRange[1]))
 
     def getSpinePosition(self, t: int, spineID: str):
-        return to_js(super().getSpinePosition(t, spineID))
+        return to_js(list(self._points.loc[spineID, "point"].coords)[0])
 
     def getSegmentsAndSpines(self, options: AnnotationsOptions):
         options = options.to_py()
-        return super().getSegmentsAndSpines(options)
+        z_range = options['selection']['z']
+        index_filter = options["filters"] if "filters" in options else []
+        segments = []
+
+        for (segmentID, points) in self._points.groupby("segmentID"):
+            spines = points.index.to_frame(name="id")
+            spines["type"] = "Start"
+            spines["invisible"] = ~ inRange(points["z"], z_range)
+            spines["invisible"] = spines["invisible"] & ~ filterMask(
+                points.index, index_filter)
+
+            segments.append({
+                "segmentID": segmentID,
+                "spines": spines.to_dict('records')
+            })
+
+        return segments
 
 
 async def loadGeoCsv(path, geometryCols, index_col=None, dtype=None):

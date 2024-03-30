@@ -1,67 +1,45 @@
-from copy import copy
-import numpy as np
 import pandas as pd
+
+from mapmanagercore.utils import polygonUnion
 from ....layers.line import calcSubLine, extend
 from .utils import QueryableInterface, queryable
 from ..base_mutation import AnnotationsBaseMut
-from ...types import AnnotationsOptions
-from ....layers.utils import inRange
-from ....utils import filterMask
-from shapely.geometry import LineString
+from shapely.geometry import LineString, MultiPolygon
 import shapely
 import geopandas as gp
 
-
 class QueryAnnotations(AnnotationsBaseMut, QueryableInterface):
-    def getSegmentsAndSpines(self, options: AnnotationsOptions):
-        z_range = options['selection']['z']
-        index_filter = options["filters"]
-        segments = []
+    @property
+    def segments(self):
+        return SegmentQuery(self[self["segmentID"].drop_duplicates().index])
 
-        for (segmentID, points) in self._points.groupby("segmentID"):
-            spines = points.index.to_frame(name="id")
-            spines["type"] = "Start"
-            spines["invisible"] = ~ inRange(points["z"], z_range)
-            spines["invisible"] = spines["invisible"] & ~ filterMask(
-                points.index, index_filter)
-
-            segments.append({
-                "segmentID": segmentID,
-                "spines": spines.to_dict('records')
-            })
-
-        return segments
-
-    def filter(self, index: pd.Index):
-        filtered = copy(self)
-        filtered._points = filtered._points[index]
-        return filtered
-
-    def __getitem__(self, key):
-        return self._points[key]
-
-    def getSpinePosition(self, t: int, spineID: str):
-        return list(self._points.loc[spineID, "point"].coords)[0]
-
-    @queryable(title="Spine ID", categorical=True)
+    @queryable(title="Spine ID", categorical=True, index=True)
     def spineID(self):
-        return self._points.index
+        return pd.Series(self._points.index)
 
     @queryable(title="Segment ID", categorical=True)
     def segmentID(self):
         return self._points["segmentID"]
 
     @queryable(title="x")
-    def pointX(self):
+    def x(self):
         return gp.GeoSeries(self._points["point"]).x
 
     @queryable(title="y")
-    def pointY(self):
+    def y(self):
         return gp.GeoSeries(self._points["point"]).y
 
     @queryable(title="z")
-    def pointZ(self):
+    def z(self):
         return self._points["z"]
+    
+    @queryable(title="Note", plot=False)
+    def note(self):
+        return self._points["note"]
+    
+    @queryable(title="User Type", categorical=True)
+    def userType(self):
+        return self._points["userType"]
 
     @queryable(title="Anchor X")
     def anchorX(self):
@@ -92,28 +70,31 @@ class QueryAnnotations(AnnotationsBaseMut, QueryableInterface):
     def roiExtend(self):
         return self._points["roiExtend"]
 
-    @queryable(title="Point", plotAble=False)
+    @queryable(title="Point", plot=False)
     def points(self):
         return self._points["point"]
 
-    @queryable(title="Anchor", plotAble=False)
+    @queryable(title="Anchor", plot=False)
     def anchors(self):
         return self._points.apply(lambda x: LineString([x["anchor"], x["point"]]), axis=1)
 
-    @queryable(title="Anchor Point", plotAble=False)
+    @queryable(title="Anchor Point", plot=False)
     def anchorPoint(self):
         return self._points["anchor"]
 
     def _segments(self):
-        return self._lineSegments.loc[self._points["segmentID"].drop_duplicates()]
+        return self._points[["segmentID"]].join(self._lineSegments, on="segmentID")
 
-    def segments(self):
+    @queryable(title="Segment", plot=False)
+    def segment(self):
         return self._segments()["segment"]
 
-    def segmentsLeft(self):
+    @queryable(title="Left Segment", plot=False)
+    def segmentLeft(self):
         return self._segments().apply(lambda x: shapely.offset_curve(x["segment"], x["radius"]), axis=1)
 
-    def segmentsRight(self):
+    @queryable(title="Right Segment", plot=False)
+    def segmentRight(self):
         return self._segments().apply(lambda x: shapely.offset_curve(x["segment"], -x["radius"]), axis=1)
 
     @queryable(title="Radius", segmentDependencies=["radius"])
@@ -123,56 +104,68 @@ class QueryAnnotations(AnnotationsBaseMut, QueryableInterface):
             index=self._points.index
         )
 
-    @queryable(dependencies=["point", "anchor", "roiExtend", "radius"], plotAble=False)
-    def roiHead(self):
-        return self._points.apply(
-            lambda x: extend(LineString(
-                [x["anchor"], x["point"]]), origin=x["anchor"], distance=x["roiExtend"]).buffer(x["radius"], cap_style=2),
-            axis=1)
-
-    @queryable(dependencies=["roiHead", "xBackgroundOffset", "yBackgroundOffset"], plotAble=False)
-    def roiHeadBg(self):
-        return self._points.apply(
-            lambda x: shapely.affinity.translate(
-                x["roiHead"], x["xBackgroundOffset"], x["yBackgroundOffset"]),
-            axis=1)
-
-    @queryable(dependencies=["anchor", "radius"], segmentDependencies=["segment"], plotAble=False)
+    @queryable(dependencies=["anchor", "radius"], segmentDependencies=["segment"], plot=False)
     def roiBase(self):
         df = self._points.join(self._lineSegments[["segment"]], on="segmentID")
         return df.apply(lambda d: calcSubLine(d["segment"], d["anchor"], distance=8).buffer(d["radius"], cap_style=2), axis=1)
 
-    @queryable(dependencies=["roiBase", "xBackgroundOffset", "yBackgroundOffset"], plotAble=False)
+    @queryable(dependencies=["roiBase", "xBackgroundOffset", "yBackgroundOffset"], plot=False)
     def roiBaseBg(self):
         return self._points.apply(
             lambda x: shapely.affinity.translate(
                 x["roiBase"], x["xBackgroundOffset"], x["yBackgroundOffset"]),
             axis=1)
 
-    @queryable(dependencies=["roiBase", "roiHead"], plotAble=False)
+    @queryable(dependencies=["point", "anchor", "roiExtend", "radius", "roiBase"], plot=False)
+    def roiHead(self):
+        def computeRoiHead(x):
+            head = extend(LineString([x["anchor"], x["point"]]), origin=x["anchor"],
+                          distance=x["roiExtend"]).buffer(x["radius"], cap_style=2)
+            head = head.difference(x["roiBase"])
+            if isinstance(head, MultiPolygon):
+                head = next(
+                    poly for poly in head.geoms if poly.contains(x["point"]))
+            return head
+
+        return self._points.apply(computeRoiHead, axis=1)
+
+    @queryable(dependencies=["roiHead", "xBackgroundOffset", "yBackgroundOffset"], plot=False)
+    def roiHeadBg(self):
+        return self._points.apply(
+            lambda x: shapely.affinity.translate(
+                x["roiHead"], x["xBackgroundOffset"], x["yBackgroundOffset"]),
+            axis=1)
+
+    @queryable(dependencies=["roiBase", "roiHead"], plot=False)
     def roi(self):
-        return self.roiBase().union(self.roiHead())
+        return self.roiBase().combine(self.roiHead(), polygonUnion)
 
-    @queryable(dependencies=["roiBaseBg", "roiHeadBg"], plotAble=False)
+    @queryable(dependencies=["roiBaseBg", "roiHeadBg"], plot=False)
     def roiBg(self):
-        return self.roiBaseBg().union(self.roiHeadBg())
+        return self.roiBaseBg().combine(self.roiHeadBg(), polygonUnion)
 
-    def imageStats(self, shapes: gp.GeoSeries, channel: int = 0, zSpread: int = 0):
-        images = self.getShapePixels(shapes, channel, zSpread)
-        images = images.explode().astype(np.uint64)
-        images = images.groupby(level=0)
-        return images.aggregate(['sum', 'max'])
+    @queryable(title="Roi", dependencies=["roi"], aggregate=['sum', 'max'])
+    def roiStats(self, channel: int = 0):
+        return self.getShapePixels(self.roi(), channel)
 
-    def allChannelImageStats(self, shapes: gp.GeoSeries, zSpread: int = 0):
-        channels = self.images.channels()
-        return pd.concat([
-            self.imageStats(shapes, channel=channel, zSpread=zSpread).add_prefix(f"Channel {channel + 1} ") for channel in range(0, channels)
-        ], axis=1)
+    @queryable(title="Background Roi", dependencies=["roi"], aggregate=['sum', 'max'])
+    def roiStatsBg(self, channel: int = 0):
+        return self.getShapePixels(self.roi(), channel)
 
-    @queryable(title="Roi", dependencies=["roi"])
-    def _roiStats(self):
-        return self.allChannelImageStats(self.roi())
 
-    @queryable(title="Background Roi", dependencies=["roi"])
-    def _bgRoiStats(self):
-        return self.allChannelImageStats(self.roiBg())
+class SegmentQuery:
+
+    def __init__(self, annotations: QueryAnnotations) -> None:
+        self.annotations = annotations
+
+    def __getitem__(self, items):
+        df = self.annotations.__getitem__(items)
+        df.index = self.annotations._points.loc[df.index]["segmentID"]
+        return df
+
+    @property
+    def columns(self):
+        return [col for col in self.annotations.columns if col.startswith('segment') and not col == 'segmentID']
+
+    def _ipython_key_completions_(self):
+        return self.columns
