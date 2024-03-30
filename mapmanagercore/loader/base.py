@@ -10,6 +10,7 @@ import zarr
 from shapely.geometry.base import BaseGeometry
 from shapely import wkt
 
+from mapmanagercore.logger import logger
 
 class ImageLoader:
     """
@@ -193,8 +194,20 @@ def setColumnTypes(df: pd.DataFrame, types: Union[LineSegment, Spine]) -> gp.Geo
             if int == valueType:
                 valueType = 'Int64'
 
-            df[key] = df[key].astype(
-                valueType) if key in df.columns else pd.Series(dtype=valueType)
+            # abb 03/2024
+            # see: https://stackoverflow.com/questions/62899860/how-can-i-resolve-typeerror-cannot-safely-cast-non-equivalent-float64-to-int6
+            try:
+                df[key] = df[key].astype(
+                    valueType) if key in df.columns else pd.Series(dtype=valueType)
+            except (TypeError):
+                if key in df.columns:
+                    df[key] = np.floor(pd.to_numeric(df[key], errors='coerce')).astype('Int64')
+                else:
+                    df[key] = pd.Series(dtype=valueType)
+                
+                # logger.warning(e)
+                # logger.warning(f'df[key].dtype:{df[key].dtype}')
+                # logger.warning(f'key:{key} valueType:{valueType}')
 
         if key in defaults:
             df[key] = df[key].fillna(defaults[key])

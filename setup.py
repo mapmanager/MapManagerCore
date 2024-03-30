@@ -16,7 +16,8 @@ install_requires = [
     'shapely',
     'geopandas',
     'scikit-image',
-    'zarr'
+    'zarr',
+    'platformdirs',  # to get platform specific App paths
 ]
 
 testRequirements = [
