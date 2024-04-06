@@ -3,8 +3,8 @@ import zipfile
 import geopandas as gp
 import numpy as np
 import pandas as pd
-from ..types import ImageSlice
-from ...loader.base import ImageLoader, Loader
+from mapmanagercore.image_slices import ImageSlice
+from ..loader.base import ImageLoader, Loader
 import zarr
 import warnings
 import io

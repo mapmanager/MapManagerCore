@@ -2,12 +2,12 @@ from typing import Tuple, Union
 import numpy as np
 from shapely.geometry import Point
 
-from mapmanagercore.annotations.base.base_mutation import Key
-from mapmanagercore.annotations.types import SegmentId, SpineId
+from mapmanagercore.annotations.base_mutation import Key
+from mapmanagercore.types import SegmentId, SpineId
 from mapmanagercore.config import Spine
-from ...layers.layer import DragState
+from ..layers.layer import DragState
 from .query import QueryAnnotations
-from ...layers.utils import roundPoint
+from ..layers.utils import roundPoint
 from shapely.geometry import LineString
 
 

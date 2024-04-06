@@ -5,7 +5,7 @@ import geopandas as gp
 from typing import Callable, Dict, List, TypedDict, Unpack
 from pandas.util import hash_pandas_object
 from copy import copy
-from ....benchmark import timer
+from ...benchmark import timer
 
 
 class ColumnAttributes(TypedDict):

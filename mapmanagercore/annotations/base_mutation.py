@@ -3,11 +3,11 @@ from typing import Tuple, Union
 import geopandas as gp
 import numpy as np
 import pandas as pd
-from mapmanagercore.annotations.types import SpineId
+from mapmanagercore.types import SpineId
 from mapmanagercore.config import LineSegment, Spine
 from mapmanagercore.loader.base import Loader
 from mapmanagercore.utils import validateColumns
-from ...log import Op, RecordLog
+from ..log import Op, RecordLog
 from enum import Enum
 from .base import AnnotationsBase
 

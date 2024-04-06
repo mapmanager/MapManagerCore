@@ -1,9 +1,10 @@
 from io import BytesIO, StringIO
 from typing import Tuple
+from mapmanagercore.image_slices import ImageSlice
 from mapmanagercore.layers.utils import inRange
 from mapmanagercore.loader.imageio import MultiImageLoader
 from mapmanagercore.utils import filterMask
-from .types import AnnotationsOptions, ImageSlice, SpineId
+from ..types import AnnotationsOptions, SpineId
 from .base import Annotations
 from pyodide.http import pyfetch
 from pyodide.ffi import to_js

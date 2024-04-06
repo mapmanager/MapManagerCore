@@ -1,17 +1,17 @@
 import warnings
 import geopandas as gp
 
-from ...config import COLORS, CONFIG, TRANSPARENT
+from ..config import COLORS, CONFIG, TRANSPARENT
 from ..types import AnnotationsOptions
-from ...layers import LineLayer, PointLayer, Layer
-from ...layers.utils import dropZ
-from ...benchmark import timer
+from ..layers import LineLayer, PointLayer, Layer
+from ..layers.utils import dropZ
+from ..benchmark import timer
 import warnings
 from shapely.errors import ShapelyDeprecationWarning
 from .interactions import AnnotationsInteractions
 from typing import List, Tuple
 from typing import List
-from ...layers.layer import Layer
+from ..layers.layer import Layer
 from typing import List
 
 

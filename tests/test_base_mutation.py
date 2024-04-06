@@ -1,5 +1,5 @@
 import unittest
-from mapmanagercore.annotations.base.base_mutation import AnnotationsBaseMut
+from mapmanagercore.annotations.base_mutation import AnnotationsBaseMut
 from mapmanagercore.loader.base import Loader
 
 class TestAnnotationsBaseMut(unittest.TestCase):

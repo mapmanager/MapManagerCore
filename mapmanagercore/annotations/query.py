@@ -1,9 +1,9 @@
 import pandas as pd
 
 from mapmanagercore.utils import polygonUnion
-from ....layers.line import calcSubLine, extend
-from .utils import QueryableInterface, queryable
-from ..base_mutation import AnnotationsBaseMut
+from ..layers.line import calcSubLine, extend
+from .utils.utils import QueryableInterface, queryable
+from .base_mutation import AnnotationsBaseMut
 from shapely.geometry import LineString, MultiPolygon
 import shapely
 import geopandas as gp
