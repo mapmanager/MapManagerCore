@@ -12,13 +12,11 @@ class ColumnAttributes(TypedDict):
     title: str
     categorical: bool
     key: str
-    index: bool
     plot: bool
 
     def default():
         return ColumnAttributes({
             "categorical": False,
-            "index": False,
             "plot": True,
         })
 
@@ -43,11 +41,13 @@ class QueryableInterface:
     QUERIES_MAP: Dict[str, Query] = {}
 
     @property
+    def index(self):
+        return self._points.index
+
+    @property
     def columns(self) -> List[str]:
         columns = []
         for query in self.QUERIES_MAP.values():
-            if query.attr["index"]:
-                continue
             if query.aggregate is None:
                 columns.append(query.key)
             else:
@@ -56,7 +56,7 @@ class QueryableInterface:
                         columns.append(f"{query.key}_ch{channel}_{agg}")
 
         return columns
-    
+
     def _ipython_key_completions_(self):
         return self.columns
 
@@ -87,9 +87,6 @@ class QueryableInterface:
             else:
                 query = self.QUERIES_MAP[column]
 
-            if query.attr["index"]:
-                continue
-
             data = query.runWith(self)
             if isinstance(data, pd.DataFrame):
                 if aggregate:
@@ -114,20 +111,25 @@ class QueryableInterface:
 
         if isinstance(index, str):
             index = [index]
+            
+        if isinstance(index, tuple) and len(index) == 2:
+            index = [index]
 
-        filtered._points = filtered._points.loc[index]
+        filtered._points = filtered._points.loc[index, :]
         return filtered
 
     def __getitem__(self, items):
         row = None
         key = None
         filtered = self
-
         if isinstance(items, slice) or isinstance(items, pd.Index) or isinstance(items, pd.Series) or isinstance(items, np.ndarray):
             row = items
         elif isinstance(items, tuple):
-            row = items[0]
-            key = items[1]
+            if len(items) > 1:
+                row = items[0]
+                key = items[1]
+            else:
+                row = items
         elif isinstance(items, str):
             key = items
         elif isinstance(items, list) and len(items) > 0:
@@ -177,8 +179,10 @@ class QueryableInterface:
         # opt avoid the cost of a hash by checking the modified data
         newModDate = self._points["modified"]
         if segmentDependencies is not None:
+            index = pd.MultiIndex.from_arrays(
+                [self._points['segmentID'], self._points.index.get_level_values(1)])
             newModDate = np.maximum(
-                self._lineSegments["modified"][self._points["segmentID"]].values, newModDate)
+                self._lineSegments["modified"][index].values, newModDate)
 
         invalid = None
         if modKey in self._points:
@@ -202,7 +206,9 @@ class QueryableInterface:
         if segmentDependencies is not None:
             segmentsHash = hash_pandas_object(
                 self._lineSegments[self._lineSegments.columns.intersection(segmentDependencies)], index=False)
-            df["segmentHash"] = segmentsHash[df["segmentID"]].values
+            index = pd.MultiIndex.from_arrays(
+                [df["segmentID"], df.index.get_level_values(1)])
+            df["segmentHash"] = segmentsHash[index].values
 
         hash = hash_pandas_object(df, index=False)
         if depKey in self._points:
@@ -224,12 +230,11 @@ class QueryableInterface:
         return self.images.channels()
 
 
-def queryable(dependencies: List[str] = None, segmentDependencies: List[str] = None, aggregate: List[str] = None, index=False, **kwargs: Unpack[ColumnAttributes]):
+def queryable(dependencies: List[str] = None, segmentDependencies: List[str] = None, aggregate: List[str] = None, **kwargs: Unpack[ColumnAttributes]):
     # A queryable function can return either a pandas Series or DataFrame.
     # If multiple values can be computed more efficiently together
     # they should be implemented in a single function and returned as a DataFrame.
     # If it returns a DataFrame, the columns will be prefixed with the query name.
-    kwargs["index"] = index
 
     def wrapper(func):
         fullTitle = kwargs["title"] if "title" in kwargs else None

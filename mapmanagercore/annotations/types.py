@@ -1,7 +1,8 @@
 from typing import List, TypedDict, Tuple
 import numpy as np
 
-SpineId = str
+SpineId = int
+SegmentId = int
 
 
 class AnnotationsSelection(TypedDict):
@@ -12,9 +13,9 @@ class AnnotationsSelection(TypedDict):
       segmentID (str): The ID of the segment.
       spineID (str): The ID of the spine.
     """
-    segmentID: str
-    segmentIDEditing: str
-    spineID: str
+    segmentID: SegmentId
+    segmentIDEditing: SegmentId
+    spineID: SpineId
 
 
 class ImageViewSelection(TypedDict):

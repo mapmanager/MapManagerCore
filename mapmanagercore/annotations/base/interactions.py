@@ -1,22 +1,23 @@
-from typing import Union
+from typing import Tuple, Union
 import numpy as np
 from shapely.geometry import Point
 
+from mapmanagercore.annotations.base.base_mutation import Key
+from mapmanagercore.annotations.types import SegmentId, SpineId
 from mapmanagercore.config import Spine
 from ...layers.layer import DragState
 from .query import QueryAnnotations
 from ...layers.utils import roundPoint
-from itertools import count
 from shapely.geometry import LineString
 
 
 class AnnotationsInteractions(QueryAnnotations):
-    def nearestAnchor(self, segmentID: str, point: Point, brightestPathDistance: int = None, channel: int = 0, zSpread: int = 0):
+    def nearestAnchor(self, segmentID: Tuple[SegmentId, int], point: Point, brightestPathDistance: int = None, channel: int = 0, zSpread: int = 0):
         """
         Finds the nearest anchor point on a given line segment to a given point.
 
         Args:
-            segmentID (str): The ID of the line segment.
+            segmentID (SegmentId): The ID of the line segment.
             point (Point): The point to find the nearest anchor to.
             brightestPathDistance (int): The distance to search for the brightest path. Defaults to None.
             channel (int): The channel. Defaults to 0.
@@ -40,14 +41,36 @@ class AnnotationsInteractions(QueryAnnotations):
                 minProjection + distance), 1)]) for distance in range_]
 
             brightest = self.getShapePixels(
-                targets, channel=channel, zSpread=zSpread).apply(np.sum).idxmax()
+                targets, channel=channel, zSpread=zSpread, time=segmentID[1]).apply(np.sum).idxmax()
             return Point(targets[brightest].coords[1])
 
         anchor = segment.interpolate(minProjection)
         anchor = roundPoint(anchor, 1)
         return anchor
 
-    def addSpine(self, segmentId: str, x: int, y: int, z: int) -> Union[str, None]:
+    def connect(self, spineKey: Tuple[SpineId, int], toSpineKey: Tuple[SpineId, int]):
+        if self._points.loc[toSpineKey, "segmentID"] != self._points.loc[spineKey, "segmentID"]:
+            raise ValueError("Cannot connect spines from different segments.")
+
+        # check if the key already exists in the time point
+        existingKey = (toSpineKey[0], spineKey[0])
+        if existingKey in self.spineID.index:
+            self.disconnect(existingKey)
+
+        # Propagate the spine ID to all future time points
+        self.updateSpine(range(spineKey, spineKey[0]), {
+            "spineID": toSpineKey[0],
+        })
+
+    def disconnect(self, spineKey: Tuple[SpineId, int]):
+        newID = self.newUnassignedSpineId()
+
+        # Propagate the spine ID change to all future time points
+        self.updateSpine(range(spineKey, spineKey[0]), {
+            "spineID": newID,
+        })
+
+    def addSpine(self, segmentId: Tuple[SpineId, int], x: int, y: int, z: int) -> Union[str, None]:
         """
         Adds a spine.
 
@@ -60,9 +83,9 @@ class AnnotationsInteractions(QueryAnnotations):
         anchor = self.nearestAnchor(segmentId, point, True)
         spineId = self.newUnassignedSpineId()
 
-        self.updateSpine(spineId, {
+        self.updateSpine((spineId, segmentId[1]), {
             **Spine.defaults(),
-            "segmentID": segmentId,
+            "segmentID": segmentId[0],
             "point": Point(point.x, point.y),
             "z": int(z),
             "anchor": Point(anchor.x, anchor.y),
@@ -73,21 +96,19 @@ class AnnotationsInteractions(QueryAnnotations):
 
         return spineId
 
-    def newUnassignedSpineId(self):
+    def newUnassignedSpineId(self) -> SpineId:
         """
         Generates a new unique spine ID that is not assigned to any existing spine.
 
         Returns:
-            str: new spine's ID.
+            int: new spine's ID.
         """
-        prefix = "unassigned"
+        ids = self._points.index.get_level_values(0)
+        if len(ids) == 0:
+            return 0
+        return self._points.index.get_level_values(0).max() + 1
 
-        for index in count(1):
-            uid = f"{prefix}_{index}"
-            if uid not in self._points.index:
-                return uid
-
-    def moveSpine(self, spineId: str, x: int, y: int, z: int, state: DragState = DragState.MANUAL) -> bool:
+    def moveSpine(self, spineId: Tuple[SpineId, int], x: int, y: int, z: int, state: DragState = DragState.MANUAL) -> bool:
         """
         Moves the spine identified by `spineId` to the given `x` and `y` coordinates.
 
@@ -106,7 +127,7 @@ class AnnotationsInteractions(QueryAnnotations):
 
         return True
 
-    def moveAnchor(self, spineId: str, x: int, y: int, z: int, state: DragState = DragState.MANUAL) -> bool:
+    def moveAnchor(self, spineId: Tuple[SpineId, int], x: int, y: int, z: int, state: DragState = DragState.MANUAL) -> bool:
         """
         Moves the anchor point of a spine to the given x and y coordinates.
 
@@ -131,7 +152,7 @@ class AnnotationsInteractions(QueryAnnotations):
 
     pendingBackgroundRoiTranslation = None
 
-    def moveBackgroundRoi(self, spineId: str, x: int, y: int, z: int = 0, state: DragState = DragState.MANUAL) -> bool:
+    def moveBackgroundRoi(self, spineId: Tuple[SpineId, int], x: int, y: int, z: int = 0, state: DragState = DragState.MANUAL) -> bool:
         """
         Translates the background ROI for a given spine ID by the specified x and y offsets.
 
@@ -168,7 +189,7 @@ class AnnotationsInteractions(QueryAnnotations):
 
         return True
 
-    def moveRoiExtend(self, spineId: str, x: int, y: int, z: int = 0, state: DragState = DragState.MANUAL) -> bool:
+    def moveRoiExtend(self, spineId: Tuple[SpineId, int], x: int, y: int, z: int = 0, state: DragState = DragState.MANUAL) -> bool:
         """
         Move the ROI extend for a given spine ID.
 
@@ -190,7 +211,7 @@ class AnnotationsInteractions(QueryAnnotations):
 
         return True
 
-    def moveSegmentRadius(self, segmentId: str, x: int, y: int, z: int = 0, state: DragState = DragState.MANUAL) -> bool:
+    def moveSegmentRadius(self, segmentId: Tuple[SegmentId, int], x: int, y: int, z: int = 0, state: DragState = DragState.MANUAL) -> bool:
         """
         Move the Radius of a segment by the given x and y coordinates.
 

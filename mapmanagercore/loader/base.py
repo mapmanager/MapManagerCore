@@ -148,7 +148,7 @@ class ImageLoader:
         """
         results = []
         indexes = []
-
+        shape = shape.reset_index()
         shape["z"] = shape["z"].astype(int)
 
         for (t, z), group in shape.groupby(by=["t", "z"]):
@@ -184,7 +184,15 @@ def setColumnTypes(df: pd.DataFrame, types: Union[LineSegment, Spine]) -> gp.Geo
             valueType = "datetime64[ns]"
 
         if key in df.index.names:
-            df.index = df.index.astype(valueType)
+            if int == valueType:
+                valueType = 'Int64'
+
+            if len(df.index.names) == 1:
+                df.index = df.index.astype(valueType)
+            else:
+                i = df.index.names.index(key)
+                df.index = df.index.set_levels(
+                    df.index.levels[i].astype(valueType), level=i)
             continue
         if not isinstance(valueType, str) and issubclass(valueType, BaseGeometry):
             df[key] = gp.GeoSeries(df[key].apply(
@@ -192,6 +200,8 @@ def setColumnTypes(df: pd.DataFrame, types: Union[LineSegment, Spine]) -> gp.Geo
         else:
             if int == valueType:
                 valueType = 'Int64'
+                if key in df.columns:
+                    df[key] = np.trunc(df[key])
 
             df[key] = df[key].astype(
                 valueType) if key in df.columns else pd.Series(dtype=valueType)
@@ -209,16 +219,18 @@ class Loader:
                 lineSegments = pd.read_csv(lineSegments, index_col=False)
 
         lineSegments = setColumnTypes(lineSegments, LineSegment)
-        if lineSegments.index.name != "segmentID":
-            lineSegments.set_index("segmentID", drop=True, inplace=True)
+        if not "segmentID" in lineSegments.index.names or not "t" in lineSegments.index.names:
+            lineSegments.set_index(["segmentID", "t"], drop=True, inplace=True)
+        lineSegments.sort_index(level=0, inplace=True)
 
         if not isinstance(points, gp.GeoDataFrame):
             if not isinstance(points, pd.DataFrame):
                 points = pd.read_csv(points, index_col=False)
 
         points = setColumnTypes(points, Spine)
-        if points.index.name != "spineID":
-            points.set_index("spineID", drop=True, inplace=True)
+        if not "spineID" in points.index.names or not "t" in points.index.names:
+            points.set_index(["spineID", "t"], drop=True, inplace=True)
+        points.sort_index(level=0, inplace=True)
 
         lineSegments["modified"] = lineSegments["modified"].astype(
             'datetime64[ns]')

@@ -20,7 +20,7 @@ class AnnotationsBase:
         self._points = loader.points()
         self.images = loader.images()
 
-    def slices(self, time: int, channel: int, zRange: Tuple[int, int] = None) -> ImageSlice:
+    def getPixels(self, time: int, channel: int, zRange: Tuple[int, int] = None) -> ImageSlice:
         """
         Loads the image data for a slice.
 
@@ -39,7 +39,7 @@ class AnnotationsBase:
 
         return ImageSlice(self.images.fetchSlices(time, channel, zRange))
 
-    def getShapePixels(self, shapes: gp.GeoSeries, channel: int = 0, zSpread: int = 0, ids: pd.Index = None, id: str = None) -> pd.Series:
+    def getShapePixels(self, shapes: gp.GeoSeries, channel: int = 0, zSpread: int = 0, ids: pd.Index = None, id: str = None, time=None) -> pd.Series:
         if id:
             ids = [id]
 
@@ -58,7 +58,8 @@ class AnnotationsBase:
                 z = self._points.loc[ids if ids else shapes.index, "z"]
         shapes = shapes.to_frame(name="shape")
         shapes["z"] = z
-        shapes["t"] = 0  # self._points.loc[shapes.index, "t"]
+        if time is not None:
+            shapes["t"] = time
 
         r = self.images.getShapePixels(
             shapes, channel=channel, zSpread=zSpread)

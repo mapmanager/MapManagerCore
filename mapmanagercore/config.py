@@ -71,10 +71,11 @@ COLORS = CONFIG["colors"]
 
 
 class LineSegment(TypedDict):
-    segmentID: str
+    segmentID: int
     segment: LineString
     radius: int
     modified: np.datetime64
+    t: int
 
     def defaults() -> Self:
         return LineSegment({
@@ -83,8 +84,9 @@ class LineSegment(TypedDict):
 
 
 class Spine(TypedDict):
-    spineID: str
-    segmentID: str
+    spineID: int
+    t: int
+    segmentID: int
     point: Point
     anchor: Point
     xBackgroundOffset: float
@@ -96,6 +98,7 @@ class Spine(TypedDict):
     modified: np.datetime64
     note: str
     userType: int
+    accept: bool
 
     def defaults() -> Self:
         return Spine({
@@ -103,4 +106,5 @@ class Spine(TypedDict):
             "roiRadius": 4.0,
             "note": "",
             "userType": -1,
+            "accept": True,
         })

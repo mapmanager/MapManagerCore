@@ -3,7 +3,7 @@ from typing import Tuple
 from mapmanagercore.layers.utils import inRange
 from mapmanagercore.loader.imageio import MultiImageLoader
 from mapmanagercore.utils import filterMask
-from .types import AnnotationsOptions, ImageSlice
+from .types import AnnotationsOptions, ImageSlice, SpineId
 from .base import Annotations
 from pyodide.http import pyfetch
 from pyodide.ffi import to_js
@@ -45,9 +45,9 @@ class PyodideAnnotations(Annotations):
         Returns:
           ImageSlice: The image slice.
         """
-        return self.slices(time, channel, (zRange[0], zRange[1]))
+        return self.getPixels(time, channel, (zRange[0], zRange[1]))
 
-    def getSpinePosition(self, t: int, spineID: str):
+    def getSpinePosition(self, t: int, spineID: SpineId):
         return to_js(list(self._points.loc[spineID, "point"].coords)[0])
 
     def getSegmentsAndSpines(self, options: AnnotationsOptions):
