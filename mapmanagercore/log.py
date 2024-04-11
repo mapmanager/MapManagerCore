@@ -18,7 +18,18 @@ class Op(Generic[T]):
     def __init__(self, type: T, before: gp.GeoDataFrame, after: gp.GeoDataFrame):
         self.type = type
         commonIndexes = before.index.intersection(after.index)
+        
+        if isinstance(before, gp.GeoSeries) or isinstance(before, pd.Series):
+            before = before.to_frame().T
+        if isinstance(after, gp.GeoSeries) or isinstance(after, pd.Series):
+            after = after.to_frame().T
 
+        if commonIndexes.empty:
+            self.deleted = before
+            self.added = after
+            self.changed = gp.GeoDataFrame()
+            return
+        
         self.changed = gp.GeoDataFrame(before.loc[commonIndexes]).compare(
             gp.GeoDataFrame(after.loc[commonIndexes]), result_names=("before", "after"))
 
@@ -52,7 +63,7 @@ class Op(Generic[T]):
                 df.loc[self.changed.index, key] = self.changed[(key, "before")]
 
         for key, values in self.deleted.iterrows():
-            df.loc[key] = values
+            df.loc[key, :] = values
 
         now = np.datetime64(datetime.datetime.now())
         df.loc[self.changed.index.union(self.deleted.index).values,
@@ -65,7 +76,7 @@ class Op(Generic[T]):
                 df.loc[self.changed.index, key] = self.changed[(key, "after")]
 
         for key, values in self.added.iterrows():
-            df.loc[key] = values
+            df.loc[key, :] = values
 
         now = np.datetime64(datetime.datetime.now())
         df.loc[self.changed.index.union(self.added.index).values,

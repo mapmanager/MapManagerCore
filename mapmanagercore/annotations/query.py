@@ -1,12 +1,13 @@
 import pandas as pd
 
 from mapmanagercore.utils import polygonUnion
-from ....layers.line import calcSubLine, extend
-from .utils import QueryableInterface, queryable
-from ..base_mutation import AnnotationsBaseMut
+from ..layers.line import calcSubLine, extend
+from .utils.utils import QueryableInterface, queryable
+from .base_mutation import AnnotationsBaseMut
 from shapely.geometry import LineString, MultiPolygon
 import shapely
 import geopandas as gp
+
 
 class QueryAnnotations(AnnotationsBaseMut, QueryableInterface):
     @property
@@ -15,7 +16,11 @@ class QueryAnnotations(AnnotationsBaseMut, QueryableInterface):
 
     @queryable(title="Spine ID", categorical=True, index=True)
     def spineID(self):
-        return pd.Series(self._points.index)
+        return pd.Series(self._points.index.get_level_values(0), index=self._points.index, name="spineID")
+
+    @queryable(title="Time", index=True)
+    def t(self):
+        return pd.Series(self._points.index.get_level_values(1), index=self._points.index, name="time")
 
     @queryable(title="Segment ID", categorical=True)
     def segmentID(self):
@@ -32,11 +37,11 @@ class QueryAnnotations(AnnotationsBaseMut, QueryableInterface):
     @queryable(title="z")
     def z(self):
         return self._points["z"]
-    
+
     @queryable(title="Note", plot=False)
     def note(self):
         return self._points["note"]
-    
+
     @queryable(title="User Type", categorical=True)
     def userType(self):
         return self._points["userType"]
@@ -50,8 +55,12 @@ class QueryAnnotations(AnnotationsBaseMut, QueryableInterface):
         return gp.GeoSeries(self._points["anchor"]).y
 
     @queryable(title="Anchor Z")
-    def anchorY(self):
+    def anchorZ(self):
         return self._points["anchorZ"]
+    
+    @queryable(title="Accept", categorical=True)
+    def accept(self):
+        return self._points["accept"]
 
     @queryable(title="Spine Length")
     def spineLength(self):
@@ -83,7 +92,7 @@ class QueryAnnotations(AnnotationsBaseMut, QueryableInterface):
         return self._points["anchor"]
 
     def _segments(self):
-        return self._points[["segmentID"]].join(self._lineSegments, on="segmentID")
+        return self._points[["segmentID"]].apply(lambda d: self._lineSegments.loc[(d["segmentID"], d.name[1])], axis=1)
 
     @queryable(title="Segment", plot=False)
     def segment(self):
@@ -99,25 +108,23 @@ class QueryAnnotations(AnnotationsBaseMut, QueryableInterface):
 
     @queryable(title="Radius", segmentDependencies=["radius"])
     def radius(self):
-        return pd.Series(
-            self._lineSegments.loc[self._points["segmentID"], "radius"].values,
-            index=self._points.index
-        )
+        return self._segments()["radius"]
 
     @queryable(dependencies=["anchor", "radius"], segmentDependencies=["segment"], plot=False)
-    def roiBase(self):
-        df = self._points.join(self._lineSegments[["segment"]], on="segmentID")
+    def roiBase(self) -> gp.GeoSeries:
+        df = self._points.copy()
+        df["segment"] = self._segments()["segment"]
         return df.apply(lambda d: calcSubLine(d["segment"], d["anchor"], distance=8).buffer(d["radius"], cap_style=2), axis=1)
 
     @queryable(dependencies=["roiBase", "xBackgroundOffset", "yBackgroundOffset"], plot=False)
-    def roiBaseBg(self):
+    def roiBaseBg(self) -> gp.GeoSeries:
         return self._points.apply(
             lambda x: shapely.affinity.translate(
                 x["roiBase"], x["xBackgroundOffset"], x["yBackgroundOffset"]),
             axis=1)
 
     @queryable(dependencies=["point", "anchor", "roiExtend", "radius", "roiBase"], plot=False)
-    def roiHead(self):
+    def roiHead(self) -> gp.GeoSeries:
         def computeRoiHead(x):
             head = extend(LineString([x["anchor"], x["point"]]), origin=x["anchor"],
                           distance=x["roiExtend"]).buffer(x["radius"], cap_style=2)
@@ -130,18 +137,18 @@ class QueryAnnotations(AnnotationsBaseMut, QueryableInterface):
         return self._points.apply(computeRoiHead, axis=1)
 
     @queryable(dependencies=["roiHead", "xBackgroundOffset", "yBackgroundOffset"], plot=False)
-    def roiHeadBg(self):
+    def roiHeadBg(self) -> gp.GeoSeries:
         return self._points.apply(
             lambda x: shapely.affinity.translate(
                 x["roiHead"], x["xBackgroundOffset"], x["yBackgroundOffset"]),
             axis=1)
 
     @queryable(dependencies=["roiBase", "roiHead"], plot=False)
-    def roi(self):
+    def roi(self) -> gp.GeoSeries:
         return self.roiBase().combine(self.roiHead(), polygonUnion)
 
     @queryable(dependencies=["roiBaseBg", "roiHeadBg"], plot=False)
-    def roiBg(self):
+    def roiBg(self) -> gp.GeoSeries:
         return self.roiBaseBg().combine(self.roiHeadBg(), polygonUnion)
 
     @queryable(title="Roi", dependencies=["roi"], aggregate=['sum', 'max'])
