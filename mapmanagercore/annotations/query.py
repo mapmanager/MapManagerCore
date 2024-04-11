@@ -1,9 +1,8 @@
+from .utils.queryable import QueryableInterface, queryable
 import pandas as pd
-
-from mapmanagercore.utils import polygonUnion
+from ..utils import polygonUnion
 from ..layers.line import calcSubLine, extend
-from .utils.utils import QueryableInterface, queryable
-from .base_mutation import AnnotationsBaseMut
+from .mutation import AnnotationsBaseMut
 from shapely.geometry import LineString, MultiPolygon
 import shapely
 import geopandas as gp
@@ -14,11 +13,11 @@ class QueryAnnotations(AnnotationsBaseMut, QueryableInterface):
     def segments(self):
         return SegmentQuery(self[self["segmentID"].drop_duplicates().index])
 
-    @queryable(title="Spine ID", categorical=True, index=True)
+    @queryable(title="Spine ID", categorical=True)
     def spineID(self):
         return pd.Series(self._points.index.get_level_values(0), index=self._points.index, name="spineID")
 
-    @queryable(title="Time", index=True)
+    @queryable(title="Time")
     def t(self):
         return pd.Series(self._points.index.get_level_values(1), index=self._points.index, name="time")
 
@@ -57,7 +56,7 @@ class QueryAnnotations(AnnotationsBaseMut, QueryableInterface):
     @queryable(title="Anchor Z")
     def anchorZ(self):
         return self._points["anchorZ"]
-    
+
     @queryable(title="Accept", categorical=True)
     def accept(self):
         return self._points["accept"]

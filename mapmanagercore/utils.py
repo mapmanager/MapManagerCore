@@ -5,7 +5,7 @@ from shapely import force_2d
 import shapely
 import skimage.draw
 
-from mapmanagercore.config import LineSegment, Spine
+from mapmanagercore.config import Segment, Spine
 
 
 def filterMask(d, index_filter):
@@ -24,7 +24,7 @@ def shapeIndexes(d: Union[Polygon, LineString]):
     return skimage.draw.line(int(x[0]), int(y[0]), int(x[1]), int(y[1]))
 
 
-def validateColumns(values: dict[str, any], typeColumns: Union[Spine, LineSegment]):
+def validateColumns(values: dict[str, any], typeColumns: Union[Spine, Segment]):
     typeColumns = typeColumns.__annotations__
     for key, value in values.items():
         if not key in typeColumns:

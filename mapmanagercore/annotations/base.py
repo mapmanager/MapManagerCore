@@ -3,7 +3,7 @@ import zipfile
 import geopandas as gp
 import numpy as np
 import pandas as pd
-from mapmanagercore.image_slices import ImageSlice
+from ..image_slices import ImageSlice
 from ..loader.base import ImageLoader, Loader
 import zarr
 import warnings
@@ -20,7 +20,7 @@ class AnnotationsBase:
         self._points = loader.points()
         self.images = loader.images()
 
-    def getPixels(self, time: int, channel: int, zRange: Tuple[int, int] = None) -> ImageSlice:
+    def getPixels(self, time: int, channel: int, zRange: Tuple[int, int] = None, z: int = None, zSpread: int = 0) -> ImageSlice:
         """
         Loads the image data for a slice.
 
@@ -28,16 +28,21 @@ class AnnotationsBase:
           time (int): The time slot index.
           channel (int): The channel index.
           zRange (Tuple[int, int]): The visible z slice range.
+          z (int): The z slice index.
+          zSpread (int): The amount to offset z +/-.
 
         Returns:
           ImageSlice: The image slice.
         """
 
         if zRange is None:
-            zRange = (int(self._points["z"].min()),
-                      int(self._points["z"].max()))
+            if z is not None:
+                zRange = (z-zSpread, z+zSpread)
+            else:
+                zRange = (int(self._points["z"].min()),
+                          int(self._points["z"].max()))
 
-        return ImageSlice(self.images.fetchSlices(time, channel, zRange))
+        return ImageSlice(self.images.fetchSlices(time, channel, (zRange[0], zRange[1] + 1)))
 
     def getShapePixels(self, shapes: gp.GeoSeries, channel: int = 0, zSpread: int = 0, ids: pd.Index = None, id: str = None, time=None) -> pd.Series:
         if id:

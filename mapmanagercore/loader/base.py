@@ -3,7 +3,7 @@ from typing import Self, Tuple, Union
 import numpy as np
 import pandas as pd
 
-from mapmanagercore.config import LineSegment, Spine
+from ..config import Segment, Spine
 from ..utils import shapeIndexes
 import geopandas as gp
 import zarr
@@ -175,7 +175,7 @@ def loadShape(shape: Union[str, BaseGeometry]):
     return wkt.loads(shape)
 
 
-def setColumnTypes(df: pd.DataFrame, types: Union[LineSegment, Spine]) -> gp.GeoDataFrame:
+def setColumnTypes(df: pd.DataFrame, types: Union[Segment, Spine]) -> gp.GeoDataFrame:
     defaults = types.defaults()
     types = types.__annotations__
     df = gp.GeoDataFrame(df)
@@ -218,7 +218,7 @@ class Loader:
             if not isinstance(lineSegments, pd.DataFrame):
                 lineSegments = pd.read_csv(lineSegments, index_col=False)
 
-        lineSegments = setColumnTypes(lineSegments, LineSegment)
+        lineSegments = setColumnTypes(lineSegments, Segment)
         if not "segmentID" in lineSegments.index.names or not "t" in lineSegments.index.names:
             lineSegments.set_index(["segmentID", "t"], drop=True, inplace=True)
         lineSegments.sort_index(level=0, inplace=True)

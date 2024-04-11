@@ -1,5 +1,5 @@
 import pandas as pd
-from mapmanagercore.loader.base import ImageLoader, Loader
+from .base import ImageLoader, Loader
 from typing import Tuple, Union
 import numpy as np
 import zarr
@@ -24,7 +24,7 @@ class MultiImageLoader(Loader):
         from imageio import imread
         return _MultiImageLoader(imread(path))
 
-    def read(self, uri, time: int = 0, channel: int = 0):
+    def read(self, path, time: int = 0, channel: int = 0):
         """
         Load an image from the given path and store it in the images array.
 
@@ -34,7 +34,7 @@ class MultiImageLoader(Loader):
           channel (int): The channel index.
         """
         from imageio import imread
-        self._images.append([time, channel, imread(uri)])
+        self._images.append([time, channel, imread(path)])
 
     def images(self) -> ImageLoader:
         maxTime = max(time for time, _, _ in self._images) + 1
