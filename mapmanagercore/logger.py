@@ -73,5 +73,3 @@ f_handler.setFormatter(formatter)
 
 logger.addHandler(handler)
 logger.addHandler(f_handler)
-
-logger.info(f'Logging to:{logFilePath}')

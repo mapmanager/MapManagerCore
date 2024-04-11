@@ -41,6 +41,7 @@ class MMapLoaderLazy(Loader, ImageLoader):
         return self._images[time][channel][slice]
 
     def fetchSlices(self, time: int, channel: int, sliceRange: Tuple[int, int]) -> np.ndarray:
+        _imgData = self._images[time][channel][sliceRange[0]:sliceRange[1]]
         return np.max(self._images[time][channel][sliceRange[0]:sliceRange[1]], axis=0)
 
 
