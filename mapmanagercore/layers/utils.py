@@ -50,3 +50,13 @@ def Sourced(func):
 
 def roundPoint(point: Point, ndig=0):
     return Point(round(point.x, ndig), round(point.y, ndig), round(point.z, ndig))
+
+
+def offsetCurveZ(line: LineString, offset: int) -> LineString:
+    offsetLine: LineString = line.offset_curve(offset)
+    points = []
+    for x, y in offsetLine.coords:
+        lineI = offsetLine.project(Point(x, y), normalized=True)
+        z = line.interpolate(lineI, normalized=True).z
+        points.append((x, y, z))
+    return LineString(points)

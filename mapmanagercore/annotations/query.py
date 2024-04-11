@@ -1,3 +1,4 @@
+from ..layers.utils import offsetCurveZ
 from .utils.queryable import QueryableInterface, queryable
 import pandas as pd
 from ..utils import polygonUnion
@@ -99,11 +100,11 @@ class QueryAnnotations(AnnotationsBaseMut, QueryableInterface):
 
     @queryable(title="Left Segment", plot=False)
     def segmentLeft(self):
-        return self._segments().apply(lambda x: shapely.offset_curve(x["segment"], x["radius"]), axis=1)
+        return self._segments().apply(lambda x: offsetCurveZ(x["segment"], x["radius"]), axis=1)
 
     @queryable(title="Right Segment", plot=False)
     def segmentRight(self):
-        return self._segments().apply(lambda x: shapely.offset_curve(x["segment"], -x["radius"]), axis=1)
+        return self._segments().apply(lambda x: offsetCurveZ(x["segment"], -x["radius"]), axis=1)
 
     @queryable(title="Radius", segmentDependencies=["radius"])
     def radius(self):
