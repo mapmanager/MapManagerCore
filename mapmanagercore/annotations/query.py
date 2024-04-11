@@ -1,3 +1,5 @@
+from ..loader.base import setColumnTypes
+from ..config import Segment
 from ..layers.utils import offsetCurveZ
 from .utils.queryable import QueryableInterface, queryable
 import pandas as pd
@@ -92,7 +94,9 @@ class QueryAnnotations(AnnotationsBaseMut, QueryableInterface):
         return self._points["anchor"]
 
     def _segments(self):
-        return self._points[["segmentID"]].apply(lambda d: self._lineSegments.loc[(d["segmentID"], d.name[1])], axis=1)
+        segments = self._points[["segmentID"]].apply(
+            lambda d: self._lineSegments.loc[(d["segmentID"], d.name[1])], axis=1)
+        return segments if not segments.empty else setColumnTypes(segments, Segment)
 
     @queryable(title="Segment", plot=False)
     def segment(self):

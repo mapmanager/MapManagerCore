@@ -87,7 +87,7 @@ class QueryableInterface:
                 result[query.key] = data
 
         for column in columns:
-            if column not in result:
+            if column not in result or result[column].empty:
                 continue
             if isinstance(result[column].iloc[0], shapely.geometry.base.BaseGeometry):
                 result[column] = gp.GeoSeries(result[column])
