@@ -1,7 +1,6 @@
 from io import BytesIO
-
 import pandas as pd
-from mapmanagercore.loader.base import ImageLoader, Loader
+from .base import ImageLoader, Loader
 from typing import Tuple
 import numpy as np
 import zarr

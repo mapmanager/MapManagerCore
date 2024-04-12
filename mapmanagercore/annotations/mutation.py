@@ -3,10 +3,9 @@ from typing import Tuple, Union
 import geopandas as gp
 import numpy as np
 import pandas as pd
-from mapmanagercore.types import SpineId
-from mapmanagercore.config import LineSegment, Spine
-from mapmanagercore.loader.base import Loader
-from mapmanagercore.utils import validateColumns
+from ..config import Segment, Spine, SpineId
+from ..loader.base import Loader
+from ..utils import validateColumns
 from ..log import Op, RecordLog
 from enum import Enum
 from .base import AnnotationsBase
@@ -57,6 +56,11 @@ class AnnotationsBaseMut(AnnotationsBase):
         self._delete(AnnotationType.Point, spineId, skipLog=skipLog)
 
     def deleteSegment(self, segmentId: Keys, skipLog=False) -> None:
+        for segmentID, time in self._lineSegments.loc[[0]].index:
+            if (self._points.xs(time, level=1)["segmentID"] == segmentID).any():
+                raise ValueError(
+                    f"Cannot delete segment {segmentID} at time point {time} as it has an attached spine(s)")
+
         self._delete(AnnotationType.LineSegment, segmentId, skipLog=skipLog)
 
     def _delete(self, type: AnnotationType, id: Keys, skipLog=False) -> None:
@@ -85,7 +89,7 @@ class AnnotationsBaseMut(AnnotationsBase):
         # if not spineId in self._points.index:
         #     raise ValueError(f"Spine with ID {spineId} not found")
         validateColumns(value, Spine)
-        
+
         if "t" in value:
             raise ValueError(
                 f"Invalid type for column 't' must be set on the spine key")
@@ -96,7 +100,7 @@ class AnnotationsBaseMut(AnnotationsBase):
 
         return self._update(AnnotationType.Point, spineId, value, replaceLog, skipLog)
 
-    def updateSegment(self, segmentId: Keys, value: LineSegment, replaceLog=False, skipLog=False):
+    def updateSegment(self, segmentId: Keys, value: Segment, replaceLog=False, skipLog=False):
         """
         Set the segment with the given ID to the specified value.
 
@@ -106,8 +110,8 @@ class AnnotationsBaseMut(AnnotationsBase):
         """
         # if not segmentId in self._lineSegments.index:
         #     raise ValueError(f"Segment with ID {segmentId} not found")
-        validateColumns(value, LineSegment)
-        
+        validateColumns(value, Segment)
+
         if "t" in value:
             raise ValueError(
                 f"Invalid type for column 't' must be set on the segment key")

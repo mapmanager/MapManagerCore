@@ -1,8 +1,6 @@
 import warnings
 import geopandas as gp
-
-from ..config import COLORS, CONFIG, TRANSPARENT
-from ..types import AnnotationsOptions
+from ..config import COLORS, CONFIG, TRANSPARENT, SegmentId, SpineId
 from ..layers import LineLayer, PointLayer, Layer
 from ..layers.utils import dropZ
 from ..benchmark import timer
@@ -13,6 +11,59 @@ from typing import List, Tuple
 from typing import List
 from ..layers.layer import Layer
 from typing import List
+
+from typing import TypedDict, Tuple
+
+class AnnotationsSelection(TypedDict):
+    """
+    Represents a selection of annotations.
+
+    Attributes:
+      segmentID (str): The ID of the segment.
+      spineID (str): The ID of the spine.
+    """
+    segmentID: SegmentId
+    segmentIDEditing: SegmentId
+    spineID: SpineId
+
+
+class ImageViewSelection(TypedDict):
+    """
+    Represents the image view state.
+
+    Attributes:
+      t (int): the time slot index.
+      z (Tuple[int, int]): The visible z slice range.
+    """
+    t: int
+    z: Tuple[int, int]
+
+
+class AnnotationsOptions(TypedDict):
+    """
+    Represents the options for annotations.
+
+    Attributes:
+      selection (ImageViewSelection): The image view state.
+      annotationSelections (AnnotationsSelection): The selected annotations.
+      showLineSegments (bool): Flag indicating whether to show line segments.
+      showLineSegmentsRadius (bool): Flag indicating whether to show line segment radius.
+      showLabels (bool): Flag indicating whether to show labels.
+      showAnchors (bool): Flag indicating whether to show anchors.
+      showSpines (bool): Flag indicating whether to show spines.
+      colorOn (str): The column to color the spines with.
+      symbolOn (str): The column to use as the symbol of the spine.
+    """
+    selection: ImageViewSelection
+    annotationSelections: AnnotationsSelection
+    showLineSegments: bool
+    showLineSegmentsRadius: bool
+    showLabels: bool
+    showAnchors: bool
+    showSpines: bool
+
+    colorOn: str
+    symbolOn: str
 
 
 class AnnotationsLayers(AnnotationsInteractions):

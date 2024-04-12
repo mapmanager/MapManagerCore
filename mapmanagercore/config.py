@@ -2,7 +2,12 @@ from typing import Self, TypedDict, Tuple, Union
 import numpy as np
 from shapely.geometry import LineString, Point
 
+SpineId = int
+SegmentId = int
+
 Color = Union[Tuple[int, int, int], Tuple[int, int, int, int]]
+
+MAX_TRACING_DISTANCE = None
 
 
 class Colors(TypedDict):
@@ -70,15 +75,16 @@ CONFIG: Config = {
 COLORS = CONFIG["colors"]
 
 
-class LineSegment(TypedDict):
+class Segment(TypedDict):
     segmentID: int
     segment: LineString
+    roughTracing: LineString
     radius: int
     modified: np.datetime64
     t: int
 
     def defaults() -> Self:
-        return LineSegment({
+        return Segment({
             "radius": 4.0,
         })
 

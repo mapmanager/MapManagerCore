@@ -2,23 +2,11 @@ import numpy as np
 import shapely
 import pandas as pd
 import geopandas as gp
-from typing import Callable, Dict, List, TypedDict, Unpack
+from typing import Callable, Dict, List, Unpack
 from pandas.util import hash_pandas_object
 from copy import copy
+from .column_attributes import ColumnAttributes
 from ...benchmark import timer
-
-
-class ColumnAttributes(TypedDict):
-    title: str
-    categorical: bool
-    key: str
-    plot: bool
-
-    def default():
-        return ColumnAttributes({
-            "categorical": False,
-            "plot": True,
-        })
 
 
 class Query:
@@ -99,7 +87,7 @@ class QueryableInterface:
                 result[query.key] = data
 
         for column in columns:
-            if column not in result:
+            if column not in result or result[column].empty:
                 continue
             if isinstance(result[column].iloc[0], shapely.geometry.base.BaseGeometry):
                 result[column] = gp.GeoSeries(result[column])
@@ -111,7 +99,7 @@ class QueryableInterface:
 
         if isinstance(index, str):
             index = [index]
-            
+
         if isinstance(index, tuple) and len(index) == 2:
             index = [index]
 
@@ -231,11 +219,6 @@ class QueryableInterface:
 
 
 def queryable(dependencies: List[str] = None, segmentDependencies: List[str] = None, aggregate: List[str] = None, **kwargs: Unpack[ColumnAttributes]):
-    # A queryable function can return either a pandas Series or DataFrame.
-    # If multiple values can be computed more efficiently together
-    # they should be implemented in a single function and returned as a DataFrame.
-    # If it returns a DataFrame, the columns will be prefixed with the query name.
-
     def wrapper(func):
         fullTitle = kwargs["title"] if "title" in kwargs else None
         if fullTitle is None:

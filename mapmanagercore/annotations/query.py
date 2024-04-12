@@ -1,9 +1,11 @@
+from ..loader.base import setColumnTypes
+from ..config import Segment
+from ..layers.utils import offsetCurveZ
+from .utils.queryable import QueryableInterface, queryable
 import pandas as pd
-
-from mapmanagercore.utils import polygonUnion
+from ..utils import polygonUnion
 from ..layers.line import calcSubLine, extend
-from .utils.utils import QueryableInterface, queryable
-from .base_mutation import AnnotationsBaseMut
+from .mutation import AnnotationsBaseMut
 from shapely.geometry import LineString, MultiPolygon
 import shapely
 import geopandas as gp
@@ -14,11 +16,11 @@ class QueryAnnotations(AnnotationsBaseMut, QueryableInterface):
     def segments(self):
         return SegmentQuery(self[self["segmentID"].drop_duplicates().index])
 
-    @queryable(title="Spine ID", categorical=True, index=True)
+    @queryable(title="Spine ID", categorical=True)
     def spineID(self):
         return pd.Series(self._points.index.get_level_values(0), index=self._points.index, name="spineID")
 
-    @queryable(title="Time", index=True)
+    @queryable(title="Time")
     def t(self):
         return pd.Series(self._points.index.get_level_values(1), index=self._points.index, name="time")
 
@@ -57,7 +59,7 @@ class QueryAnnotations(AnnotationsBaseMut, QueryableInterface):
     @queryable(title="Anchor Z")
     def anchorZ(self):
         return self._points["anchorZ"]
-    
+
     @queryable(title="Accept", categorical=True)
     def accept(self):
         return self._points["accept"]
@@ -92,7 +94,9 @@ class QueryAnnotations(AnnotationsBaseMut, QueryableInterface):
         return self._points["anchor"]
 
     def _segments(self):
-        return self._points[["segmentID"]].apply(lambda d: self._lineSegments.loc[(d["segmentID"], d.name[1])], axis=1)
+        segments = self._points[["segmentID"]].apply(
+            lambda d: self._lineSegments.loc[(d["segmentID"], d.name[1])], axis=1)
+        return segments if not segments.empty else setColumnTypes(segments, Segment)
 
     @queryable(title="Segment", plot=False)
     def segment(self):
@@ -100,11 +104,11 @@ class QueryAnnotations(AnnotationsBaseMut, QueryableInterface):
 
     @queryable(title="Left Segment", plot=False)
     def segmentLeft(self):
-        return self._segments().apply(lambda x: shapely.offset_curve(x["segment"], x["radius"]), axis=1)
+        return self._segments().apply(lambda x: offsetCurveZ(x["segment"], x["radius"]), axis=1)
 
     @queryable(title="Right Segment", plot=False)
     def segmentRight(self):
-        return self._segments().apply(lambda x: shapely.offset_curve(x["segment"], -x["radius"]), axis=1)
+        return self._segments().apply(lambda x: offsetCurveZ(x["segment"], -x["radius"]), axis=1)
 
     @queryable(title="Radius", segmentDependencies=["radius"])
     def radius(self):

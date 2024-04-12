@@ -1,6 +1,7 @@
 from typing import List, Tuple
 import numpy as np
 
+
 class ImageSlice:
     """
     Represents an image slice.
@@ -8,6 +9,19 @@ class ImageSlice:
 
     def __init__(self, image: np.ndarray):
         self._image = image
+
+    def __getitem__(self, key):
+        return self._image[key]
+
+    @property
+    def shape(self) -> Tuple[int, int]:
+        """
+        Returns the shape of the image data.
+
+        Returns:
+          tuple: The shape of the image data.
+        """
+        return self._image.shape
 
     def data(self) -> np.ndarray:
         """

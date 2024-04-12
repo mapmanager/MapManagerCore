@@ -1,6 +1,5 @@
 from typing import Callable, Self, Tuple, Union
 import numpy as np
-
 from ..layers.point import PointLayer
 from .layer import Layer
 from .utils import getCoords
