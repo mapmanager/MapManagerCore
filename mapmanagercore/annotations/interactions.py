@@ -8,6 +8,8 @@ from ..layers.utils import roundPoint
 from shapely.geometry import LineString
 from shapely.ops import split, linemerge
 
+from mapmanagercore.logger import logger
+
 
 class AnnotationsInteractions(AnnotationsSegments):
     def nearestAnchor(self, segmentID: Tuple[SegmentId, int], point: Point, brightestPathDistance: int = None, channel: int = 0, zSpread: int = 0):
@@ -304,9 +306,10 @@ class AnnotationsInteractions(AnnotationsSegments):
 
         roughTracing: LineString = self._lineSegments.loc[segmentId,
                                                           "roughTracing"]
+                
         point = Point(x, y, z)
         snappedPoint = roughTracing.interpolate(roughTracing.project(point))
-
+        
         if MAX_TRACING_DISTANCE is not None and point.distance(snappedPoint) > MAX_TRACING_DISTANCE:
             # Snap the point to the maximum tracing distance
             point = LineString([snappedPoint.coords[0], point.coords[0]]).interpolate(
