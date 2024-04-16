@@ -145,11 +145,11 @@ class QueryAnnotations(AnnotationsBaseMut, QueryableInterface):
                 x["roiBase"], x["xBackgroundOffset"], x["yBackgroundOffset"]),
             axis=1)
 
-    @queryable(dependencies=["point", "anchor", "roiExtend", "radius", "roiBase"], plot=False)
+    @queryable(dependencies=["point", "anchor", "roiExtend", "roiRadius", "roiBase"], plot=False)
     def roiHead(self) -> gp.GeoSeries:
         def computeRoiHead(x):
             head = extend(LineString([x["anchor"], x["point"]]), origin=x["anchor"],
-                          distance=x["roiExtend"]).buffer(x["radius"], cap_style=2)
+                          distance=x["roiExtend"]).buffer(x["roiRadius"], cap_style=2)
             head = head.difference(x["roiBase"])
             if isinstance(head, MultiPolygon):
                 head = next(
