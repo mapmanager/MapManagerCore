@@ -1,11 +1,10 @@
 from typing import Union
 import numpy as np
 from shapely.geometry import Polygon, LineString, GeometryCollection
-from shapely import force_2d
 import shapely
 import skimage.draw
 from .config import Segment, Spine
-
+from .layers.utils import dropZ
 
 def filterMask(d, index_filter):
     if index_filter == None or len(index_filter) == 0:
@@ -14,7 +13,7 @@ def filterMask(d, index_filter):
 
 
 def shapeIndexes(d: Union[Polygon, LineString]):
-    d = force_2d(d)
+    d = dropZ(d)
     if isinstance(d, Polygon):
         x, y = zip(*d.exterior.coords)
         return skimage.draw.polygon(x, y)

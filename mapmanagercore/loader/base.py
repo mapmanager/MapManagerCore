@@ -1,9 +1,10 @@
 from functools import lru_cache
+import json
 from typing import Self, Tuple, Union
 import numpy as np
 import pandas as pd
 
-from ..config import Segment, Spine
+from ..config import Metadata, Segment, Spine
 from ..utils import shapeIndexes
 import geopandas as gp
 import zarr
@@ -170,6 +171,8 @@ class ImageLoader:
 
 
 def loadShape(shape: Union[str, BaseGeometry]):
+    if shape is None:
+        return None
     if isinstance(shape, BaseGeometry):
         return shape
     return wkt.loads(shape)
@@ -213,7 +216,7 @@ def setColumnTypes(df: pd.DataFrame, types: Union[Segment, Spine]) -> gp.GeoData
 
 
 class Loader:
-    def __init__(self, lineSegments: Union[str, pd.DataFrame] = pd.DataFrame(), points: Union[str, pd.DataFrame] = pd.DataFrame()):
+    def __init__(self, lineSegments: Union[str, pd.DataFrame] = pd.DataFrame(), points: Union[str, pd.DataFrame] = pd.DataFrame(), metadata: Union[str, Metadata] = Metadata()):
         if not isinstance(lineSegments, gp.GeoDataFrame):
             if not isinstance(lineSegments, pd.DataFrame):
                 lineSegments = pd.read_csv(lineSegments, index_col=False)
@@ -239,6 +242,12 @@ class Loader:
         self._lineSegments = lineSegments
         self._points = points
 
+        if isinstance(metadata, str):
+            with open(metadata, "r") as metadataFile:
+                metadata = json.load(metadataFile)
+
+        self._metadata = metadata
+
     def points(self) -> gp.GeoDataFrame:
         return self._points
 
@@ -247,6 +256,9 @@ class Loader:
 
     def images(self) -> ImageLoader:
         "abstract method"
+
+    def metadata(self) -> Metadata:
+        return self._metadata
 
 
 def bounds(x: np.array):

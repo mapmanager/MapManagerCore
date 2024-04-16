@@ -3,6 +3,8 @@ import zipfile
 import geopandas as gp
 import numpy as np
 import pandas as pd
+
+from ..config import Metadata
 from ..image_slices import ImageSlice
 from ..loader.base import ImageLoader, Loader
 import zarr
@@ -14,11 +16,16 @@ class AnnotationsBase:
     images: ImageLoader  # used for the brightest path
     _points: gp.GeoDataFrame
     _lineSegments: gp.GeoDataFrame
+    _metadata: Metadata
 
     def __init__(self, loader: Loader):
         self._lineSegments = loader.segments()
         self._points = loader.points()
         self.images = loader.images()
+        self._metadata = loader.metadata()
+        
+    def metadata(self) -> Metadata:
+        return self._metadata
 
     def getPixels(self, time: int, channel: int, zRange: Tuple[int, int] = None, z: int = None, zSpread: int = 0) -> ImageSlice:
         """
@@ -88,7 +95,7 @@ class AnnotationsBase:
                                  dtype=np.uint8)
             group.create_dataset("lineSegments", data=toBytes(self._lineSegments),
                                  dtype=np.uint8)
-
+            group.attrs["metadata"] = self.metadata()
             store.close()
 
 

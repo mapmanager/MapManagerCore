@@ -1,12 +1,12 @@
 from io import BytesIO, StringIO
 from typing import Tuple
-
-from annotations.layers import AnnotationsOptions
+from ..config import SpineId
+from .layers import AnnotationsOptions
 from ..image_slices import ImageSlice
 from ..layers.utils import inRange
-from ..loader.imageio import MultiImageLoader
-from .utils import filterMask
-from .base import Annotations
+from ..loader.mmap import MMapLoader
+from ..utils import filterMask
+from . import Annotations
 from pyodide.http import pyfetch
 from pyodide.ffi import to_js
 
@@ -15,17 +15,9 @@ class PyodideAnnotations(Annotations):
     """ PyodideAnnotations contains pyodide specific helper methods to allow JS to use Annotations.
     """
 
-    async def load(url: str):
-        lineSegments = await loadGeoCsv(url + "/line_segments.csv")
-        points = await loadGeoCsv(url + "/points.csv")
-
-        loader = MultiImageLoader(lineSegments=lineSegments, points=points)
-        loader.read(await fetchBytes(url + "/t0/ch0.tif.br"), channel=0, time=0)
-        loader.read(await fetchBytes(url + "/t0/ch1.tif.br"), channel=0, time=0)
-
-        # TODO: Create a concurrent async Loader (subclass imageio's loader).
-
-        return PyodideAnnotations(loader, lineSegments, points)
+    async def load(path: str):
+        loader = MMapLoader(path)
+        return PyodideAnnotations(loader)
 
     def getAnnotations_js(self, options: AnnotationsOptions):
         """
@@ -73,7 +65,7 @@ class PyodideAnnotations(Annotations):
         return segments
 
 
-async def loadGeoCsv(path, geometryCols, index_col=None, dtype=None):
+async def loadGeoCsv(path):
     response = await pyfetch(path)
     csv_text = await response.text()
     return StringIO(csv_text)

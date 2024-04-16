@@ -4,5 +4,6 @@ scikit-image
 geopandas
 shapely
 imagecodecs
+plotly
 zarr
 Blosc
