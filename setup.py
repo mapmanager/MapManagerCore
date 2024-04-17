@@ -18,6 +18,7 @@ install_requires = [
     'scikit-image',
     'zarr',
     'platformdirs',  # to get platform specific App paths
+    'plotly',
 ]
 
 testRequirements = [
