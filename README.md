@@ -8,14 +8,18 @@ An example notebook is located under `examples/example.ipynb`.
 
 Clone the repo, create a conda environment, install with pip, and run the tests.
 
+    # clone
     git clone https://github.com/mapmanager/MapManagerCore.git
     cd MapManagerCore
 
+    # create environment
     conda create -y -n mmc-env python=3.11
     conda activate mmc-env
 
+    # install
     pip install -e '.[dev]'
 
-    python tests/test_base_mutation.py
+    # run test
+    pytest tests
 
 
