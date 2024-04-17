@@ -4,8 +4,7 @@ from shapely.geometry import Polygon, LineString, GeometryCollection
 from shapely import force_2d
 import shapely
 import skimage.draw
-
-from mapmanagercore.config import Segment, Spine
+from .config import Segment, Spine
 
 
 def filterMask(d, index_filter):

@@ -1,3 +1,4 @@
+from ..benchmark import timer
 from ..loader.base import setColumnTypes
 from ..config import Segment
 from ..layers.utils import offsetCurveZ
@@ -60,7 +61,13 @@ class QueryAnnotations(AnnotationsBaseMut, QueryableInterface):
     def anchorZ(self):
         return self._points["anchorZ"]
 
-    @queryable(title="Accept", categorical=True)
+    @queryable(title="Accept", categorical=True, colors={
+        True: [255, 0, 0],
+        False: [255, 255, 255]
+    }, symbols={
+        True: "circle",
+        False: "cross"
+    })
     def accept(self):
         return self._points["accept"]
 
@@ -94,6 +101,17 @@ class QueryAnnotations(AnnotationsBaseMut, QueryableInterface):
         return self._points["anchor"]
 
     def _segments(self):
+        invalid = self._lineSegments.index if not ".dep.m" in self._lineSegments.columns else (self._lineSegments.index[self._lineSegments[
+            ".dep.m"] != self._lineSegments["modified"]])
+
+        if not invalid.empty:
+            self._lineSegments.loc[invalid, "segmentLeft"] = self._lineSegments.loc[invalid].apply(
+                lambda x: offsetCurveZ(x["segment"], x["radius"]), axis=1)
+            self._lineSegments.loc[invalid, "segmentRight"] = self._lineSegments.loc[invalid].apply(
+                lambda x: offsetCurveZ(x["segment"], -x["radius"]), axis=1)
+            self._lineSegments.loc[invalid,
+                                   ".dep.m"] = self._lineSegments.loc[invalid, "modified"]
+
         segments = self._points[["segmentID"]].apply(
             lambda d: self._lineSegments.loc[(d["segmentID"], d.name[1])], axis=1)
         return segments if not segments.empty else setColumnTypes(segments, Segment)
@@ -104,11 +122,11 @@ class QueryAnnotations(AnnotationsBaseMut, QueryableInterface):
 
     @queryable(title="Left Segment", plot=False)
     def segmentLeft(self):
-        return self._segments().apply(lambda x: offsetCurveZ(x["segment"], x["radius"]), axis=1)
+        return self._segments()["segmentLeft"]
 
     @queryable(title="Right Segment", plot=False)
     def segmentRight(self):
-        return self._segments().apply(lambda x: offsetCurveZ(x["segment"], -x["radius"]), axis=1)
+        return self._segments()["segmentRight"]
 
     @queryable(title="Radius", segmentDependencies=["radius"])
     def radius(self):
@@ -127,11 +145,11 @@ class QueryAnnotations(AnnotationsBaseMut, QueryableInterface):
                 x["roiBase"], x["xBackgroundOffset"], x["yBackgroundOffset"]),
             axis=1)
 
-    @queryable(dependencies=["point", "anchor", "roiExtend", "radius", "roiBase"], plot=False)
+    @queryable(dependencies=["point", "anchor", "roiExtend", "roiRadius", "roiBase"], plot=False)
     def roiHead(self) -> gp.GeoSeries:
         def computeRoiHead(x):
             head = extend(LineString([x["anchor"], x["point"]]), origin=x["anchor"],
-                          distance=x["roiExtend"]).buffer(x["radius"], cap_style=2)
+                          distance=x["roiExtend"]).buffer(x["roiRadius"], cap_style=2)
             head = head.difference(x["roiBase"])
             if isinstance(head, MultiPolygon):
                 head = next(

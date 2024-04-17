@@ -6,7 +6,7 @@ from typing import Callable, Dict, List, Unpack
 from pandas.util import hash_pandas_object
 from copy import copy
 from .column_attributes import ColumnAttributes
-from ...benchmark import timer
+from ...benchmark import timeAll, timer
 
 
 class Query:
@@ -49,19 +49,20 @@ class QueryableInterface:
         return self.columns
 
     @property
-    def columnsAttributes(self) -> List[ColumnAttributes]:
-        attributes = []
+    def columnsAttributes(self) -> Dict[str, ColumnAttributes]:
+        attributes = {}
         for query in self.QUERIES_MAP.values():
             if query.aggregate is None:
-                attributes.append(query.attr)
+                attributes[query.key] = query.attr
             else:
                 for agg in query.aggregate:
                     for channel in range(0, self.images.channels()):
-                        attributes.append({
+                        queryKey = f"{query.key}_ch{channel}_{agg}"
+                        attributes[queryKey] = {
                             **query.attr,
-                            "column": f"{query.key}_ch{channel}_{agg}",
+                            "key": queryKey,
                             "title": f"{query.attr['title']} Channel {channel} ({agg})"
-                        })
+                        }
 
         return attributes
 
@@ -106,6 +107,7 @@ class QueryableInterface:
         filtered._points = filtered._points.loc[index, :]
         return filtered
 
+    @timeAll
     def __getitem__(self, items):
         row = None
         key = None
@@ -226,6 +228,7 @@ def queryable(dependencies: List[str] = None, segmentDependencies: List[str] = N
 
         key = func.__name__
         hasChannels = "channel" in func.__code__.co_varnames
+        func = timer(func)
 
         if dependencies is not None or segmentDependencies is not None:
             deps = dependencies or []
