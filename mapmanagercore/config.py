@@ -142,3 +142,30 @@ class Spine(TypedDict):
             "userType": -1,
             "accept": True,
         })
+
+
+class SizeMetadata(TypedDict):
+    x: int
+    y: int
+    z: int
+    t: int
+    c: int
+
+
+class VoxelMetadata(TypedDict):
+    x: float
+    y: float
+    z: float
+
+
+class MetadataPhysicalSize(TypedDict):
+    x: float
+    y: float
+    unit: Literal["µm"]
+
+
+class Metadata(TypedDict):
+    size: SizeMetadata
+    voxel: VoxelMetadata
+    dtype: Literal["Uint16"]
+    physicalSize: MetadataPhysicalSize

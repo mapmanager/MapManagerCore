@@ -164,4 +164,5 @@ cython_debug/
 #.idea/
 
 /TODO.md
-data/rr30a_s0us.mmap
+data/rr30a_s0u.mmap
+example.ipynb

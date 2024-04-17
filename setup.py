@@ -11,6 +11,7 @@ install_requires = [
     'asyncio',
     'tifffile',
     'imagecodecs',  # required for compression
+    'plotly',  # required for compression
     'numpy',
     'pandas',
     'shapely',

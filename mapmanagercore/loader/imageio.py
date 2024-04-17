@@ -1,4 +1,6 @@
 import pandas as pd
+
+from mapmanagercore.config import Metadata
 from .base import ImageLoader, Loader
 from typing import Tuple, Union
 import numpy as np
@@ -10,8 +12,8 @@ class MultiImageLoader(Loader):
     Class for building an MultiImageLoader.
     """
 
-    def __init__(self, lineSegments: Union[str, pd.DataFrame] = pd.DataFrame(), points: Union[str, pd.DataFrame] = pd.DataFrame()):
-        super().__init__(lineSegments, points)
+    def __init__(self, lineSegments: Union[str, pd.DataFrame] = pd.DataFrame(), points: Union[str, pd.DataFrame] = pd.DataFrame(), metadata: Union[str, Metadata] = Metadata()):
+        super().__init__(lineSegments, points, metadata)
         self._images = []
 
     def imread(path: str) -> ImageLoader:

@@ -19,8 +19,9 @@ class MMapLoaderLazy(Loader, ImageLoader):
             BytesIO(group["lineSegments"][:].tobytes()))
         lineSegments = gp.GeoDataFrame(lineSegments, geometry="segment")
         lineSegments["segment"] = gp.GeoSeries(lineSegments["segment"])
-
-        super().__init__(lineSegments, points)
+        metadata = group.attrs["metadata"]
+        
+        super().__init__(lineSegments, points, metadata)
         self._images = group["images"]
 
     def images(self) -> ImageLoader:
