@@ -116,7 +116,6 @@ class Segment(TypedDict):
             "radius": 4.0,
         })
 
-
 class Spine(TypedDict):
     spineID: int
     t: int

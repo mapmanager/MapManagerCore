@@ -2,7 +2,7 @@ import pandas as pd
 
 from mapmanagercore.config import Metadata
 from .base import ImageLoader, Loader
-from typing import Tuple, Union
+from typing import Dict, List, Tuple, Union
 import numpy as np
 import zarr
 
@@ -39,15 +39,14 @@ class MultiImageLoader(Loader):
         self._images.append([time, channel, imread(path)])
 
     def images(self) -> ImageLoader:
-        maxTime = max(time for time, _, _ in self._images) + 1
         maxChannel = max(channel for _, channel, _ in self._images) + 1
         maxSlice, maxX, maxY = self._images[0][2].shape
 
-        dimensions = [maxTime, maxChannel, maxSlice, maxX, maxY]
-        images = np.zeros(dimensions, dtype=np.uint16)
+        dimensions = [maxChannel, maxSlice, maxX, maxY]
+        images = { t: np.zeros(dimensions, dtype=np.uint16) for t, _, i in  self._images}
 
         for time, channel, image in self._images:
-            images[time, channel] = image
+            images[time][channel] = image
 
         return _MultiImageLoader(images)
 
@@ -57,7 +56,7 @@ class _MultiImageLoader(ImageLoader):
     A loader class for loading from imageio supported formats.
     """
 
-    def __init__(self, images: np.ndarray):
+    def __init__(self, images: Dict[np.ndarray]):
         """
         Initialize the BaseImage class.
 
@@ -72,8 +71,8 @@ class _MultiImageLoader(ImageLoader):
         return self._images.shape
 
     def saveTo(self, group: zarr.Group):
-        group.create_dataset("images", data=self._images,
-                             dtype=self._images.dtype)
+        for time, images in self._images:
+            group.create_dataset(f"t-{time}", data=images, dtype=images.dtype)
 
     def loadSlice(self, time: int, channel: int, slice: int) -> np.ndarray:
         return self._images[time][channel][slice]

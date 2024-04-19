@@ -271,6 +271,7 @@ class AnnotationsInteractions(AnnotationsSegments):
 
         self.updateSegment((segmentId, t), {
             **Segment.defaults(),
+            "segmentID": segmentId,
             "segment": LineString([]),
             "roughTracing": LineString([])
         })

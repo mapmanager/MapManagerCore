@@ -9,75 +9,83 @@ from mapmanagercore.logger import setLogLevel
 
 setLogLevel()
 
-if 0:
-    # Create an image loader
-    loader = MultiImageLoader(
-        lineSegments="../data/rr30a_s0u/line_segments.csv",
-        points="../data/rr30a_s0u/points.csv")
+def tryIt():
+    if 0:
+        # Create an image loader
+        loader = MultiImageLoader(
+            lineSegments="../data/rr30a_s0u/line_segments.csv",
+            points="../data/rr30a_s0u/points.csv",
+            metadata="../data/rr30a_s0u/metadata.json",)
 
-    # add image channels to the loader
-    loader.read("../data/rr30a_s0u/t0/rr30a_s0_ch1.tif", channel=0)
-    loader.read("../data/rr30a_s0u/t0/rr30a_s0_ch2.tif", channel=1)
+        # add image channels to the loader
+        loader.read("../data/rr30a_s0u/t0/rr30a_s0_ch1.tif", channel=0)
+        loader.read("../data/rr30a_s0u/t0/rr30a_s0_ch2.tif", channel=1)
 
-    # Create the annotation map
-    map = MapAnnotations(loader)
+        # Create the annotation map
+        map = MapAnnotations(loader)
 
-    # save the annotation map
-    map.save("../data/rr30a_s0us.mmap")
+        # save the annotation map
+        print('saving ../data/cudmoreMap.mmap')
+        map.save("../data/cudmoreMap.mmap")
 
-map = MapAnnotations(MMapLoader("../data/rr30a_s0us.mmap").cached())
+        return
 
-# print(map._table().head())
+    map = MapAnnotations(MMapLoader("../data/cudmoreMap.mmap").cached())
 
-# cols = map.columns
-# print(f'cols:{cols}')
+    # print(map._table().head())
 
-# each columnsAttribute is like
-# {'categorical': True, 'index': False, 'plot': True, 'title': 'Segment ID', 'column': 'segmentID'}
-columnsAttributes = map.columnsAttributes
-# print(f'columnsAttributes:')
-# for columnsAttribute in columnsAttributes:
-#     print(f'   {columnsAttribute}')
+    # cols = map.columns
+    # print(f'cols:{cols}')
 
-# from mapmanagercore.config import Spine
-# aSpine = Spine.defaults()
-# print(aSpine)
-# segmentIdType = type(aSpine['segmentID'])
-# print(f'segmentIdType:{segmentIdType}')
+    # each columnsAttribute is like
+    # {'categorical': True, 'index': False, 'plot': True, 'title': 'Segment ID', 'column': 'segmentID'}
+    columnsAttributes = map.columnsAttributes
+    # print(f'columnsAttributes:')
+    # for columnsAttribute in columnsAttributes:
+    #     print(f'   {columnsAttribute}')
 
-# sys.exit(1)
+    # from mapmanagercore.config import Spine
+    # aSpine = Spine.defaults()
+    # print(aSpine)
+    # segmentIdType = type(aSpine['segmentID'])
+    # print(f'segmentIdType:{segmentIdType}')
 
-# print("map['z']")
-spineIDs = map.spineID()
-print('len(spineIDs):', len(spineIDs))
+    # sys.exit(1)
 
-# mapmanagercore.annotations.base.layers.AnnotationsLayers
-# filtered = map[spineIDs]
+    # print("map['z']")
+    spineIDs = map.spineID()
+    print('len(spineIDs):', len(spineIDs))
 
-allSpines = map[map.spineID()]  # mapmanagercore.annotations.base.layers.AnnotationsLayers
-allSpines = allSpines[:]  # geopandas.geodataframe.GeoDataFrame
-print(allSpines.columns)
-print(allSpines)
+    # mapmanagercore.annotations.base.layers.AnnotationsLayers
+    # filtered = map[spineIDs]
 
-# get a subset of columns
-cols = ['x', 'y', 'z', 'segmentID', 'note', 'userType', 'spineLength']
-df = map[cols]  # geopandas.geodataframe.GeoDataFrame
-print(df)
+    allSpines = map[ map['t']==0 ]  # mapmanagercore.annotations.base.layers.AnnotationsLayers
+    allSpines = allSpines[:]  # geopandas.geodataframe.GeoDataFrame
+    print(allSpines.columns)
+    print(allSpines)
 
-#
-# map.segments['segment'] is geopandas.geoseries.GeoSeries
-xyz = map.segments["segment"].get_coordinates(include_z=True)  # pd.DataFrame
-# print(map.segments.columns)  # columns is ['segment', 'segmentLeft', 'segmentRight']
+    # get a subset of columns
+    cols = ['x', 'y', 'z', 'segmentID', 'note', 'userType', 'spineLength']
+    df = map[cols]  # geopandas.geodataframe.GeoDataFrame
+    print(df)
 
-# get spine line
-anchorDf = map['anchors'].get_coordinates(include_z=True)
-print('ananchorDf')
-print(anchorDf)
-"""
-             x      y   z
-spineID                  
-0        425.0  225.4 NaN
-0        431.0  239.0 NaN
-1        378.0  236.0 NaN
-1        382.0  250.0 NaN
-"""
+    #
+    # map.segments['segment'] is geopandas.geoseries.GeoSeries
+    xyz = map.segments["segment"].get_coordinates(include_z=True)  # pd.DataFrame
+    # print(map.segments.columns)  # columns is ['segment', 'segmentLeft', 'segmentRight']
+
+    # get spine line
+    anchorDf = map['anchors'].get_coordinates(include_z=True)
+    print('ananchorDf')
+    print(anchorDf)
+    """
+                x      y   z
+    spineID                  
+    0        425.0  225.4 NaN
+    0        431.0  239.0 NaN
+    1        378.0  236.0 NaN
+    1        382.0  250.0 NaN
+    """
+
+if __name__ == '__main__':
+    tryIt()

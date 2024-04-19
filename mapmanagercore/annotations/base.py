@@ -26,6 +26,9 @@ class AnnotationsBase:
         
     def metadata(self) -> Metadata:
         return self._metadata
+    
+    def numChannels(self):
+        return self.images.shape()[1]
 
     def getPixels(self, time: int, channel: int, zRange: Tuple[int, int] = None, z: int = None, zSpread: int = 0) -> ImageSlice:
         """
