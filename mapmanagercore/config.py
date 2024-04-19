@@ -1,8 +1,22 @@
-from typing import Self, TypedDict, Tuple, Union
+from enum import Enum
+from typing import List, Self, TypedDict, Tuple, Union, Literal, get_args
 import numpy as np
 from shapely.geometry import LineString, Point
+from plotly.express import colors
+
+SpineId = int
+SegmentId = int
 
 Color = Union[Tuple[int, int, int], Tuple[int, int, int, int]]
+
+MAX_TRACING_DISTANCE = None
+
+Symbol = Literal[
+    "circle",
+    "cross",
+]
+
+symbols = get_args(Symbol)
 
 
 class Colors(TypedDict):
@@ -20,6 +34,9 @@ class Colors(TypedDict):
     segmentSelected: Color
     segmentEditing: Color
     intractable: Color
+    categorical: List[Color]
+    scalar: List[Color]
+    divergent: List[Color]
 
 
 TRANSPARENT = [0, 0, 0, 0]
@@ -36,6 +53,19 @@ class Config(TypedDict):
     pointRadius: int
     pointRadiusEditing: int
     labelOffset: int
+
+
+def colorsRGB(colorList: list[str]):
+    colorRGBs, _ = colors.convert_colors_to_same_type(
+        colorList, colortype="tuple")
+    return scaleColors(colorRGBs, 255)
+
+
+def scaleColors(colors: list[Color], scale: float) -> list[Color]:
+    useInt = scale == int(scale)
+    if isinstance(colors, tuple):
+        return tuple(int(c*scale) if useInt else c * scale for c in colors)
+    return [tuple(int(c*scale) if useInt else c * scale for c in color) for color in colors]
 
 
 CONFIG: Config = {
@@ -55,6 +85,9 @@ CONFIG: Config = {
         "segmentSelected": [0, 255, 255],
         "segmentEditing": [0, 255, 0],
         "intractable": [0, 255, 0],
+        "categorical": colorsRGB(colors.qualitative.Alphabet),
+        "divergent": colorsRGB(colors.diverging.balance),
+        "scalar": colorsRGB(colors.sequential.gray)
     },
     "ghostOpacity": 255 * 0.5,
     "labelExtension": 6,
@@ -70,21 +103,24 @@ CONFIG: Config = {
 COLORS = CONFIG["colors"]
 
 
-class LineSegment(TypedDict):
-    segmentID: str
+class Segment(TypedDict):
+    segmentID: int
     segment: LineString
+    roughTracing: LineString
     radius: int
     modified: np.datetime64
+    t: int
 
     def defaults() -> Self:
-        return LineSegment({
+        return Segment({
             "radius": 4.0,
         })
 
 
 class Spine(TypedDict):
-    spineID: str
-    segmentID: str
+    spineID: int
+    t: int
+    segmentID: int
     point: Point
     anchor: Point
     xBackgroundOffset: float
@@ -96,6 +132,7 @@ class Spine(TypedDict):
     modified: np.datetime64
     note: str
     userType: int
+    accept: bool
 
     def defaults() -> Self:
         return Spine({
@@ -103,4 +140,32 @@ class Spine(TypedDict):
             "roiRadius": 4.0,
             "note": "",
             "userType": -1,
+            "accept": True,
         })
+
+
+class SizeMetadata(TypedDict):
+    x: int
+    y: int
+    z: int
+    t: int
+    c: int
+
+
+class VoxelMetadata(TypedDict):
+    x: float
+    y: float
+    z: float
+
+
+class MetadataPhysicalSize(TypedDict):
+    x: float
+    y: float
+    unit: Literal["µm"]
+
+
+class Metadata(TypedDict):
+    size: SizeMetadata
+    voxel: VoxelMetadata
+    dtype: Literal["Uint16"]
+    physicalSize: MetadataPhysicalSize

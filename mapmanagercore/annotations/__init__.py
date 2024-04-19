@@ -1,1 +1,1 @@
-from .base import Annotations
+from .layers import AnnotationsLayers as Annotations

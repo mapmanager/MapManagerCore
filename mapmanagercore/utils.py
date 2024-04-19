@@ -1,12 +1,10 @@
 from typing import Union
 import numpy as np
 from shapely.geometry import Polygon, LineString, GeometryCollection
-from shapely import force_2d
 import shapely
 import skimage.draw
-
-from mapmanagercore.config import LineSegment, Spine
-
+from .config import Segment, Spine
+from .layers.utils import dropZ
 
 def filterMask(d, index_filter):
     if index_filter == None or len(index_filter) == 0:
@@ -15,7 +13,7 @@ def filterMask(d, index_filter):
 
 
 def shapeIndexes(d: Union[Polygon, LineString]):
-    d = force_2d(d)
+    d = dropZ(d)
     if isinstance(d, Polygon):
         x, y = zip(*d.exterior.coords)
         return skimage.draw.polygon(x, y)
@@ -24,7 +22,7 @@ def shapeIndexes(d: Union[Polygon, LineString]):
     return skimage.draw.line(int(x[0]), int(y[0]), int(x[1]), int(y[1]))
 
 
-def validateColumns(values: dict[str, any], typeColumns: Union[Spine, LineSegment]):
+def validateColumns(values: dict[str, any], typeColumns: Union[Spine, Segment]):
     typeColumns = typeColumns.__annotations__
     for key, value in values.items():
         if not key in typeColumns:

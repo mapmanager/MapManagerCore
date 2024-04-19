@@ -1,18 +1,73 @@
 import warnings
 import geopandas as gp
 
-from ...config import COLORS, CONFIG, TRANSPARENT
-from ..types import AnnotationsOptions
-from ...layers import LineLayer, PointLayer, Layer
-from ...layers.utils import dropZ
-from ...benchmark import timer
+from .utils.column_attributes import ColumnAttributes
+from ..config import COLORS, CONFIG, TRANSPARENT, SegmentId, SpineId, scaleColors, symbols
+from ..layers import LineLayer, PointLayer, Layer
+from ..layers.utils import dropZ
+from ..benchmark import timer
 import warnings
 from shapely.errors import ShapelyDeprecationWarning
 from .interactions import AnnotationsInteractions
 from typing import List, Tuple
 from typing import List
-from ...layers.layer import Layer
+from ..layers.layer import Layer
 from typing import List
+import pandas as pd
+from typing import TypedDict, Tuple
+from plotly.express.colors import sample_colorscale
+
+
+class AnnotationsSelection(TypedDict):
+    """
+    Represents a selection of annotations.
+
+    Attributes:
+      segmentID (str): The ID of the segment.
+      spineID (str): The ID of the spine.
+    """
+    segmentID: SegmentId
+    segmentIDEditing: SegmentId
+    spineID: SpineId
+
+
+class ImageViewSelection(TypedDict):
+    """
+    Represents the image view state.
+
+    Attributes:
+      t (int): the time slot index.
+      z (Tuple[int, int]): The visible z slice range.
+    """
+    t: int
+    z: Tuple[int, int]
+
+
+class AnnotationsOptions(TypedDict):
+    """
+    Represents the options for annotations.
+
+    Attributes:
+      selection (ImageViewSelection): The image view state.
+      annotationSelections (AnnotationsSelection): The selected annotations.
+      showLineSegments (bool): Flag indicating whether to show line segments.
+      showLineSegmentsRadius (bool): Flag indicating whether to show line segment radius.
+      showLabels (bool): Flag indicating whether to show labels.
+      showAnchors (bool): Flag indicating whether to show anchors.
+      showSpines (bool): Flag indicating whether to show spines.
+      colorOn (str): The column to color the spines with.
+      symbolOn (str): The column to use as the symbol of the spine.
+    """
+    selection: ImageViewSelection
+    annotationSelections: AnnotationsSelection
+    showLineSegments: bool
+    showLineSegmentsRadius: bool
+    showLabels: bool
+    showAnchors: bool
+    showSpines: bool
+
+    colorOn: str
+    symbolOn: str
 
 
 class AnnotationsLayers(AnnotationsInteractions):
@@ -274,3 +329,73 @@ class AnnotationsLayers(AnnotationsInteractions):
 
             # Add the ghost
         layers.append(ghost)
+
+    def getColors(self, colorOn: str = None, function=False) -> pd.Series:
+        if colorOn is None:
+            if function:
+                return lambda _: COLORS["spine"]
+            return pd.Series([COLORS["spine"]] * len(self._points), index=self.index)
+
+        categorical = False
+        if colorOn not in self.columnsAttributes:
+            raise ValueError(f"Column {colorOn} has no color attributes.")
+
+        attr = self.columnsAttributes[colorOn]
+        if "colors" in attr:
+            colors = attr["colors"]
+        elif "categorical" in attr and attr["categorical"]:
+            colors = COLORS["categorical"]
+            categorical = True
+        elif "divergent" in attr and attr["divergent"]:
+            colors = COLORS["divergent"]
+        else:
+            colors = COLORS["scalar"]
+
+        values = self[colorOn]
+        if categorical and not isinstance(colors, dict):
+            keys = list(values.unique())
+            keys.sort()
+            originalColors = colors
+            colors = {key: originalColors[i % len(
+                originalColors)] for i, key in enumerate(keys)}
+
+        if isinstance(colors, dict):
+            if function:
+                return lambda x: colors[x]
+            return values.apply(lambda x: colors[x])
+
+        valuesMin = values.min()
+        valuesMax = values.max()
+
+        colors = scaleColors(colors, 1.0/255.0)
+        if function:
+            return lambda x: scaleColors(sample_colorscale(colors, (x-valuesMin)/(valuesMax-valuesMin), colortype="tuple"), 255)
+
+        normalized = (values-valuesMin)/(valuesMax-valuesMin)
+        return pd.Series(scaleColors(sample_colorscale(colors, normalized, colortype="tuple"), 255), index=values.index)
+
+    def getSymbols(self, shapeOn: str, function=False) -> pd.Series:
+        if shapeOn not in self.columnsAttributes:
+            raise ValueError(f"Column {shapeOn} has no shape attributes.")
+
+        attr = self.columnsAttributes[shapeOn]
+        if "symbols" in attr:
+            symbols_ = attr["symbols"]
+        elif "categorical" in attr and attr["categorical"]:
+            symbols_ = symbols
+        else:
+            raise ValueError(
+                f"Column {shapeOn} is scalar and cannot be used as a shape.")
+
+        values = self[shapeOn]
+        if not isinstance(symbols_, dict):
+            keys = list(values.unique())
+            keys.sort()
+            originalSymbols = symbols_
+            symbols_ = {key: originalSymbols[i % len(
+                originalSymbols)] for i, key in enumerate(keys)}
+
+        if function:
+            return lambda x: symbols_[x]
+
+        return values.apply(lambda x: symbols_[x])

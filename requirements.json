@@ -1,5 +1,5 @@
 {
-  "micropip": ["imagecodecs"],
+  "micropip": ["plotly"],
   "loadPackage": [
     "numpy",
     "pandas",

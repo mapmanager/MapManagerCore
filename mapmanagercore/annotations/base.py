@@ -3,8 +3,10 @@ import zipfile
 import geopandas as gp
 import numpy as np
 import pandas as pd
-from ..types import ImageSlice
-from ...loader.base import ImageLoader, Loader
+
+from ..config import Metadata
+from ..image_slices import ImageSlice
+from ..loader.base import ImageLoader, Loader
 import zarr
 import warnings
 import io
@@ -14,13 +16,18 @@ class AnnotationsBase:
     images: ImageLoader  # used for the brightest path
     _points: gp.GeoDataFrame
     _lineSegments: gp.GeoDataFrame
+    _metadata: Metadata
 
     def __init__(self, loader: Loader):
         self._lineSegments = loader.segments()
         self._points = loader.points()
         self.images = loader.images()
+        self._metadata = loader.metadata()
+        
+    def metadata(self) -> Metadata:
+        return self._metadata
 
-    def slices(self, time: int, channel: int, zRange: Tuple[int, int] = None) -> ImageSlice:
+    def getPixels(self, time: int, channel: int, zRange: Tuple[int, int] = None, z: int = None, zSpread: int = 0) -> ImageSlice:
         """
         Loads the image data for a slice.
 
@@ -28,18 +35,23 @@ class AnnotationsBase:
           time (int): The time slot index.
           channel (int): The channel index.
           zRange (Tuple[int, int]): The visible z slice range.
+          z (int): The z slice index.
+          zSpread (int): The amount to offset z +/-.
 
         Returns:
           ImageSlice: The image slice.
         """
 
         if zRange is None:
-            zRange = (int(self._points["z"].min()),
-                      int(self._points["z"].max()))
+            if z is not None:
+                zRange = (z-zSpread, z+zSpread)
+            else:
+                zRange = (int(self._points["z"].min()),
+                          int(self._points["z"].max()))
 
-        return ImageSlice(self.images.fetchSlices(time, channel, zRange))
+        return ImageSlice(self.images.fetchSlices(time, channel, (zRange[0], zRange[1] + 1)))
 
-    def getShapePixels(self, shapes: gp.GeoSeries, channel: int = 0, zSpread: int = 0, ids: pd.Index = None, id: str = None) -> pd.Series:
+    def getShapePixels(self, shapes: gp.GeoSeries, channel: int = 0, zSpread: int = 0, ids: pd.Index = None, id: str = None, time=None) -> pd.Series:
         if id:
             ids = [id]
 
@@ -58,7 +70,8 @@ class AnnotationsBase:
                 z = self._points.loc[ids if ids else shapes.index, "z"]
         shapes = shapes.to_frame(name="shape")
         shapes["z"] = z
-        shapes["t"] = 0  # self._points.loc[shapes.index, "t"]
+        if time is not None:
+            shapes["t"] = time
 
         r = self.images.getShapePixels(
             shapes, channel=channel, zSpread=zSpread)
@@ -82,7 +95,7 @@ class AnnotationsBase:
                                  dtype=np.uint8)
             group.create_dataset("lineSegments", data=toBytes(self._lineSegments),
                                  dtype=np.uint8)
-
+            group.attrs["metadata"] = self.metadata()
             store.close()
 
 

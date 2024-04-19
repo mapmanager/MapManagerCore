@@ -117,6 +117,10 @@ class Layer:
             translate, lambda g, o: shapely.affinity.translate(g, o.iloc[0, 0], o.iloc[0, 1]))
         return self
 
+    def setSeries(self, series: gp.GeoSeries) -> Self:
+        self.series = series
+        return self
+    
     def copy(self, series: gp.GeoSeries = None, id="") -> Self:
         cls = self.__class__
         result = cls.__new__(cls)
