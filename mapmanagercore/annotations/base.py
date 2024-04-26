@@ -11,12 +11,14 @@ import zarr
 import warnings
 import io
 
+from mapmanagercore.analysis_params import AnalysisParams
 
 class AnnotationsBase:
     images: ImageLoader  # used for the brightest path
     _points: gp.GeoDataFrame
     _lineSegments: gp.GeoDataFrame
     _metadata: Metadata
+    _analysisParams: AnalysisParams
 
     def __init__(self, loader: Loader):
         self._lineSegments = loader.segments()
@@ -24,6 +26,9 @@ class AnnotationsBase:
         self.images = loader.images()
         self._metadata = loader.metadata()
         
+        # abb 20240421
+        self._analysisParams = loader.analysisParams()
+
     def metadata(self) -> Metadata:
         return self._metadata
     
@@ -98,7 +103,12 @@ class AnnotationsBase:
                                  dtype=np.uint8)
             group.create_dataset("lineSegments", data=toBytes(self._lineSegments),
                                  dtype=np.uint8)
+            
+            # abb 20240420
+            group.attrs['analysisParams'] = self._analysisParams.getJson()
+
             group.attrs["metadata"] = self.metadata()
+
             store.close()
 
 

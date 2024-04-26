@@ -6,6 +6,9 @@ import numpy as np
 import zarr
 import geopandas as gp
 
+from mapmanagercore.analysis_params import AnalysisParams
+from mapmanagercore.logger import logger
+
 class MMapLoaderLazy(Loader, ImageLoader):
     def __init__(self, path: str):
         store = zarr.ZipStore(path, mode="r")
@@ -19,9 +22,14 @@ class MMapLoaderLazy(Loader, ImageLoader):
             BytesIO(group["lineSegments"][:].tobytes()))
         lineSegments = gp.GeoDataFrame(lineSegments, geometry="segment")
         lineSegments["segment"] = gp.GeoSeries(lineSegments["segment"])
+        
+        # abb
+        _analysisParams_json = group.attrs['analysisParams']  # json str
+        analysisParams = AnalysisParams(loadJson=_analysisParams_json)
+
         metadata = group.attrs["metadata"]
         
-        super().__init__(lineSegments, points, metadata)
+        super().__init__(lineSegments, points, metadata, analysisParams)
         self._images = group["images"]
 
     def images(self) -> ImageLoader:

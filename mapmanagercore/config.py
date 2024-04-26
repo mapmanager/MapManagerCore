@@ -138,7 +138,7 @@ class Spine(TypedDict):
             "roiExtend": 4.0,
             "roiRadius": 4.0,
             "note": "",
-            "userType": -1,
+            "userType": 0,  # 0 represents "no" user type
             "accept": True,
         })
 
