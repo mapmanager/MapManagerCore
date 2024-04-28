@@ -30,7 +30,7 @@ def importStack(folder):
     numSessions = 8
     maxSlices = 80
         
-    oneTimepoint = 0  # set to None to make a map of numSessions
+    oneTimepoint = 1  # set to None to make a map of numSessions
     if oneTimepoint is None:
         sessionList = range(numSessions)
     else:
@@ -183,7 +183,7 @@ def importStack(folder):
         mmMapSessionFile = f'rr30a.mmap'
     else:
         mmMapSessionFile = f'rr30a_s{oneTimepoint}.mmap'
-    savePath = os.path.join('sandbox', mmMapSessionFile)
+    savePath = os.path.join('sandbox', 'data', mmMapSessionFile)
     logger.info(f'saving: {savePath}')
     map.save(savePath)
 
