@@ -180,9 +180,9 @@ def importStack(folder):
     
     # save our new map
     if oneTimepoint is None:
-        mmMapSessionFile = f'rr30a_tmp2.mmap'
+        mmMapSessionFile = f'rr30a.mmap'
     else:
-        mmMapSessionFile = f'rr30a_s{oneTimepoint}_tmp2.mmap'
+        mmMapSessionFile = f'rr30a_s{oneTimepoint}.mmap'
     savePath = os.path.join('sandbox', mmMapSessionFile)
     logger.info(f'saving: {savePath}')
     map.save(savePath)
