@@ -54,8 +54,11 @@ def getLoggerFilePath():
     logFilePath = os.path.join(appDir, 'mapmanager.log')
     return logFilePath
 
+setLogLevel()
+
 # Create a custom logger with the name as the module name
 logger = logging.getLogger(__name__)
+
 
 handler = logging.StreamHandler(sys.stdout)
 

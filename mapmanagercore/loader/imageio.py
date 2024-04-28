@@ -2,10 +2,75 @@ import pandas as pd
 
 from mapmanagercore.config import Metadata
 from .base import ImageLoader, Loader
+from mapmanagercore.logger import logger
 from typing import Dict, List, Tuple, Union
 import numpy as np
 import zarr
 
+
+def _createMetaData(imgData : np.ndarray,
+                    maxSlices : int = None,
+                    numChannels : int = 1) -> Metadata:
+    """Get MetaData with a seed image volume.
+    
+    Parameters
+    ----------
+    imgData : np.ndarray
+        Template image/volume to get size and dtype
+    maxSlices : int
+        Maximum number of slices in a timeseries/map.
+        Used when creating one metadata for a timeseries with
+            different number of slices per timepoint.
+    numChannels : int
+        The number of channels in final map,
+            imgData is often just one channel of many
+
+    Notes
+    -----
+    In final version, this can be metadata for one timepoint (multiple channels)?
+    With that, we can remove:
+        MetaData.SizeMetadata.t
+        
+    """
+
+    # from typing import Literal
+    from mapmanagercore.config import Metadata, SizeMetadata, VoxelMetadata, MetadataPhysicalSize
+
+    # time = 0  # on create, always the first timepoint
+    #numChannels = 1  # on first image, always one channel
+
+    dtype = imgData.dtype
+    numSlices, x, y = imgData.shape
+
+    if maxSlices is not None:
+        numSlices = maxSlices
+
+    xVoxel = 1  # 0.12
+    yVoxel = 1  # 0.12
+    zVoxel = 1
+    unit = "pixels"  # "µm"
+
+    xPhysical = x * xVoxel
+    yPhysical = y * yVoxel
+    zPhysical = numSlices * zVoxel
+
+    _metadata = Metadata(
+        size=SizeMetadata(x=x,
+                        y=y,
+                        z=numSlices,
+                        # t=time,  # the timepoint of the image
+                        c=numChannels),  # number of color channels, will have to update as more are added
+        voxel=VoxelMetadata(x=xVoxel,
+                            y=yVoxel,
+                            z=zVoxel),
+        dtype=str(dtype),  # Literal['Uint16'],
+        physicalSize=MetadataPhysicalSize(x=xPhysical,
+                                y=yPhysical,
+                                z=zPhysical,
+                                unit=unit)
+        )
+    
+    return _metadata
 
 class MultiImageLoader(Loader):
     """
@@ -26,7 +91,7 @@ class MultiImageLoader(Loader):
         from imageio import imread
         return _MultiImageLoader(imread(path))
 
-    def read(self, path, time: int = 0, channel: int = 0):
+    def read(self, path : Union[str, np.ndarray], time: int = 0, channel: int = 0):
         """
         Load an image from the given path and store it in the images array.
 
@@ -35,8 +100,15 @@ class MultiImageLoader(Loader):
           time (int): The time index.
           channel (int): The channel index.
         """            
-        from imageio import imread
-        _imgData = imread(path)
+        
+        if isinstance(path, str):
+            from imageio import imread
+            _imgData = imread(path)
+        elif isinstance(path, np.ndarray):
+            _imgData = path
+        else:
+            logger.error(f'did not understand path with type {type(path)}, expecting str or np.ndarray')
+
         self._images.append([time, channel, _imgData])
 
         # abb TODO: hold off on this, will try and make a map with one stack meta data
@@ -49,52 +121,6 @@ class MultiImageLoader(Loader):
         #     # add a color channel
         #     self._metadata['size']['c'] += 1
 
-    # not used
-    def _createMetaData(self, imgData : np.array):
-        """On first image load, create metadata
-       
-        Notes
-        -----
-        This can just represent metadata for one timepoint (multipl channels)?
-        With that, we can remove:
-            MetaData.SizeMetadata.t
-            
-        """
-    
-        # from typing import Literal
-        from mapmanagercore.config import Metadata, SizeMetadata, VoxelMetadata, MetadataPhysicalSize
-
-        # time = 0  # on create, always the first timepoint
-        numChannels = 1  # on first image, always one channel
-
-        dtype = imgData.dtype
-        numSlices, x, y = imgData.shape
-
-        xVoxel = 1  # 0.12
-        yVoxel = 1  # 0.12
-        zVoxel = 1
-        unit = ""  # "µm"
-
-        xPhysical = x * xVoxel
-        yPhysical = y * yVoxel
-        zPhysical = numSlices * zVoxel
-
-        self._metadata = Metadata(
-            size=SizeMetadata(x=x,
-                            y=y,
-                            z=numSlices,
-                            # t=time,  # the timepoint of the image
-                            c=numChannels),  # number of color channels, will have to update as more are added
-            voxel=VoxelMetadata(x=xVoxel,
-                                y=yVoxel,
-                                z=zVoxel),
-            dtype=str(dtype),  # Literal['Uint16'],
-            physicalSize=MetadataPhysicalSize(x=xPhysical,
-                                    y=yPhysical,
-                                    z=zPhysical,
-                                    unit=unit)
-            )
-        
     def images(self) -> ImageLoader:
         maxTime = max(time for time, _, _ in self._images) + 1
         maxChannel = max(channel for _, channel, _ in self._images) + 1
@@ -103,6 +129,9 @@ class MultiImageLoader(Loader):
         # dimensions = [maxChannel, maxSlice, maxX, maxY]
         dimensions = [maxTime, maxChannel, maxSlice, maxX, maxY]
         # images = { t: np.zeros(dimensions, dtype=np.uint16) for t, _, i in  self._images}
+        
+        logger.warning(f'making np.zeros dimensions: {dimensions}')
+        
         images = np.zeros(dimensions, dtype=np.uint16)
 
         for time, channel, image in self._images:

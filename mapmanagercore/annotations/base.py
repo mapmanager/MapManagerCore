@@ -12,6 +12,7 @@ import warnings
 import io
 
 from mapmanagercore.analysis_params import AnalysisParams
+from mapmanagercore.logger import logger
 
 class AnnotationsBase:
     images: ImageLoader  # used for the brightest path
@@ -97,10 +98,12 @@ class AnnotationsBase:
 
             store = zarr.ZipStore(path, mode="w", compression=compression)
             group = zarr.group(store=store)
+            
             self.images.saveTo(group)
 
             group.create_dataset("points", data=toBytes(self._points),
                                  dtype=np.uint8)
+            
             group.create_dataset("lineSegments", data=toBytes(self._lineSegments),
                                  dtype=np.uint8)
             

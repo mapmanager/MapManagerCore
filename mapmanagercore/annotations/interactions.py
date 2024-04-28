@@ -32,6 +32,8 @@ class AnnotationsInteractions(AnnotationsSegments):
             Point: The nearest anchor point.
         """
         
+        # logger.info('')
+
         # if not specified, get defaults from AnalysisParams()
         if brightestPathDistance is None:
             brightestPathDistance = self._analysisParams.getValue('brightestPathDistance')
@@ -40,7 +42,7 @@ class AnnotationsInteractions(AnnotationsSegments):
         if zSpread is None:
             zSpread = self._analysisParams.getValue('zSpread')
 
-        logger.warning(f'brightestPathDistance:{brightestPathDistance} channel:{channel} zSpread:{zSpread}')
+        # logger.warning(f'brightestPathDistance:{brightestPathDistance} channel:{channel} zSpread:{zSpread}')
 
         segment: LineString = self._lineSegments.loc[segmentID, "segment"]
         minProjection = segment.project(point)
