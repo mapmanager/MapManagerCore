@@ -11,12 +11,15 @@ import zarr
 import warnings
 import io
 
+from mapmanagercore.analysis_params import AnalysisParams
+from mapmanagercore.logger import logger
 
 class AnnotationsBase:
     images: ImageLoader  # used for the brightest path
     _points: gp.GeoDataFrame
     _lineSegments: gp.GeoDataFrame
     _metadata: Metadata
+    _analysisParams: AnalysisParams
 
     def __init__(self, loader: Loader):
         self._lineSegments = loader.segments()
@@ -24,8 +27,14 @@ class AnnotationsBase:
         self.images = loader.images()
         self._metadata = loader.metadata()
         
+        # abb 20240421
+        self._analysisParams = loader.analysisParams()
+
     def metadata(self) -> Metadata:
         return self._metadata
+    
+    def numChannels(self):
+        return self.images.shape()[1]
 
     def getPixels(self, time: int, channel: int, zRange: Tuple[int, int] = None, z: int = None, zSpread: int = 0) -> ImageSlice:
         """
@@ -89,13 +98,20 @@ class AnnotationsBase:
 
             store = zarr.ZipStore(path, mode="w", compression=compression)
             group = zarr.group(store=store)
+            
             self.images.saveTo(group)
 
             group.create_dataset("points", data=toBytes(self._points),
                                  dtype=np.uint8)
+            
             group.create_dataset("lineSegments", data=toBytes(self._lineSegments),
                                  dtype=np.uint8)
+            
+            # abb 20240420
+            group.attrs['analysisParams'] = self._analysisParams.getJson()
+
             group.attrs["metadata"] = self.metadata()
+
             store.close()
 
 

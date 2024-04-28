@@ -8,9 +8,16 @@ from ..layers.utils import roundPoint
 from shapely.geometry import LineString
 from shapely.ops import split, linemerge
 
+from mapmanagercore.logger import logger
+
 
 class AnnotationsInteractions(AnnotationsSegments):
-    def nearestAnchor(self, segmentID: Tuple[SegmentId, int], point: Point, brightestPathDistance: int = None, channel: int = 0, zSpread: int = 0):
+    def nearestAnchor(self,
+                      segmentID: Tuple[SegmentId, int],
+                      point: Point,
+                      brightestPathDistance: int = None,
+                      channel: int = None,
+                      zSpread: int = None):
         """
         Finds the nearest anchor point on a given line segment to a given point.
 
@@ -24,10 +31,23 @@ class AnnotationsInteractions(AnnotationsSegments):
         Returns:
             Point: The nearest anchor point.
         """
+        
+        # logger.info('')
+
+        # if not specified, get defaults from AnalysisParams()
+        if brightestPathDistance is None:
+            brightestPathDistance = self._analysisParams.getValue('brightestPathDistance')
+        if channel is None:
+            channel = self._analysisParams.getValue('channel')
+        if zSpread is None:
+            zSpread = self._analysisParams.getValue('zSpread')
+
+        # logger.warning(f'brightestPathDistance:{brightestPathDistance} channel:{channel} zSpread:{zSpread}')
+
         segment: LineString = self._lineSegments.loc[segmentID, "segment"]
         minProjection = segment.project(point)
 
-        if brightestPathDistance:
+        if brightestPathDistance is not None:
             segmentLength = int(segment.length)
             minProjection = int(minProjection)
             range_ = range(
@@ -68,7 +88,15 @@ class AnnotationsInteractions(AnnotationsSegments):
             "spineID": newID,
         })
 
-    def addSpine(self, segmentId: Tuple[SpineId, int], x: int, y: int, z: int) -> Union[SpineId, None]:
+    def addSpine(self,
+                 segmentId: Tuple[SpineId, int],
+                 x: int,
+                 y: int,
+                 z: int,
+                 brightestPathDistance: int = None,
+                 channel: int = None,
+                 zSpread: int = None
+                 ) -> Union[SpineId, None]:
         """
         Adds a spine.
 
@@ -78,7 +106,11 @@ class AnnotationsInteractions(AnnotationsSegments):
         z (int): The z coordinate of the spine.
         """
         point = Point(x, y, z)
-        anchor = self.nearestAnchor(segmentId, point, True)
+        anchor = self.nearestAnchor(segmentId,
+                                    point,
+                                    brightestPathDistance,
+                                    channel=channel,
+                                    zSpread=zSpread)
         spineId = self.newUnassignedSpineId()
 
         self.updateSpine((spineId, segmentId[1]), {
@@ -90,6 +122,8 @@ class AnnotationsInteractions(AnnotationsSegments):
             "anchorZ": int(anchor.z),
             "xBackgroundOffset": 0.0,
             "yBackgroundOffset": 0.0,
+            "roiExtend": self._analysisParams['roiExtend'],
+            "roiRadius": self._analysisParams['roiRadius'],
         })
 
         return spineId
@@ -269,6 +303,7 @@ class AnnotationsInteractions(AnnotationsSegments):
 
         self.updateSegment((segmentId, t), {
             **Segment.defaults(),
+            # "segmentID": segmentId,
             "segment": LineString([]),
             "roughTracing": LineString([])
         })
@@ -304,14 +339,23 @@ class AnnotationsInteractions(AnnotationsSegments):
 
         roughTracing: LineString = self._lineSegments.loc[segmentId,
                                                           "roughTracing"]
+
+        # abb
+        # _numPoints = len(self._lineSegments)
+        # logger.info(f'_numPoints:{_numPoints}')
+
         point = Point(x, y, z)
         snappedPoint = roughTracing.interpolate(roughTracing.project(point))
-
+        
         if MAX_TRACING_DISTANCE is not None and point.distance(snappedPoint) > MAX_TRACING_DISTANCE:
             # Snap the point to the maximum tracing distance
             point = LineString([snappedPoint.coords[0], point.coords[0]]).interpolate(
                 MAX_TRACING_DISTANCE)
 
+        # if _numPoints:
+        #     logger.info('xxx')
+        #     _twoPoints = [(x, y, z),(x, y, z)]
+        #     roughTracing = LineString(_twoPoints)  # list[tuple]
         if roughTracing.coords[0] == snappedPoint.coords[0]:
             # Prepend the point to the rough tracing
             roughTracing = LineString(

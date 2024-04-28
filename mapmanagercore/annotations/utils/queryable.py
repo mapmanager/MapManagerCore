@@ -8,6 +8,7 @@ from copy import copy
 from .column_attributes import ColumnAttributes
 from ...benchmark import timeAll, timer
 
+from mapmanagercore.logger import logger
 
 class Query:
     def __init__(self, key: str, func: Callable[[], pd.Series], aggregate: List[str] = None, **kwargs):
@@ -109,6 +110,9 @@ class QueryableInterface:
 
     @timeAll
     def __getitem__(self, items):
+        # abb getitem
+        # logger.info(f'items:{items} {type(items)}')
+        
         row = None
         key = None
         filtered = self
@@ -136,6 +140,8 @@ class QueryableInterface:
                 return filtered
 
         if isinstance(key, str):
+            # logger.info(f'here key:{key}')
+            
             df = filtered._table([key])
             if df.shape[1] == 1:
                 return df.iloc[:, 0]

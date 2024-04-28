@@ -11,6 +11,9 @@ import zarr
 from shapely.geometry.base import BaseGeometry
 from shapely import wkt
 
+from mapmanagercore.analysis_params import AnalysisParams
+
+from mapmanagercore.logger import logger
 
 class ImageLoader:
     """
@@ -206,8 +209,20 @@ def setColumnTypes(df: pd.DataFrame, types: Union[Segment, Spine]) -> gp.GeoData
                 if key in df.columns:
                     df[key] = np.trunc(df[key])
 
-            df[key] = df[key].astype(
-                valueType) if key in df.columns else pd.Series(dtype=valueType)
+            # abb 03/2024
+            # see: https://stackoverflow.com/questions/62899860/how-can-i-resolve-typeerror-cannot-safely-cast-non-equivalent-float64-to-int6
+            try:
+                df[key] = df[key].astype(
+                    valueType) if key in df.columns else pd.Series(dtype=valueType)
+            except (TypeError):
+                if key in df.columns:
+                    df[key] = np.floor(pd.to_numeric(df[key], errors='coerce')).astype('Int64')
+                else:
+                    df[key] = pd.Series(dtype=valueType)
+                
+                # logger.warning(e)
+                # logger.warning(f'df[key].dtype:{df[key].dtype}')
+                # logger.warning(f'key:{key} valueType:{valueType}')
 
         if key in defaults:
             df[key] = df[key].fillna(defaults[key])
@@ -216,7 +231,12 @@ def setColumnTypes(df: pd.DataFrame, types: Union[Segment, Spine]) -> gp.GeoData
 
 
 class Loader:
-    def __init__(self, lineSegments: Union[str, pd.DataFrame] = pd.DataFrame(), points: Union[str, pd.DataFrame] = pd.DataFrame(), metadata: Union[str, Metadata] = Metadata()):
+    def __init__(self,
+                 lineSegments: Union[str, pd.DataFrame] = pd.DataFrame(),
+                 points: Union[str, pd.DataFrame] = pd.DataFrame(),
+                 metadata: Union[str, Metadata] = Metadata(),
+                 analysisParams: AnalysisParams = AnalysisParams()):
+        
         if not isinstance(lineSegments, gp.GeoDataFrame):
             if not isinstance(lineSegments, pd.DataFrame):
                 lineSegments = pd.read_csv(lineSegments, index_col=False)
@@ -225,6 +245,9 @@ class Loader:
         if not "segmentID" in lineSegments.index.names or not "t" in lineSegments.index.names:
             lineSegments.set_index(["segmentID", "t"], drop=True, inplace=True)
         lineSegments.sort_index(level=0, inplace=True)
+
+        # logger.info('core lineSegments')
+        # print(lineSegments)
 
         if not isinstance(points, gp.GeoDataFrame):
             if not isinstance(points, pd.DataFrame):
@@ -248,6 +271,9 @@ class Loader:
 
         self._metadata = metadata
 
+        # abb 202404
+        self._analysisParams = analysisParams
+
     def points(self) -> gp.GeoDataFrame:
         return self._points
 
@@ -260,6 +286,8 @@ class Loader:
     def metadata(self) -> Metadata:
         return self._metadata
 
+    def analysisParams(self) -> AnalysisParams:
+        return self._analysisParams
 
 def bounds(x: np.array):
     return (x.min(), int(x.max()) + 1)

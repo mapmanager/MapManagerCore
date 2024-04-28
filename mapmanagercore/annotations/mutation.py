@@ -10,6 +10,8 @@ from ..log import Op, RecordLog
 from enum import Enum
 from .base import AnnotationsBase
 
+from mapmanagercore.logger import logger
+
 Key = Union[SpineId, Tuple[SpineId, int]]
 Keys = Union[Key, list[Key]]
 
@@ -129,6 +131,8 @@ class AnnotationsBaseMut(AnnotationsBase):
         old = df.loc[df.index.intersection(ids) if isinstance(
             ids[0], tuple) else df.index.get_level_values(0).intersection(ids)].copy()
         value = pd.Series(value)
+
+        # logger.info(f'df:{df} ids:{ids} value:{value}')
 
         updateDataFrame(df, ids, value)
 
