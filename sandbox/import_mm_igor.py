@@ -1,5 +1,14 @@
 """Scripts to import a Map Manager Igor stack and map.
 
+This assumes you have
+PyMapManager-Data folder at same level as MapManagerCore folder
+(not inside it)
+
+Set `oneTimePoint` to None to make a map with 8 timepoints (hard-coded).
+
+Run this from command line from MapManagerCore like:
+
+    python sandbox/import_mm_igor.py
 """
 
 import os
@@ -14,18 +23,20 @@ from mapmanagercore.loader.imageio import _createMetaData
 from mapmanagercore.logger import logger, setLogLevel
 
 def importStack(folder):
-    mapName = os.path.split(folder)[1]
-
-    maxSlices = 80  # hard coded for map rr30a
-
+    logger.info(f'folder:{folder}')
+    
+    # hard coded for map rr30a
     numChannels = 2
     numSessions = 8
+    maxSlices = 80
         
-    oneTimepoint = 0
+    oneTimepoint = 0  # set to None to make a map of numSessions
     if oneTimepoint is None:
         sessionList = range(numSessions)
     else:
         sessionList = [0]
+
+    mapName = os.path.split(folder)[1]
 
     igorDict = {
         'dfPoints': [],
@@ -152,6 +163,7 @@ def importStack(folder):
             
             # print('ADDING SPINE:', '_count', _count, 'index:', index, 'segmentID:', segmentID, 't:', _t, x, y, z)
 
+            # TODO: add spine does not connect anchor properly
             newSpineID = map.addSpine(segmentId=(segmentID,_t),
                                     x=x, y=y, z=z,
                                     #brightestPathDistance=brightestPathDistance,
@@ -160,31 +172,27 @@ def importStack(folder):
                                     )
             
             _count += 1
-            # if _count > 4:
-            #     break
+
         _totalAdded += _count
         print(f'_idx:{_idx} sessionID:{sessionID} add {_count} spines')
+
     print('total added spine:', _totalAdded)
     
-
     # save our new map
     if oneTimepoint is None:
         mmMapSessionFile = f'rr30a_tmp2.mmap'
     else:
         mmMapSessionFile = f'rr30a_s{oneTimepoint}_tmp2.mmap'
-    savePath = os.path.join('/Users/cudmore/Desktop', mmMapSessionFile)
-    print('saving:', savePath)
+    savePath = os.path.join('sandbox', mmMapSessionFile)
+    logger.info(f'saving: {savePath}')
     map.save(savePath)
 
     # make sure we can load the map
     print('re-load as map2')
     map2 = MapAnnotations(MMapLoader(savePath).cached())
-    print('map2:', map2)
-
-    # print('re-saving points')
-    # map2.savePoints(savePath)
+    logger.info(f'map2:{map2}')
 
 if __name__ == '__main__':
     setLogLevel()
-    folder = '/Users/cudmore/Sites/PyMapManager-Data/maps/rr30a'
+    folder = '../PyMapManager-Data/maps/rr30a'
     importStack(folder)
