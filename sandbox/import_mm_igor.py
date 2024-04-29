@@ -15,6 +15,7 @@ import os
 import numpy as np
 import pandas as pd
 from shapely.geometry import LineString
+from shapely.ops import linemerge
 
 import tifffile
 

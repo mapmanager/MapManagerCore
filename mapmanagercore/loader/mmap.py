@@ -63,8 +63,10 @@ class MMapLoaderLazy(Loader, ImageLoader):
     # abb
     def fetchSlices2(self, time: int, channel: int, sliceRange: Tuple[int, int]) -> np.ndarray:
         # _imgData = self._images[time][channel][sliceRange[0]:sliceRange[1]]
-        return self._images[time][channel][sliceRange[0]:sliceRange[1]]
-
+        if isinstance(sliceRange, tuple):
+            return self._images[time][channel][sliceRange[0]:sliceRange[1]]
+        else:
+            return self._images[time][channel][sliceRange]
 
 class MMapLoader(MMapLoaderLazy):
     def __init__(self, path: str):
