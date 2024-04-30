@@ -1,9 +1,8 @@
 from functools import lru_cache
 import json
-from typing import Self, Tuple, Union
+from typing import Iterator, Self, Tuple, Union
 import numpy as np
 import pandas as pd
-
 from ..config import Metadata, Segment, Spine
 from ..utils import shapeIndexes
 import geopandas as gp
@@ -17,6 +16,15 @@ class ImageLoader:
     Base class for image loaders.
     """
 
+    def timePoints(self) -> Iterator[int]:
+        ("implemented by subclass")
+
+    def _images(self, t: int) -> np.ndarray:
+        ("implemented by subclass", t)
+
+    def metadata(self, t: int) -> Metadata:
+        ("implemented by subclass")
+
     def loadSlice(self, time: int, channel: int, slice: int) -> np.ndarray:
         """
         Loads a slice of data for the given time, channel, and slice index.
@@ -29,43 +37,61 @@ class ImageLoader:
         Returns:
           np.ndarray: The loaded slice of data.
         """
-        ("implemented by subclass", time, channel, slice)
+        return self._images(time)[channel][slice]
 
-    def dtype(self) -> np.dtype:
+    def dtype(self, t: int) -> np.dtype:
         """
         Returns the data type of the image data.
 
         Returns:
           np.dtype: The data type of the image data.
         """
-        np.dtype("uint16")
+        np.dtype(str.lower(self.metadata(t)["dtype"]))
 
-    def shape(self) -> Tuple[int, int, int, int, int]:
+    def shape(self, t: int) -> Tuple[int, int, int, int]:
         """
         Returns the shape of the image data.
 
         Returns:
-          Tuple[int, int, int, int, int]: The shape of the image data, (t,c,z,x,y).
+          Tuple[int, int, int, int]: The shape of the image data, (c,z,x,y).
         """
-        ("implemented by subclass")
+        return self._images(t).shape
 
-    def channels(self) -> int:
+    def channels(self, t: int = None) -> int:
         """
         Returns the number of channels in the image data.
 
         Returns:
           int: The number of channels in the image data.
         """
-        return self.shape()[1]
 
-    def saveTo(self, store: zarr.Group):
+        if t is None:
+            return min(self.shape(t)[0] for t in self.timePoints())
+
+        return self.shape(t)[0]
+
+    def slices(self, t: int) -> int:
+        """
+        Returns the number of channels in the image data.
+
+        Returns:
+          int: The number of channels in the image data.
+        """
+        return self.shape(t)[1]
+
+    def saveTo(self, group: zarr.Group):
         """
         Saves the image data to a store.
 
         Args:
           store: The store to save the data to.
         """
-        ("implemented by subclass")
+        for t in self.timePoints():
+            image = self._images(t)
+            group.create_dataset(f"img-{t}", data=image, dtype=image.dtype)
+            group.attrs[f"metadata-{t}"] = self.metadata(t)
+
+        group.attrs["timePoints"] = list(self.timePoints())
 
     def fetchSlices(self, time: int, channel: int, sliceRange: Tuple[int, int]) -> np.ndarray:
         """
@@ -79,13 +105,7 @@ class ImageLoader:
         Returns:
           np.ndarray: The fetched slices.
         """
-        sls = [self.loadSlice(time, channel, i)
-               for i in range(int(sliceRange[0]), int(sliceRange[1]))]
-
-        if len(sls) == 1:
-            return sls[0]
-
-        return np.max(sls, axis=0)
+        return np.max(self._images(time)[channel][sliceRange[0]:sliceRange[1]], axis=0)
 
     def cached(self, maxsize=15) -> Self:
         """
@@ -242,12 +262,6 @@ class Loader:
         self._lineSegments = lineSegments
         self._points = points
 
-        if isinstance(metadata, str):
-            with open(metadata, "r") as metadataFile:
-                metadata = json.load(metadataFile)
-
-        self._metadata = metadata
-
     def points(self) -> gp.GeoDataFrame:
         return self._points
 
@@ -256,9 +270,6 @@ class Loader:
 
     def images(self) -> ImageLoader:
         "abstract method"
-
-    def metadata(self) -> Metadata:
-        return self._metadata
 
 
 def bounds(x: np.array):

@@ -1,1 +1,1 @@
-from .layers import AnnotationsLayers as Annotations
+from .query import QueryAnnotations as Annotations

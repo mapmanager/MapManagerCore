@@ -2,15 +2,18 @@ from typing import Tuple, Union
 import numpy as np
 from shapely.geometry import Point
 from .segment import AnnotationsSegments
-from ..config import MAX_TRACING_DISTANCE, SegmentId, Spine, SpineId, Segment
-from ..layers.layer import DragState
-from ..layers.utils import roundPoint
+from ...config import MAX_TRACING_DISTANCE, SegmentId, Spine, SpineId, Segment
+from ...layers.layer import DragState
+from ...layers.utils import roundPoint
 from shapely.geometry import LineString
 from shapely.ops import split, linemerge
 
 
+pendingBackgroundRoiTranslation = None
+
+
 class AnnotationsInteractions(AnnotationsSegments):
-    def nearestAnchor(self, segmentID: Tuple[SegmentId, int], point: Point, brightestPathDistance: int = None, channel: int = 0, zSpread: int = 0):
+    def nearestAnchor(self, segmentID: SegmentId, point: Point, brightestPathDistance: int = None, channel: int = 0, zSpread: int = 0):
         """
         Finds the nearest anchor point on a given line segment to a given point.
 
@@ -39,36 +42,14 @@ class AnnotationsInteractions(AnnotationsSegments):
                 minProjection + distance), 1)]) for distance in range_]
 
             brightest = self.getShapePixels(
-                targets, channel=channel, zSpread=zSpread, time=segmentID[1]).apply(np.sum).idxmax()
+                targets, channel=channel, zSpread=zSpread).apply(np.sum).idxmax()
             return Point(targets[brightest].coords[1])
 
         anchor = segment.interpolate(minProjection)
         anchor = roundPoint(anchor, 1)
         return anchor
 
-    def connect(self, spineKey: Tuple[SpineId, int], toSpineKey: Tuple[SpineId, int]):
-        if self._points.loc[toSpineKey, "segmentID"] != self._points.loc[spineKey, "segmentID"]:
-            raise ValueError("Cannot connect spines from different segments.")
-
-        # check if the key already exists in the time point
-        existingKey = (toSpineKey[0], spineKey[0])
-        if existingKey in self._points.index:
-            self.disconnect(existingKey)
-
-        # Propagate the spine ID to all future time points
-        self.updateSpine(range(spineKey, spineKey[0]), {
-            "spineID": toSpineKey[0],
-        })
-
-    def disconnect(self, spineKey: Tuple[SpineId, int]):
-        newID = self.newUnassignedSpineId()
-
-        # Propagate the spine ID change to all future time points
-        self.updateSpine(range(spineKey, spineKey[0]), {
-            "spineID": newID,
-        })
-
-    def addSpine(self, segmentId: Tuple[SpineId, int], x: int, y: int, z: int) -> Union[SpineId, None]:
+    def addSpine(self, segmentId: SpineId, x: int, y: int, z: int) -> Union[SpineId, None]:
         """
         Adds a spine.
 
@@ -78,12 +59,12 @@ class AnnotationsInteractions(AnnotationsSegments):
         z (int): The z coordinate of the spine.
         """
         point = Point(x, y, z)
-        anchor = self.nearestAnchor(segmentId, point, True)
+        anchor = self.nearestAnchor(segmentId, point)
         spineId = self.newUnassignedSpineId()
 
-        self.updateSpine((spineId, segmentId[1]), {
+        self.updateSpine(spineId, {
             **Spine.defaults(),
-            "segmentID": segmentId[0],
+            "segmentID": segmentId,
             "point": Point(point.x, point.y),
             "z": int(z),
             "anchor": Point(anchor.x, anchor.y),
@@ -101,12 +82,12 @@ class AnnotationsInteractions(AnnotationsSegments):
         Returns:
             int: new spine's ID.
         """
-        ids = self._points.index.get_level_values(0)
+        ids = self._annotations._points.index.get_level_values(0)
         if len(ids) == 0:
             return 0
-        return self._points.index.get_level_values(0).max() + 1
+        return ids.max() + 1
 
-    def moveSpine(self, spineId: Tuple[SpineId, int], x: int, y: int, z: int, state: DragState = DragState.MANUAL) -> bool:
+    def moveSpine(self, spineId: SpineId, x: int, y: int, z: int, state: DragState = DragState.MANUAL) -> bool:
         """
         Moves the spine identified by `spineId` to the given `x` and `y` coordinates.
 
@@ -125,7 +106,7 @@ class AnnotationsInteractions(AnnotationsSegments):
 
         return True
 
-    def moveAnchor(self, spineId: Tuple[SpineId, int], x: int, y: int, z: int, state: DragState = DragState.MANUAL) -> bool:
+    def moveAnchor(self, spineId: SpineId, x: int, y: int, z: int, state: DragState = DragState.MANUAL) -> bool:
         """
         Moves the anchor point of a spine to the given x and y coordinates.
 
@@ -139,7 +120,7 @@ class AnnotationsInteractions(AnnotationsSegments):
             bool: True if the anchor point was successfully translated, False otherwise.
         """
         point = self._points.loc[spineId]
-        anchor = self.nearestAnchor(point["segmentID"], Point(x, y))
+        anchor = self.nearestAnchor(point["segmentID"], Point(x, y, z))
 
         self.updateSpine(spineId, {
             "anchorZ": int(anchor.z),
@@ -148,9 +129,7 @@ class AnnotationsInteractions(AnnotationsSegments):
 
         return True
 
-    pendingBackgroundRoiTranslation = None
-
-    def moveBackgroundRoi(self, spineId: Tuple[SpineId, int], x: int, y: int, z: int = 0, state: DragState = DragState.MANUAL) -> bool:
+    def moveBackgroundRoi(self, spineId: SpineId, x: int, y: int, z: int = 0, state: DragState = DragState.MANUAL) -> bool:
         """
         Translates the background ROI for a given spine ID by the specified x and y offsets.
 
@@ -172,22 +151,22 @@ class AnnotationsInteractions(AnnotationsSegments):
 
         point = self._points.loc[spineId]
 
-        if self.pendingBackgroundRoiTranslation is None or state == DragState.START:
-            self.pendingBackgroundRoiTranslation = [x, y]
+        global pendingBackgroundRoiTranslation
+
+        if pendingBackgroundRoiTranslation is None or state == DragState.START:
+            pendingBackgroundRoiTranslation = [x, y]
 
         self.updateSpine(spineId, {
-            "xBackgroundOffset": float(point["xBackgroundOffset"] + x - self.pendingBackgroundRoiTranslation[0]),
-            "yBackgroundOffset": float(point["yBackgroundOffset"] + y - self.pendingBackgroundRoiTranslation[1]),
+            "xBackgroundOffset": float(point["xBackgroundOffset"] + x - pendingBackgroundRoiTranslation[0]),
+            "yBackgroundOffset": float(point["yBackgroundOffset"] + y - pendingBackgroundRoiTranslation[1]),
         }, state != DragState.START and state != DragState.MANUAL)
-
-        self.pendingBackgroundRoiTranslation = [x, y]
-
-        if state == DragState.END:
-            self.pendingBackgroundRoiTranslation = None
+        
+        pendingBackgroundRoiTranslation = None if state == DragState.END else [
+            x, y]
 
         return True
 
-    def moveRoiExtend(self, spineId: Tuple[SpineId, int], x: int, y: int, z: int = 0, state: DragState = DragState.MANUAL) -> bool:
+    def moveRoiExtend(self, spineId: SpineId, x: int, y: int, z: int = 0, state: DragState = DragState.MANUAL) -> bool:
         """
         Move the ROI extend for a given spine ID.
 
@@ -208,8 +187,30 @@ class AnnotationsInteractions(AnnotationsSegments):
         }, state != DragState.START and state != DragState.MANUAL)
 
         return True
+    
+    def moveRoiRadius(self, spineId: SpineId, x: int, y: int, z: int = 0, state: DragState = DragState.MANUAL) -> bool:
+        """
+        Move the ROI extend for a given spine ID.
 
-    def moveSegmentRadius(self, segmentId: Tuple[SegmentId, int], x: int, y: int, z: int = 0, state: DragState = DragState.MANUAL) -> bool:
+        Args:
+            spineId (str): The ID of the spine.
+            x (int): The x-coordinate of the cursor.
+            y (int): The y-coordinate of the cursor.
+            state (DragState): The state of the translation.
+
+        returns:
+            bool: True if the ROI extend was successfully translated, False otherwise.
+        """
+
+        point = self._points.loc[spineId, "point"]
+
+        self.updateSpine(spineId, {
+            "roiRadius": float(point.distance(Point(x, y)))
+        }, state != DragState.START and state != DragState.MANUAL)
+
+        return True
+
+    def moveSegmentRadius(self, segmentId: SegmentId, x: int, y: int, z: int = 0, state: DragState = DragState.MANUAL) -> bool:
         """
         Move the Radius of a segment by the given x and y coordinates.
 
@@ -223,7 +224,7 @@ class AnnotationsInteractions(AnnotationsSegments):
             bool: True if the segment was successfully translated, False otherwise.
         """
 
-        anchor = self.nearestAnchor(segmentId, Point(x, y), True)
+        anchor = self.nearestAnchor(segmentId, Point(x, y))
         self.updateSegment(segmentId, {
             "radius": Point(anchor.x, anchor.y).distance(Point(x, y))
         }, state != DragState.START and state != DragState.MANUAL)
@@ -232,30 +233,7 @@ class AnnotationsInteractions(AnnotationsSegments):
 
     # Segments
 
-    def connectSegment(self, segmentKey: Tuple[SegmentId, int], toSegmentKey: Tuple[SegmentId, int]):
-        if segmentKey[1] == toSegmentKey[1]:
-            raise ValueError(
-                "Cannot connect segments in the same time points.")
-
-        # check if the key already exists in the time point
-        existingKey = (toSegmentKey[0], segmentKey[1])
-        if existingKey in self._lineSegments.index:
-            self.disconnectSegment(existingKey)
-
-        # Propagate the segment ID to all future time points
-        self.updateSegment(range(segmentKey, segmentKey[0]), {
-            "segmentID": toSegmentKey[0],
-        })
-
-    def disconnectSegment(self, segmentKey: Tuple[SegmentId, int]):
-        newID = self.newUnassignedSegmentId()
-
-        # Propagate the segment ID change to all future time points
-        self.updateSegment(range(segmentKey, segmentKey[0]), {
-            "segmentID": newID,
-        })
-
-    def addSegment(self, t: int = 0) -> Union[SegmentId, None]:
+    def addSegment(self) -> Union[SegmentId, None]:
         """
         Generates a new segment.
 
@@ -267,7 +245,7 @@ class AnnotationsInteractions(AnnotationsSegments):
         """
         segmentId = self.newUnassignedSegmentId()
 
-        self.updateSegment((segmentId, t), {
+        self.updateSegment(segmentId, {
             **Segment.defaults(),
             "segment": LineString([]),
             "roughTracing": LineString([])
@@ -282,12 +260,12 @@ class AnnotationsInteractions(AnnotationsSegments):
         Returns:
             int: new segment's ID.
         """
-        ids = self._lineSegments.index.get_level_values(0)
+        ids = self._annotations._lineSegments.index.get_level_values(0)
         if len(ids) == 0:
             return 0
-        return self._lineSegments.index.get_level_values(0).max() + 1
+        return ids.max() + 1
 
-    def appendSegmentPoint(self, segmentId: Tuple[SegmentId, int], x: int, y: int, z: int, speculate: bool = False) -> LineString:
+    def appendSegmentPoint(self, segmentId: SegmentId, x: int, y: int, z: int, speculate: bool = False) -> LineString:
         """
         Adds a point to a segment.
 
@@ -330,7 +308,7 @@ class AnnotationsInteractions(AnnotationsSegments):
         self.updateSegmentWithLiveTracing(segmentId, roughTracing)
         return roughTracing
 
-    def moveSegmentPoint(self, segmentId: Tuple[SegmentId, int], x: int, y: int, z: int, index: int, state: DragState = DragState.MANUAL) -> bool:
+    def moveSegmentPoint(self, segmentId: SegmentId, x: int, y: int, z: int, index: int, state: DragState = DragState.MANUAL) -> bool:
         """
         Moves a point in a segment.
 
@@ -350,7 +328,7 @@ class AnnotationsInteractions(AnnotationsSegments):
 
         return True
 
-    def deleteSegmentPoint(self, segmentId: Tuple[SegmentId, int], index: int) -> bool:
+    def deleteSegmentPoint(self, segmentId: SegmentId, index: int) -> bool:
         """
         Deletes a point from a segment.
 
@@ -366,7 +344,7 @@ class AnnotationsInteractions(AnnotationsSegments):
 
         return True
 
-    def updateSegmentWithLiveTracing(self, segmentId: Tuple[SegmentId, int], roughTracing: LineString, replaceLog: bool = False):
+    def updateSegmentWithLiveTracing(self, segmentId: SegmentId, roughTracing: LineString, replaceLog: bool = False):
         """
         Updates a segment with live tracing.
 
@@ -385,7 +363,7 @@ class AnnotationsInteractions(AnnotationsSegments):
 
         self.updateSegment(segmentId, update, replaceLog)
 
-    def commitSegmentTracing(self, segmentId: Tuple[SegmentId, int]) -> bool:
+    def commitSegmentTracing(self, segmentId: SegmentId) -> bool:
         """
         Commits the rough tracing of a segment.
 

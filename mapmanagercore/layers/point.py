@@ -20,7 +20,7 @@ class PointLayer(Layer):
         return LineLayer(self)
 
     @Layer.setProperty
-    def radius(self, radius: Union[int, Callable[[str], int]]) -> Self:
+    def radius(self, radius: Union[int, Callable[[int], int]]) -> Self:
         ("implemented by decorator", radius)
         return self
 

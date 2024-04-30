@@ -66,17 +66,17 @@ class Layer:
         return [self.copy(id="ghost").filter(~visibleMask).opacity(opacity), self.filter(visibleMask)]
 
     @setProperty
-    def stroke(self, color: Union[Color, Callable[[str], Color]]) -> Self:
+    def stroke(self, color: Union[Color, Callable[[int], Color]]) -> Self:
         ("implemented by decorator", color)
         return self
 
     @setProperty
-    def strokeWidth(self, width: Union[int, Callable[[str], int]]) -> Self:
+    def strokeWidth(self, width: Union[int, Callable[[int], int]]) -> Self:
         ("implemented by decorator", width)
         return self
 
     @setProperty
-    def fill(self, color: Union[Color, Callable[[str], Color]]) -> Self:
+    def fill(self, color: Union[Color, Callable[[int], Color]]) -> Self:
         ("implemented by decorator", color)
         return self
 
@@ -97,7 +97,6 @@ class Layer:
 
         if "id" not in self.properties:
             warnings.warn("missing id")
-
         return {
             **self._encodeBin(),
             "properties": self.properties
@@ -120,9 +119,9 @@ class Layer:
     def setSeries(self, series: gp.GeoSeries) -> Self:
         self.series = series
         return self
-    
-    def copy(self, series: gp.GeoSeries = None, id="") -> Self:
-        cls = self.__class__
+            
+    def copy(self, series: gp.GeoSeries = None, id="", cls = None) -> Self:
+        cls = cls if cls is not None else self.__class__
         result = cls.__new__(cls)
         result.properties = self.properties.copy()
         if len(id) != 0:

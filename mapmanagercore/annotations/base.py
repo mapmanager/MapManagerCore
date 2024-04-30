@@ -3,8 +3,6 @@ import zipfile
 import geopandas as gp
 import numpy as np
 import pandas as pd
-
-from ..config import Metadata
 from ..image_slices import ImageSlice
 from ..loader.base import ImageLoader, Loader
 import zarr
@@ -13,19 +11,18 @@ import io
 
 
 class AnnotationsBase:
-    images: ImageLoader  # used for the brightest path
+    _images: ImageLoader  # used for the brightest path
     _points: gp.GeoDataFrame
     _lineSegments: gp.GeoDataFrame
-    _metadata: Metadata
 
     def __init__(self, loader: Loader):
         self._lineSegments = loader.segments()
         self._points = loader.points()
-        self.images = loader.images()
-        self._metadata = loader.metadata()
-        
-    def metadata(self) -> Metadata:
-        return self._metadata
+        self._images = loader.images()
+
+    def getTimePoint(self, time: int):
+        from .single_time_point import SingleTimePointAnnotations
+        return SingleTimePointAnnotations(self, time)
 
     def getPixels(self, time: int, channel: int, zRange: Tuple[int, int] = None, z: int = None, zSpread: int = 0) -> ImageSlice:
         """
@@ -49,7 +46,7 @@ class AnnotationsBase:
                 zRange = (int(self._points["z"].min()),
                           int(self._points["z"].max()))
 
-        return ImageSlice(self.images.fetchSlices(time, channel, (zRange[0], zRange[1] + 1)))
+        return ImageSlice(self._images.fetchSlices(time, channel, (zRange[0], zRange[1] + 1)))
 
     def getShapePixels(self, shapes: gp.GeoSeries, channel: int = 0, zSpread: int = 0, ids: pd.Index = None, id: str = None, time=None) -> pd.Series:
         if id:
@@ -73,7 +70,7 @@ class AnnotationsBase:
         if time is not None:
             shapes["t"] = time
 
-        r = self.images.getShapePixels(
+        r = self._images.getShapePixels(
             shapes, channel=channel, zSpread=zSpread)
         if singleRow:
             return r.iloc[0]
@@ -89,13 +86,13 @@ class AnnotationsBase:
 
             store = zarr.ZipStore(path, mode="w", compression=compression)
             group = zarr.group(store=store)
-            self.images.saveTo(group)
+            self._images.saveTo(group)
 
             group.create_dataset("points", data=toBytes(self._points),
                                  dtype=np.uint8)
             group.create_dataset("lineSegments", data=toBytes(self._lineSegments),
                                  dtype=np.uint8)
-            group.attrs["metadata"] = self.metadata()
+            group.attrs["version"] = 1
             store.close()
 
 

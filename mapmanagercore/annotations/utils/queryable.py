@@ -14,7 +14,7 @@ class Query:
         self.func = func
         self.key = key
         self.attr = ColumnAttributes(
-            {**ColumnAttributes.default(), **kwargs, "column": key})
+            {**ColumnAttributes.default(), **kwargs, "key": key})
         self.aggregate = aggregate
 
     @timer
@@ -23,6 +23,11 @@ class Query:
         if insureCached:
             return
         return result
+
+
+class SegmentKey:
+    def __init__(self, items) -> None:
+        self.items = items
 
 
 class QueryableInterface:
@@ -40,7 +45,7 @@ class QueryableInterface:
                 columns.append(query.key)
             else:
                 for agg in query.aggregate:
-                    for channel in range(0, self.images.channels()):
+                    for channel in range(0, self._channels()):
                         columns.append(f"{query.key}_ch{channel}_{agg}")
 
         return columns
@@ -56,7 +61,7 @@ class QueryableInterface:
                 attributes[query.key] = query.attr
             else:
                 for agg in query.aggregate:
-                    for channel in range(0, self.images.channels()):
+                    for channel in range(0, self._channels()):
                         queryKey = f"{query.key}_ch{channel}_{agg}"
                         attributes[queryKey] = {
                             **query.attr,
@@ -66,6 +71,7 @@ class QueryableInterface:
 
         return attributes
 
+    @timer
     def _table(self, columns: List[str]) -> pd.DataFrame:
         result = {}
 
@@ -95,31 +101,57 @@ class QueryableInterface:
 
         return gp.GeoDataFrame(result)
 
-    def _filter(self, index: pd.Index):
+    @timer
+    def _filter(self, index: pd.Index, isSegments: bool = False):
         filtered = copy(self)
 
-        if isinstance(index, str):
+        if isinstance(index, int) or isinstance(index, np.int64) or isinstance(index, np.int32):
             index = [index]
 
-        if isinstance(index, tuple) and len(index) == 2:
+        elif isinstance(index, tuple) and len(index) == 2:
             index = [index]
+
+        elif isinstance(index, pd.Series):
+            if not isinstance(index.index, pd.MultiIndex):
+                index = index[index].index
+
+        if isinstance(index, pd.Index):
+            if isSegments:
+                index = self._lineSegments.index.get_level_values(
+                    0).isin(index)
+            else:
+                index = self._points.index.get_level_values(0).isin(index)
+
+        if isSegments:
+            segments = filtered._lineSegments.loc[index, :]
+            filtered._points = filtered._points[filtered._points[["segmentID"]].apply(
+                lambda x: (x["segmentID"], x.name[1]) in segments.index, axis=1).values]
+            return filtered
 
         filtered._points = filtered._points.loc[index, :]
         return filtered
 
-    @timeAll
+    @timer
     def __getitem__(self, items):
         row = None
         key = None
+        isSegments = False
+
+        if isinstance(items, SegmentKey):
+            items = items.items
+            isSegments = True
+
         filtered = self
-        if isinstance(items, slice) or isinstance(items, pd.Index) or isinstance(items, pd.Series) or isinstance(items, np.ndarray):
+        if isinstance(items, slice) or isinstance(items, pd.Index) or isinstance(items, pd.MultiIndex) or isinstance(items, pd.Series) or isinstance(items, np.ndarray):
             row = items
         elif isinstance(items, tuple):
-            if len(items) > 1:
+            if len(items) == 2 and not (isinstance(items[1], int) or isinstance(items[1], np.int64) or isinstance(items[1], np.int32)):
                 row = items[0]
                 key = items[1]
             else:
                 row = items
+        elif isinstance(items, int) or isinstance(items, np.int64) or isinstance(items, np.int32):
+            row = items
         elif isinstance(items, str):
             key = items
         elif isinstance(items, list) and len(items) > 0:
@@ -131,8 +163,11 @@ class QueryableInterface:
             raise ValueError("Invalid item type.", type(items))
 
         if row is not None:
-            filtered = self._filter(row)
-            if key is None and not isinstance(row, slice):
+            filtered = self._filter(row, isSegments)
+            if key is None and not (isinstance(row, slice) and row == slice(None, None, None)):
+                if isSegments:
+                    from ...annotations.query import SegmentQuery
+                    return SegmentQuery(filtered)
                 return filtered
 
         if isinstance(key, str):
@@ -213,11 +248,12 @@ class QueryableInterface:
         selfCopy._points = selfCopy._points.loc[hash.index]
         return [selfCopy, hash]
 
+    @timer
     def _updateModDate(self, modKey, missingIndex, newModDate):
         self._points.loc[missingIndex, modKey] = newModDate
 
     def _channels(self):
-        return self.images.channels()
+        return self._images.channels()
 
 
 def queryable(dependencies: List[str] = None, segmentDependencies: List[str] = None, aggregate: List[str] = None, **kwargs: Unpack[ColumnAttributes]):

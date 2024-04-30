@@ -53,10 +53,6 @@ def roundPoint(point: Point, ndig=0):
 
 
 def offsetCurveZ(line: LineString, offset: int) -> LineString:
-    offsetLine: LineString = line.offset_curve(offset)
-    points = []
-    for x, y in offsetLine.coords:
-        lineI = offsetLine.project(Point(x, y), normalized=True)
-        z = line.interpolate(lineI, normalized=True).z
-        points.append((x, y, z))
+    offsetLine: LineString = line.parallel_offset(offset, join_style=2)
+    points = [(x, y, line.interpolate(line.project(Point(x, y))).z) for x, y in offsetLine.coords]
     return LineString(points)

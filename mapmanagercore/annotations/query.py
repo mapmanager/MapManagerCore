@@ -2,7 +2,7 @@ from ..benchmark import timer
 from ..loader.base import setColumnTypes
 from ..config import Segment
 from ..layers.utils import offsetCurveZ
-from .utils.queryable import QueryableInterface, queryable
+from .utils.queryable import QueryableInterface, SegmentKey, queryable
 import pandas as pd
 from ..utils import polygonUnion
 from ..layers.line import calcSubLine, extend
@@ -29,6 +29,10 @@ class QueryAnnotations(AnnotationsBaseMut, QueryableInterface):
     def segmentID(self):
         return self._points["segmentID"]
 
+    @queryable(title="Point")
+    def point(self):
+        return gp.GeoSeries(self._points["point"])
+    
     @queryable(title="x")
     def x(self):
         return gp.GeoSeries(self._points["point"]).x
@@ -49,6 +53,10 @@ class QueryAnnotations(AnnotationsBaseMut, QueryableInterface):
     def userType(self):
         return self._points["userType"]
 
+    @queryable(title="Anchor")
+    def anchor(self):
+        return gp.GeoSeries(self._points["anchor"])
+    
     @queryable(title="Anchor X")
     def anchorX(self):
         return gp.GeoSeries(self._points["anchor"]).x
@@ -91,6 +99,10 @@ class QueryAnnotations(AnnotationsBaseMut, QueryableInterface):
     @queryable(title="Point", plot=False)
     def points(self):
         return self._points["point"]
+    
+    @queryable(title="ROI Radius", plot=False)
+    def roiRadius(self):
+        return self._points["roiRadius"]
 
     @queryable(title="Anchor", plot=False)
     def anchors(self):
@@ -114,11 +126,18 @@ class QueryAnnotations(AnnotationsBaseMut, QueryableInterface):
 
         segments = self._points[["segmentID"]].apply(
             lambda d: self._lineSegments.loc[(d["segmentID"], d.name[1])], axis=1)
-        return segments if not segments.empty else setColumnTypes(segments, Segment)
+
+        if segments.empty:
+            segments = setColumnTypes(segments, Segment)
+            segments["segmentLeft"] = gp.GeoSeries()
+            segments["segmentRight"] = gp.GeoSeries()
+            return segments
+
+        return segments
 
     @queryable(title="Segment", plot=False)
     def segment(self):
-        return self._segments()["segment"]
+        return self._points[["segmentID"]].apply(lambda d: self._lineSegments.loc[(d["segmentID"], d.name[1]), "segment"], axis=1)
 
     @queryable(title="Left Segment", plot=False)
     def segmentLeft(self):
@@ -130,12 +149,12 @@ class QueryAnnotations(AnnotationsBaseMut, QueryableInterface):
 
     @queryable(title="Radius", segmentDependencies=["radius"])
     def radius(self):
-        return self._segments()["radius"]
+        return self._points[["segmentID"]].apply(lambda d: self._lineSegments.loc[(d["segmentID"], d.name[1]), "radius"], axis=1)
 
     @queryable(dependencies=["anchor", "radius"], segmentDependencies=["segment"], plot=False)
     def roiBase(self) -> gp.GeoSeries:
         df = self._points.copy()
-        df["segment"] = self._segments()["segment"]
+        df["segment"] = self.segment()
         return df.apply(lambda d: calcSubLine(d["segment"], d["anchor"], distance=8).buffer(d["radius"], cap_style=2), axis=1)
 
     @queryable(dependencies=["roiBase", "xBackgroundOffset", "yBackgroundOffset"], plot=False)
@@ -188,7 +207,10 @@ class SegmentQuery:
         self.annotations = annotations
 
     def __getitem__(self, items):
-        df = self.annotations.__getitem__(items)
+        df = self.annotations.__getitem__(SegmentKey(items))
+        if isinstance(df, SegmentQuery):
+            return df
+        
         df.index = self.annotations._points.loc[df.index]["segmentID"]
         return df
 

@@ -1,10 +1,10 @@
+import json
 import pandas as pd
 
 from mapmanagercore.config import Metadata
 from .base import ImageLoader, Loader
-from typing import Tuple, Union
+from typing import Iterator, Union
 import numpy as np
-import zarr
 
 
 class MultiImageLoader(Loader):
@@ -12,9 +12,10 @@ class MultiImageLoader(Loader):
     Class for building an MultiImageLoader.
     """
 
-    def __init__(self, lineSegments: Union[str, pd.DataFrame] = pd.DataFrame(), points: Union[str, pd.DataFrame] = pd.DataFrame(), metadata: Union[str, Metadata] = Metadata()):
-        super().__init__(lineSegments, points, metadata)
-        self._images = []
+    def __init__(self, lineSegments: Union[str, pd.DataFrame] = pd.DataFrame(), points: Union[str, pd.DataFrame] = pd.DataFrame()):
+        super().__init__(lineSegments, points)
+        self._images = {}
+        self._metadata = {}
 
     def imread(path: str) -> ImageLoader:
         """
@@ -36,20 +37,41 @@ class MultiImageLoader(Loader):
           channel (int): The channel index.
         """
         from imageio import imread
-        self._images.append([time, channel, imread(path)])
+        if time not in self._images:
+            self._images[time] = []
+
+        self._images[time].append([channel, imread(path)])
+
+    def readMetadata(self, metadata: Union[Metadata, str], time: int = 0):
+        """
+        Set the metadata for the given time index.
+
+        Args:
+          time (int): The time index.
+          metadata (Metadata): The metadata.
+        """
+
+        if isinstance(metadata, str):
+            with open(metadata, "r") as metadataFile:
+                metadata = json.load(metadataFile)
+
+        self._metadata[time] = metadata
 
     def images(self) -> ImageLoader:
-        maxTime = max(time for time, _, _ in self._images) + 1
-        maxChannel = max(channel for _, channel, _ in self._images) + 1
-        maxSlice, maxX, maxY = self._images[0][2].shape
+        images = {}
 
-        dimensions = [maxTime, maxChannel, maxSlice, maxX, maxY]
-        images = np.zeros(dimensions, dtype=np.uint16)
+        for time, values in self._images.items():
+            if not (time in self._metadata):
+                raise ValueError(f"Metadata not found for time point {time}")
 
-        for time, channel, image in self._images:
-            images[time, channel] = image
+            maxChannel = max(channel for channel, _ in values) + 1
+            maxSlice, maxX, maxY = values[0][1].shape
+            dimensions = [maxChannel, maxSlice, maxX, maxY]
+            images[time] = np.zeros(dimensions, dtype=np.uint16)
+            for channel, image in values:
+                images[time][channel] = image
 
-        return _MultiImageLoader(images)
+        return _MultiImageLoader(images, self._metadata)
 
 
 class _MultiImageLoader(ImageLoader):
@@ -57,7 +79,7 @@ class _MultiImageLoader(ImageLoader):
     A loader class for loading from imageio supported formats.
     """
 
-    def __init__(self, images: np.ndarray):
+    def __init__(self, images: dict[int, np.ndarray], metadata: dict[int, Metadata]):
         """
         Initialize the BaseImage class.
 
@@ -66,17 +88,14 @@ class _MultiImageLoader(ImageLoader):
 
         """
         super().__init__()
-        self._images = images
+        self._imagesSrcs = images
+        self._metadata = metadata
 
-    def shape(self) -> Tuple[int, int, int, int, int]:
-        return self._images.shape
+    def timePoints(self) -> Iterator[int]:
+        return self._imagesSrcs.keys()
 
-    def saveTo(self, group: zarr.Group):
-        group.create_dataset("images", data=self._images,
-                             dtype=self._images.dtype)
+    def _images(self, t: int) -> np.ndarray:
+        return self._imagesSrcs[t]
 
-    def loadSlice(self, time: int, channel: int, slice: int) -> np.ndarray:
-        return self._images[time][channel][slice]
-
-    def fetchSlices(self, time: int, channel: int, sliceRange: Tuple[int, int]) -> np.ndarray:
-        return np.max(self._images[time][channel][sliceRange[0]:sliceRange[1]], axis=0)
+    def metadata(self, t: int) -> Metadata:
+        return self._metadata[t] if t in self._metadata else Metadata()

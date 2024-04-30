@@ -18,21 +18,20 @@ class MultiLineLayer(Layer):
         return PolygonLayer(self)
 
     @Layer.setProperty
-    def offset(self, offset: Union[int, Callable[[str], int]]) -> Self:
+    def offset(self, offset: Union[int, Callable[[int], int]]) -> Self:
         ("implemented by decorator", offset)
         return self
 
     @Layer.setProperty
-    def outline(self, outline: Union[int, Callable[[str], int]]) -> Self:
+    def outline(self, outline: Union[int, Callable[[int], int]]) -> Self:
         ("implemented by decorator", outline)
         return self
 
     def normalize(self) -> Self:
         if "offset" in self.properties:
             distance = self.properties["offset"]
-            distance = self.series.index.map(
-                lambda x: distance(x) if callable(distance) else distance)
-            self.series = shapely.offset_curve(self.series, distance=distance)
+            self.series = self.series.apply(
+                lambda x: x.parallel_offset(distance(x) if callable(distance) else distance))
 
         if "outline" in self.properties:
             distance = self.properties["outline"]
@@ -44,7 +43,7 @@ class MultiLineLayer(Layer):
 
     def _encodeBin(self):
         coords = self.series.apply(getCoords)
-        featureId = coords.index
+        featureId = coords.index.get_level_values(0)
         coords = coords.reset_index(drop=True)
         coords = coords.explode()
         pathIndices = coords.apply(len).cumsum()
@@ -65,19 +64,19 @@ class LineLayer(MultiLineLayer):
         self.series.dropna(inplace=True)
         return MultiLineLayer(self)
 
-    @timer
+    @ timer
     def createSubLine(df: gp.GeoDataFrame, distance: int, linc: str, originc: str) -> Self:
         series = df.apply(lambda d: calcSubLine(
             d[linc], d[originc], distance), axis=1)
         return LineLayer(series)
 
-    @timer
+    @ timer
     def subLine(self, distance: int) -> Self:
         self.series = self.series.apply(lambda d: calcSubLine(
             d, getTail(d), distance))
         return self
 
-    @timer
+    @ timer
     def simplify(self, res: int) -> Self:
         self.series = self.series.simplify(res)
         return self
@@ -95,13 +94,18 @@ class LineLayer(MultiLineLayer):
         points = PointLayer(self)
         points.series = points.series.apply(lambda x: Point(x.coords[-1]))
         return points
+    
+    def head(self):
+        points = PointLayer(self)
+        points.series = points.series.apply(lambda x: Point(x.coords[0]))
+        return points
 
 
 def getTail(d):
     return Point(d.coords[1][0], d.coords[1][1])
 
 
-@timer
+@ timer
 def calcSubLine(line: LineLayer, origin: Point, distance: int):
     root = line.project(origin)
     sub = substring(line, start_dist=max(

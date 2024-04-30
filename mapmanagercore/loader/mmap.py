@@ -1,10 +1,14 @@
 from io import BytesIO
+import json
 import pandas as pd
+
+from mapmanagercore.config import Metadata
 from .base import ImageLoader, Loader
-from typing import Tuple
+from typing import Iterator, Tuple
 import numpy as np
 import zarr
 import geopandas as gp
+
 
 class MMapLoaderLazy(Loader, ImageLoader):
     def __init__(self, path: str):
@@ -19,32 +23,29 @@ class MMapLoaderLazy(Loader, ImageLoader):
             BytesIO(group["lineSegments"][:].tobytes()))
         lineSegments = gp.GeoDataFrame(lineSegments, geometry="segment")
         lineSegments["segment"] = gp.GeoSeries(lineSegments["segment"])
-        metadata = group.attrs["metadata"]
-        
-        super().__init__(lineSegments, points, metadata)
-        self._images = group["images"]
+
+        super().__init__(lineSegments, points)
+
+        self._imagesSrcs = {}
+        self._metadata = {}
+        for t in group.attrs["timePoints"]:
+            self._imagesSrcs[t] = group[f"img-{t}"]
+            self._metadata[t] = group.attrs[f"metadata-{t}"]
 
     def images(self) -> ImageLoader:
         return self
 
-    def shape(self) -> Tuple[int, int, int, int, int]:
-        return self._images.shape
+    def timePoints(self) -> Iterator[int]:
+        return self._imagesSrcs.keys()
 
-    def dtype(self) -> np.dtype:
-        return self._images.dtype
+    def _images(self, t: int) -> np.ndarray:
+        return self._imagesSrcs[t]
 
-    def saveTo(self, group: zarr.Group):
-        group.create_dataset("images", data=self._images,
-                             dtype=self._images.dtype)
-
-    def loadSlice(self, time: int, channel: int, slice: int) -> np.ndarray:
-        return self._images[time][channel][slice]
-
-    def fetchSlices(self, time: int, channel: int, sliceRange: Tuple[int, int]) -> np.ndarray:
-        return np.max(self._images[time][channel][sliceRange[0]:sliceRange[1]], axis=0)
+    def metadata(self, t: int) -> Metadata:
+        return self._metadata[t] if t in self._metadata else Metadata()
 
 
 class MMapLoader(MMapLoaderLazy):
     def __init__(self, path: str):
         super().__init__(path)
-        self._images = self._images[:]
+        self._imagesSrcs = {key: value[:] for key, value in self._imagesSrcs.items()}

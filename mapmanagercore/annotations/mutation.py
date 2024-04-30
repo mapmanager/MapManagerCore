@@ -3,7 +3,7 @@ from typing import Tuple, Union
 import geopandas as gp
 import numpy as np
 import pandas as pd
-from ..config import Segment, Spine, SpineId
+from ..config import Segment, SegmentId, Spine, SpineId
 from ..loader.base import Loader
 from ..utils import validateColumns
 from ..log import Op, RecordLog
@@ -148,6 +148,51 @@ class AnnotationsBaseMut(AnnotationsBase):
             return
 
         self._log.push(op, replace=replaceLog)
+
+    def connect(self, spineKey: Tuple[SpineId, int], toSpineKey: Tuple[SpineId, int]):
+        if self._points.loc[toSpineKey, "segmentID"] != self._points.loc[spineKey, "segmentID"]:
+            raise ValueError("Cannot connect spines from different segments.")
+
+        # check if the key already exists in the time point
+        existingKey = (toSpineKey[0], spineKey[0])
+        if existingKey in self._points.index:
+            self.disconnect(existingKey)
+
+        # Propagate the spine ID to all future time points
+        self.updateSpine(range(spineKey, spineKey[0]), {
+            "spineID": toSpineKey[0],
+        })
+
+    def disconnect(self, spineKey: Tuple[SpineId, int]):
+        newID = self.newUnassignedSpineId()
+
+        # Propagate the spine ID change to all future time points
+        self.updateSpine(range(spineKey, spineKey[0]), {
+            "spineID": newID,
+        })
+
+    def connectSegment(self, segmentKey: Tuple[SegmentId, int], toSegmentKey: Tuple[SegmentId, int]):
+        if segmentKey[1] == toSegmentKey[1]:
+            raise ValueError(
+                "Cannot connect segments in the same time points.")
+
+        # check if the key already exists in the time point
+        existingKey = (toSegmentKey[0], segmentKey[1])
+        if existingKey in self._lineSegments.index:
+            self.disconnectSegment(existingKey)
+
+        # Propagate the segment ID to all future time points
+        self.updateSegment(range(segmentKey, segmentKey[0]), {
+            "segmentID": toSegmentKey[0],
+        })
+
+    def disconnectSegment(self, segmentKey: Tuple[SegmentId, int]):
+        newID = self.newUnassignedSegmentId()
+
+        # Propagate the segment ID change to all future time points
+        self.updateSegment(range(segmentKey, segmentKey[0]), {
+            "segmentID": newID,
+        })
 
 
 def updateDataFrame(df: gp.GeoDataFrame, ids: list[Key], value: pd.Series):

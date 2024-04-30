@@ -148,7 +148,6 @@ class SizeMetadata(TypedDict):
     x: int
     y: int
     z: int
-    t: int
     c: int
 
 
