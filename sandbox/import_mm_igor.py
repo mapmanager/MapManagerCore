@@ -12,6 +12,7 @@ Run this from command line from MapManagerCore like:
 """
 
 import os
+import time
 import numpy as np
 import pandas as pd
 from shapely.geometry import LineString
@@ -23,15 +24,25 @@ from mapmanagercore import MapAnnotations, MultiImageLoader, MMapLoader
 from mapmanagercore.loader.imageio import _createMetaData
 from mapmanagercore.logger import logger, setLogLevel
 
-def importStack(folder):
+def importStack(folder, oneTimepoint : int = None):
+    """
+    folder : str
+        Path to Igor folder
+    oneTimepoint : int | None
+        If int specified then make a single timepoint map
+            o.w. make a map with numSessions
+    """
+    
     logger.info(f'folder:{folder}')
     
+    _startTime = time.time()
+
     # hard coded for map rr30a
     numChannels = 2
     numSessions = 8
     maxSlices = 80
         
-    oneTimepoint = 0  # set to None to make a map of numSessions
+    # oneTimepoint = 0  # set to None to make a map of numSessions
     if oneTimepoint is None:
         sessionList = range(numSessions)
     else:
@@ -99,6 +110,8 @@ def importStack(folder):
         for segmentID in segments:
             dfSegment = dfLines[ dfLines['segmentID']==segmentID ]
 
+            # TODO: reduce resolution of line by removing every other point?
+            
             n = len(dfSegment)
             zxy = np.ndarray((n,3), dtype=int)
             zxy[:,0] = dfSegment['x'].to_list()
@@ -149,11 +162,25 @@ def importStack(folder):
     import warnings
     warnings.filterwarnings("ignore")
 
+    # list of dict, one dict per session
+    # each dict maps original igor spine id to core spine id
+    # use this at end to load, convert and then connect spines with igor map
+    sessionMapList = []
+
     _totalAdded = 0
     for _idx, sessionID in enumerate(sessionList):
+        
         _t = _idx
         dfPoints = igorDict['dfPoints'][_idx]
+        
+        # original has roiType in ['globalPIvot' 'pivotPnt' 'controlPnt' 'spineROI']
+        # print('unique:', dfPoints['roiType'].unique())
+        
         dfSpines = dfPoints[ dfPoints['roiType']=='spineROI' ]
+
+        # each session needs to map igor spine id to core spine id
+        thisSessionMap = {}  #np.zeros((len(dfSpines)))
+
         _count = 0
         for index, row in dfSpines.iterrows():
             # index is the original row before reducing to spineROI
@@ -162,7 +189,7 @@ def importStack(folder):
             y = row['y']
             z = row['z']
             
-            # print('ADDING SPINE:', '_count', _count, 'index:', index, 'segmentID:', segmentID, 't:', _t, x, y, z)
+            print('ADDING SPINE:', 'sessionID:', sessionID, '_count', _count, 'index:', index, 'segmentID:', segmentID, 't:', _t, x, y, z)
 
             # TODO: add spine does not connect anchor properly
             newSpineID = map.addSpine(segmentId=(segmentID,_t),
@@ -172,28 +199,71 @@ def importStack(folder):
                                     #zSpread=zSpread
                                     )
             
+            print(f'   newSpineID:{newSpineID}')
+
+            # original spine row is `index`, in core will be newSpineID
+            # map to spine id to igor spine id
+            thisSessionMap[index] = newSpineID
+            
             _count += 1
+
+        sessionMapList.append(thisSessionMap)
 
         _totalAdded += _count
         print(f'_idx:{_idx} sessionID:{sessionID} add {_count} spines')
 
     print('total added spine:', _totalAdded)
     
+    # computer all spine columns (e.g. intensity analysis)
+    print('calling map[:]')
+    map[:]
+
+    #
     # save our new map
     if oneTimepoint is None:
-        mmMapSessionFile = f'rr30a_tmp2.mmap'
+        mmMapSessionFile = f'rr30a.mmap'
     else:
-        mmMapSessionFile = f'rr30a_s{oneTimepoint}_tmp2.mmap'
-    savePath = os.path.join('sandbox', mmMapSessionFile)
+        mmMapSessionFile = f'rr30a_s{oneTimepoint}.mmap'
+    savePath = os.path.join('sandbox', 'data', mmMapSessionFile)
     logger.info(f'saving: {savePath}')
     map.save(savePath)
 
     # make sure we can load the map
-    print('re-load as map2')
-    map2 = MapAnnotations(MMapLoader(savePath).cached())
-    logger.info(f'map2:{map2}')
+    # print('re-load as map2')
+    # map2 = MapAnnotations(MMapLoader(savePath).cached())
+    # logger.info(f'map2:{map2}')
+
+    _stopTime = time.time()
+    print(f'done, import took {round(_stopTime-_startTime,3)} s')
+
+def convertRunMap(igorFolder, coreMapPath = 'sandbox/data/rr30a.mmap'):
+    """Convert run map saved in xxx to core centric spine ID.
+    """
+
+    print('loading coreMapPath:', coreMapPath)
+    # coreMap = MapAnnotations(MMapLoader(coreMapPath).cached())
+    coreMap = MapAnnotations(MMapLoader(coreMapPath))
+    print(coreMap)
+    
+    #
+    # load run/seg map manually exported from PyMapManager mmMap
+    igorRunMapPath = 'igorRunMapExport.npy'
+    igorRunMapPath = os.path.join(igorFolder, igorRunMapPath)
+    igorRunMap = np.load(igorRunMapPath)
+    print('igorRunMap:', igorRunMap.shape)
+
+    # sandbox/data/rr30a_s1.mmap
 
 if __name__ == '__main__':
     setLogLevel()
     folder = '../PyMapManager-Data/maps/rr30a'
-    importStack(folder)
+    
+    oneTimepoint = 1  # 1 timepoint (from session 1 in the map)
+    #oneTimepoint = None  # 8 session map
+    
+    # works
+    # importStack(folder, oneTimepoint=oneTimepoint)
+
+    # load multi tp core map (created in xxx) and convert spine IDs
+    # from igor to core spine id
+    convertRunMap(folder)

@@ -96,6 +96,7 @@ class ImageLoader:
         """
         cache = lru_cache(maxsize=maxsize)
         self.fetchSlices = cache(self.fetchSlices)
+        self.fetchSlices2 = cache(self.fetchSlices2)
         return self
 
     def get(self, time: int, channel: int, z: Union[Tuple[int, int], int, np.ndarray], x: Union[Tuple[int, int, np.ndarray], int], y: Union[Tuple[int, int], int, np.ndarray]) -> np.array:
@@ -155,12 +156,21 @@ class ImageLoader:
         shape = shape.reset_index()
         shape["z"] = shape["z"].astype(int)
 
+        # logger.info('shape:')
+        # print(shape)
+        # logger.info(f'zSpread:{zSpread}')
+        # logger.info(f'channel:{channel}')
+        
         for (t, z), group in shape.groupby(by=["t", "z"]):
             if zSpread == 0:
                 image = self.loadSlice(t, channel, z)
             else:
                 image = self.fetchSlices(
                     t, channel, (z - zSpread, z + zSpread + 1))
+
+            # logger.info(f'   t:{t} z:{z} image:{image.shape}')
+            # print('group')
+            # print(group)
 
             for idx, row in group.iterrows():
                 xs, ys = shapeIndexes(row["shape"])

@@ -30,6 +30,49 @@ class AnnotationsBase:
         # abb 20240421
         self._analysisParams = loader.analysisParams()
 
+    # abb
+    def __str__(self):
+        """Print info about the time-series including:
+            - images
+            -points
+            -lines
+        """
+
+        # print('self._lineSegments:', type(self._lineSegments))  # GeoDataFrame
+        # print('self._points:', type(self._points))  # GeoDataFrame
+        # print('self.images:', type(self.images))  # loader.mmap.MMapLoader
+        # print('self._metadata:', type(self._metadata))  # dict
+        # print('self._analysisParams:', type(self._analysisParams))  # analysis_params.AnalysisParams
+
+        # self.images is mapmanagercore.loader.mmap.MMapLoader
+        # print('self.images')
+        # print(self.images.shape())  # (8, 2, 80, 1024, 1024)
+        numTimePoints = self.images.shape()[0]
+        totalSpines = len(self._points)
+        totalSegments = len(self._lineSegments)
+
+        print(f'time-points:{numTimePoints} spines:{totalSpines} segments:{totalSegments}')
+
+        for timepoint in range(numTimePoints):
+            dfPoints = self._points.loc[ (slice(None), timepoint), : ]
+            numSpines = len(dfPoints)
+
+            dfSegments = self._lineSegments.loc[ (slice(None), timepoint), : ]
+            numSegments = len(dfSegments)
+
+            print(f'   tp:{timepoint} spines:{numSpines} segments:{numSegments}')
+
+
+        # print(self._points)
+        # numSpines = len(self._points)
+        # print('numSpines:', numSpines)
+        
+        # print(self._lineSegments)
+        # numSegments = len(self._lineSegments.index[0])  #[0].unique())
+        # print('numSegments:', numSegments)
+        
+        return 'xxx'
+    
     def metadata(self) -> Metadata:
         return self._metadata
     

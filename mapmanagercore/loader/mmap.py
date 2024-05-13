@@ -32,13 +32,13 @@ class MMapLoaderLazy(Loader, ImageLoader):
         
         super().__init__(lineSegments, points, metadata, analysisParams)
         
-        logger.info('loading images ...')
+        # logger.info('loading images ...')
         _start = time.time()
 
         self._images = group["images"]
         
         _stop = time.time()
-        logger.info(f'  loaded self._images:{self._images.shape} in {round(_stop-_start,3)} s')
+        # logger.info(f'  loaded self._images:{self._images.shape} in {round(_stop-_start,3)} s')
 
     def images(self) -> ImageLoader:
         return self
@@ -60,7 +60,7 @@ class MMapLoaderLazy(Loader, ImageLoader):
         # _imgData = self._images[time][channel][sliceRange[0]:sliceRange[1]]
         return np.max(self._images[time][channel][sliceRange[0]:sliceRange[1]], axis=0)
 
-    # abb
+    # abb, why is this duplicated in multiimageloader?
     def fetchSlices2(self, time: int, channel: int, sliceRange: Tuple[int, int]) -> np.ndarray:
         # _imgData = self._images[time][channel][sliceRange[0]:sliceRange[1]]
         if isinstance(sliceRange, tuple):
@@ -77,4 +77,4 @@ class MMapLoader(MMapLoaderLazy):
         # self._images = self._images[:]
 
         _stop = time.time()
-        logger.info(f'  self._images[:]:{self._images.shape} in {round(_stop-_start,3)} s')
+        # logger.info(f'  self._images[:]:{self._images.shape} in {round(_stop-_start,3)} s')

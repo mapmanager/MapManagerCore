@@ -12,6 +12,48 @@ from mapmanagercore.logger import logger
 
 
 class AnnotationsInteractions(AnnotationsSegments):
+    def nearestAnchor2(self,
+                      segmentID: Tuple[SegmentId, int],
+                      point: Point,
+                      brightestPathDistance: int = None,
+                      channel: int = None,
+                      zSpread: int = None):
+
+        # if not specified, get defaults from AnalysisParams()
+        if brightestPathDistance is None:
+            brightestPathDistance = self._analysisParams.getValue('brightestPathDistance')
+        if channel is None:
+            channel = self._analysisParams.getValue('channel')
+        if zSpread is None:
+            zSpread = self._analysisParams.getValue('zSpread')
+
+        from mapmanagercore.utils import findBrightestIndex
+        from shapely import get_coordinates
+
+        # LINESTRING Z (170 281 35, ...)
+        _segment : LineString = self._lineSegments.loc[segmentID, "segment"]
+        # xyzList = np.vstack(_segment.coords.xy).T.tolist()
+        xyzList = get_coordinates(_segment, include_z=True).tolist()
+
+        # logger.info(f'_segment:{_segment}')
+        # logger.info(f'xyzList:{xyzList}')
+
+        _t = segmentID[1]
+        x = point.x
+        y = point.y
+        z = int(point.z)
+        _image = self.images.fetchSlices(_t, channel, (z - zSpread, z + zSpread))  # was +1 ?
+        
+        # logger.info(f'_image:{_image.shape}')
+        
+        _lineWidth = 2  # TODO: add to analysis options
+        
+        lineIndex = findBrightestIndex(x, y, z, xyzList, _image, brightestPathDistance, _lineWidth)
+
+        anchor = Point(xyzList[lineIndex][0], xyzList[lineIndex][1], xyzList[lineIndex][2])
+        
+        return anchor
+    
     def nearestAnchor(self,
                       segmentID: Tuple[SegmentId, int],
                       point: Point,
@@ -64,6 +106,9 @@ class AnnotationsInteractions(AnnotationsSegments):
 
         anchor = segment.interpolate(minProjection)
         anchor = roundPoint(anchor, 1)
+        
+        # logger.info(f'anchor:{anchor} {type(anchor)}')
+        
         return anchor
 
     def connect(self, spineKey: Tuple[SpineId, int], toSpineKey: Tuple[SpineId, int]):
@@ -106,13 +151,23 @@ class AnnotationsInteractions(AnnotationsSegments):
         z (int): The z coordinate of the spine.
         """
         point = Point(x, y, z)
-        anchor = self.nearestAnchor(segmentId,
+        # anchor = self.nearestAnchor(segmentId,
+        anchor = self.nearestAnchor2(segmentId,
                                     point,
                                     brightestPathDistance,
                                     channel=channel,
                                     zSpread=zSpread)
+
+        # POINT Z (349 241 34) <class 'shapely.geometry.point.Point'>
+        # logger.info(f'anchor:{anchor} {type(anchor)}')
+        
         spineId = self.newUnassignedSpineId()
 
+        # too early, spineId does not exist yet
+        # get the background offset
+        # df = self["roi"].get_coordinates()
+        # df = df.loc[spineId]
+        
         self.updateSpine((spineId, segmentId[1]), {
             **Spine.defaults(),
             "segmentID": segmentId[0],
@@ -120,11 +175,13 @@ class AnnotationsInteractions(AnnotationsSegments):
             "z": int(z),
             "anchor": Point(anchor.x, anchor.y),
             "anchorZ": int(anchor.z),
-            "xBackgroundOffset": 0.0,
-            "yBackgroundOffset": 0.0,
+            "xBackgroundOffset": 30,  #0.0, # abb testing
+            "yBackgroundOffset": 50,  # 0.0,
             "roiExtend": self._analysisParams['roiExtend'],
             "roiRadius": self._analysisParams['roiRadius'],
         })
+
+        self.moveBackgroundRoi2((spineId, segmentId[1]))
 
         return spineId
 
@@ -183,6 +240,49 @@ class AnnotationsInteractions(AnnotationsSegments):
         return True
 
     pendingBackgroundRoiTranslation = None
+
+    # abb
+    def moveBackgroundRoi2(self, spineId: Tuple[SpineId, int]) -> bool:
+        """Move the combined spine/segment ROI to the lowest intensity background position.
+        """
+
+        from shapely import Polygon
+        from mapmanagercore.utils import polygonToMask, calculateLowestIntensityOffset
+        
+        _polygon = self["roi"].get_coordinates()  # combined spine/segment polygon
+        _polygon = _polygon.loc[spineId]  # df with x y columns
+
+        _x = _polygon['x'].tolist()
+        _y = _polygon['y'].tolist()
+
+        _polygon = Polygon(list(zip(_x, _y)))
+
+        mask = polygonToMask(_polygon)
+        distance = 20
+        numPoints = 5  # must be odd
+        _t = spineId[1]  # segmentId[1]
+        
+        z = self._points['z'].loc[spineId]
+        channel = 1  # self._points['channel']
+
+        # _zRange = (int(z)-1, int(z)+1)
+        _zRange = int(z)  # TODO: make this a range
+
+        # logger.info(f'_t:{_t} _zRange:{_zRange} channel:{channel}')
+        
+        # _img = self.images.fetchSlices(_t, channel, _zRange)
+        _img = self.images.fetchSlices2(_t, channel, _zRange)
+        
+        # logger.info(f'_img:{_img.shape}')
+
+        _xyOffset = calculateLowestIntensityOffset(mask, distance, numPoints, _img)
+        xBg = _xyOffset[0]
+        yBg = _xyOffset[1]
+        zBg = z
+        
+        logger.info(f'xBg:{xBg} yBg:{yBg}, zBg:{zBg}')
+        
+        self.moveBackgroundRoi(spineId, xBg, yBg, zBg, state = DragState.MANUAL)
 
     def moveBackgroundRoi(self, spineId: Tuple[SpineId, int], x: int, y: int, z: int = 0, state: DragState = DragState.MANUAL) -> bool:
         """

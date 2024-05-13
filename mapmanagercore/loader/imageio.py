@@ -170,3 +170,11 @@ class _MultiImageLoader(ImageLoader):
 
     def fetchSlices(self, time: int, channel: int, sliceRange: Tuple[int, int]) -> np.ndarray:
         return np.max(self._images[time][channel][sliceRange[0]:sliceRange[1]], axis=0)
+
+    # abb, why is this duplicated in mmmap?
+    def fetchSlices2(self, time: int, channel: int, sliceRange: Tuple[int, int]) -> np.ndarray:
+        # _imgData = self._images[time][channel][sliceRange[0]:sliceRange[1]]
+        if isinstance(sliceRange, tuple):
+            return self._images[time][channel][sliceRange[0]:sliceRange[1]]
+        else:
+            return self._images[time][channel][sliceRange]
