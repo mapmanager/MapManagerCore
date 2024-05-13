@@ -1,11 +1,10 @@
+import json
 import pandas as pd
 
 from mapmanagercore.config import Metadata
 from .base import ImageLoader, Loader
-from mapmanagercore.logger import logger
-from typing import Dict, List, Tuple, Union
+from typing import Iterator, Union
 import numpy as np
-import zarr
 
 
 def _createMetaData(imgData : np.ndarray,
@@ -77,9 +76,10 @@ class MultiImageLoader(Loader):
     Class for building an MultiImageLoader.
     """
 
-    def __init__(self, lineSegments: Union[str, pd.DataFrame] = pd.DataFrame(), points: Union[str, pd.DataFrame] = pd.DataFrame(), metadata: Union[str, Metadata] = Metadata()):
-        super().__init__(lineSegments, points, metadata)
-        self._images = []
+    def __init__(self, lineSegments: Union[str, pd.DataFrame] = pd.DataFrame(), points: Union[str, pd.DataFrame] = pd.DataFrame()):
+        super().__init__(lineSegments, points)
+        self._images = {}
+        self._metadata = {}
 
     def imread(path: str) -> ImageLoader:
         """
@@ -99,45 +99,43 @@ class MultiImageLoader(Loader):
           path (str): The path to the image file.
           time (int): The time index.
           channel (int): The channel index.
-        """            
-        
-        if isinstance(path, str):
-            from imageio import imread
-            _imgData = imread(path)
-        elif isinstance(path, np.ndarray):
-            _imgData = path
-        else:
-            logger.error(f'did not understand path with type {type(path)}, expecting str or np.ndarray')
+        """
+        from imageio import imread
+        if time not in self._images:
+            self._images[time] = []
 
-        self._images.append([time, channel, _imgData])
+        self._images[time].append([channel, imread(path)])
 
-        # abb TODO: hold off on this, will try and make a map with one stack meta data
-        # as is already done in the code.
-        # here I was thinking each timepoint image volume would have its own
-        # if len(self._images) == 1:
-        #     # make metadata
-        #     self._createMetaData(_imgData)
-        # else:
-        #     # add a color channel
-        #     self._metadata['size']['c'] += 1
+    def readMetadata(self, metadata: Union[Metadata, str], time: int = 0):
+        """
+        Set the metadata for the given time index.
+
+        Args:
+          time (int): The time index.
+          metadata (Metadata): The metadata.
+        """
+
+        if isinstance(metadata, str):
+            with open(metadata, "r") as metadataFile:
+                metadata = json.load(metadataFile)
+
+        self._metadata[time] = metadata
 
     def images(self) -> ImageLoader:
-        maxTime = max(time for time, _, _ in self._images) + 1
-        maxChannel = max(channel for _, channel, _ in self._images) + 1
-        maxSlice, maxX, maxY = self._images[0][2].shape
+        images = {}
 
-        # dimensions = [maxChannel, maxSlice, maxX, maxY]
-        dimensions = [maxTime, maxChannel, maxSlice, maxX, maxY]
-        # images = { t: np.zeros(dimensions, dtype=np.uint16) for t, _, i in  self._images}
-        
-        logger.warning(f'making np.zeros dimensions: {dimensions}')
-        
-        images = np.zeros(dimensions, dtype=np.uint16)
+        for time, values in self._images.items():
+            if not (time in self._metadata):
+                raise ValueError(f"Metadata not found for time point {time}")
 
-        for time, channel, image in self._images:
-            images[time][channel] = image
+            maxChannel = max(channel for channel, _ in values) + 1
+            maxSlice, maxX, maxY = values[0][1].shape
+            dimensions = [maxChannel, maxSlice, maxX, maxY]
+            images[time] = np.zeros(dimensions, dtype=np.uint16)
+            for channel, image in values:
+                images[time][channel] = image
 
-        return _MultiImageLoader(images)
+        return _MultiImageLoader(images, self._metadata)
 
 
 class _MultiImageLoader(ImageLoader):
@@ -145,7 +143,7 @@ class _MultiImageLoader(ImageLoader):
     A loader class for loading from imageio supported formats.
     """
 
-    def __init__(self, images: np.ndarray):
+    def __init__(self, images: dict[int, np.ndarray], metadata: dict[int, Metadata]):
         """
         Initialize the BaseImage class.
 
@@ -154,27 +152,14 @@ class _MultiImageLoader(ImageLoader):
 
         """
         super().__init__()
-        self._images = images
+        self._imagesSrcs = images
+        self._metadata = metadata
 
-    def shape(self) -> Tuple[int, int, int, int, int]:
-        return self._images.shape
+    def timePoints(self) -> Iterator[int]:
+        return self._imagesSrcs.keys()
 
-    def saveTo(self, group: zarr.Group):
-        # for time, images in self._images:
-            # group.create_dataset(f"t-{time}", data=images, dtype=images.dtype)
-        group.create_dataset("images", data=self._images,
-                             dtype=self._images.dtype)
+    def _images(self, t: int) -> np.ndarray:
+        return self._imagesSrcs[t]
 
-    def loadSlice(self, time: int, channel: int, slice: int) -> np.ndarray:
-        return self._images[time][channel][slice]
-
-    def fetchSlices(self, time: int, channel: int, sliceRange: Tuple[int, int]) -> np.ndarray:
-        return np.max(self._images[time][channel][sliceRange[0]:sliceRange[1]], axis=0)
-
-    # abb, why is this duplicated in mmmap?
-    def fetchSlices2(self, time: int, channel: int, sliceRange: Tuple[int, int]) -> np.ndarray:
-        # _imgData = self._images[time][channel][sliceRange[0]:sliceRange[1]]
-        if isinstance(sliceRange, tuple):
-            return self._images[time][channel][sliceRange[0]:sliceRange[1]]
-        else:
-            return self._images[time][channel][sliceRange]
+    def metadata(self, t: int) -> Metadata:
+        return self._metadata[t] if t in self._metadata else Metadata()

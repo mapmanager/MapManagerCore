@@ -1,8 +1,9 @@
 import time
 from io import BytesIO
 import pandas as pd
+from mapmanagercore.config import Metadata
 from .base import ImageLoader, Loader
-from typing import Tuple
+from typing import Iterator
 import numpy as np
 import zarr
 import geopandas as gp
@@ -12,53 +13,36 @@ from mapmanagercore.logger import logger
 
 class MMapLoaderLazy(Loader, ImageLoader):
     def __init__(self, path: str):
-        store = zarr.ZipStore(path, mode="r")
-        group = zarr.group(store=store)
+        self.store = zarr.ZipStore(path, mode="r")
+        group = zarr.group(store=self.store)
         points = pd.read_pickle(BytesIO(group["points"][:].tobytes()))
         points = gp.GeoDataFrame(points, geometry="point")
-        points["anchor"] = gp.GeoSeries(points["anchor"])
-        points["point"] = gp.GeoSeries(points["point"])
-
         lineSegments = pd.read_pickle(
             BytesIO(group["lineSegments"][:].tobytes()))
         lineSegments = gp.GeoDataFrame(lineSegments, geometry="segment")
-        lineSegments["segment"] = gp.GeoSeries(lineSegments["segment"])
-        
-        # abb
-        _analysisParams_json = group.attrs['analysisParams']  # json str
-        analysisParams = AnalysisParams(loadJson=_analysisParams_json)
 
-        metadata = group.attrs["metadata"]
-        
-        super().__init__(lineSegments, points, metadata, analysisParams)
-        
-        # logger.info('loading images ...')
-        _start = time.time()
+        super().__init__(lineSegments, points)
 
-        self._images = group["images"]
-        
-        _stop = time.time()
-        # logger.info(f'  loaded self._images:{self._images.shape} in {round(_stop-_start,3)} s')
+        self._imagesSrcs = {}
+        self._metadata = {}
+        for t in group.attrs["timePoints"]:
+            self._imagesSrcs[t] = group[f"img-{t}"]
+            self._metadata[t] = group.attrs[f"metadata-{t}"]
 
     def images(self) -> ImageLoader:
         return self
 
-    def shape(self) -> Tuple[int, int, int, int, int]:
-        return self._images.shape
+    def timePoints(self) -> Iterator[int]:
+        return self._imagesSrcs.keys()
 
-    def dtype(self) -> np.dtype:
-        return self._images.dtype
+    def _images(self, t: int) -> np.ndarray:
+        return self._imagesSrcs[t]
 
-    def saveTo(self, group: zarr.Group):
-        group.create_dataset("images", data=self._images,
-                             dtype=self._images.dtype)
+    def metadata(self, t: int) -> Metadata:
+        return self._metadata[t] if t in self._metadata else Metadata()
 
-    def loadSlice(self, time: int, channel: int, slice: int) -> np.ndarray:
-        return self._images[time][channel][slice]
-
-    def fetchSlices(self, time: int, channel: int, sliceRange: Tuple[int, int]) -> np.ndarray:
-        # _imgData = self._images[time][channel][sliceRange[0]:sliceRange[1]]
-        return np.max(self._images[time][channel][sliceRange[0]:sliceRange[1]], axis=0)
+    def close(self):
+        self.store.close()
 
     # abb, why is this duplicated in multiimageloader?
     def fetchSlices2(self, time: int, channel: int, sliceRange: Tuple[int, int]) -> np.ndarray:
@@ -71,10 +55,5 @@ class MMapLoaderLazy(Loader, ImageLoader):
 class MMapLoader(MMapLoaderLazy):
     def __init__(self, path: str):
         super().__init__(path)
-        
-        _start = time.time()
-
-        # self._images = self._images[:]
-
-        _stop = time.time()
-        # logger.info(f'  self._images[:]:{self._images.shape} in {round(_stop-_start,3)} s')
+        self._imagesSrcs = {key: value[:]
+                            for key, value in self._imagesSrcs.items()}

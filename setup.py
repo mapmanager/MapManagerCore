@@ -15,7 +15,7 @@ install_requires = [
     'numpy',
     'pandas',
     'shapely',
-    'geopandas',
+    'geopandas==1.0.0a1',
     'scikit-image',
     'zarr',
     'platformdirs',  # to get platform specific App paths

@@ -1,13 +1,7 @@
-import datetime
 from typing import Tuple, Union
-import geopandas as gp
-import numpy as np
-import pandas as pd
-from ..config import Segment, Spine, SpineId
-from ..loader.base import Loader
-from ..utils import validateColumns
-from ..log import Op, RecordLog
-from enum import Enum
+from mapmanagercore.lazy_geo_pandas.schema import MISSING_VALUE
+from ..schemas import Spine, Segment
+from ..config import SegmentId, SpineId
 from .base import AnnotationsBase
 
 from mapmanagercore.logger import logger
@@ -16,69 +10,16 @@ Key = Union[SpineId, Tuple[SpineId, int]]
 Keys = Union[Key, list[Key]]
 
 
-class AnnotationType(Enum):
-    Point = 1
-    LineSegment = 2
-
-
 class AnnotationsBaseMut(AnnotationsBase):
-    _log: RecordLog[AnnotationType]
-
-    def __init__(self, loader: Loader):
-        super().__init__(loader)
-        self._log = RecordLog()
-
-    def undo(self):
-        """
-        Undo the last operation.
-        """
-        op = self._log.undo()
-        if op is None:
-            return
-
-        op.reverse(self._getDf(op.type))
-
-    def redo(self):
-        """
-        Redo the last undone operation.
-        """
-        op = self._log.redo()
-        if op is None:
-            return
-
-        op.apply(self._getDf(op.type))
-
-    def _getDf(self, type: AnnotationType) -> gp.GeoDataFrame:
-        return {
-            AnnotationType.Point: self._points,
-            AnnotationType.LineSegment: self._lineSegments
-        }[type]
-
     def deleteSpine(self, spineId: Keys, skipLog=False) -> None:
-        self._delete(AnnotationType.Point, spineId, skipLog=skipLog)
+        self._drop(Spine, spineId, skipLog=skipLog)
 
     def deleteSegment(self, segmentId: Keys, skipLog=False) -> None:
-        for segmentID, time in self._lineSegments.loc[[0]].index:
-            if (self._points.xs(time, level=1)["segmentID"] == segmentID).any():
-                raise ValueError(
-                    f"Cannot delete segment {segmentID} at time point {time} as it has an attached spine(s)")
+        if not self.segments[:, []].join(self.points[["segmentID"]], on=["segmentID", "t"]).empty:
+            raise ValueError(
+                f"Cannot delete segment(s) {segmentId} as it has an attached spine(s)")
 
-        self._delete(AnnotationType.LineSegment, segmentId, skipLog=skipLog)
-
-    def _delete(self, type: AnnotationType, id: Keys, skipLog=False) -> None:
-        """
-        Deletes a spine or segment.
-
-        Args:
-          Id (str): The ID of the spine or segment.
-        """
-        df = self._getDf(type)
-        id = [id] if isinstance(id, str) else id
-        if not skipLog:
-            self._log.push(
-                Op(type, df.loc[id], gp.GeoDataFrame(columns=df.columns)))
-
-        df.drop(id, inplace=True)
+        self._drop(Segment, segmentId, skipLog=skipLog)
 
     def updateSpine(self, spineId: Keys, value: Spine, replaceLog=False, skipLog=False):
         """
@@ -88,19 +29,16 @@ class AnnotationsBaseMut(AnnotationsBase):
             spineId (str): The ID of the spine.
             value (Union[dict, gp.Series, pd.Series]): The value to set for the spine.
         """
-        # if not spineId in self._points.index:
-        #     raise ValueError(f"Spine with ID {spineId} not found")
-        validateColumns(value, Spine)
 
-        if "t" in value:
+        if value.t != MISSING_VALUE:
             raise ValueError(
                 f"Invalid type for column 't' must be set on the spine key")
 
-        if "spineID" in value:
+        if value.spineID != MISSING_VALUE:
             raise ValueError(
                 f"Invalid type for column 'spineID' must be set on the spine key")
 
-        return self._update(AnnotationType.Point, spineId, value, replaceLog, skipLog)
+        return self._update("Spine", spineId, value, replaceLog, skipLog)
 
     def updateSegment(self, segmentId: Keys, value: Segment, replaceLog=False, skipLog=False):
         """
@@ -110,10 +48,6 @@ class AnnotationsBaseMut(AnnotationsBase):
             segmentId (str): The ID of the spine.
             value (Union[dict, gp.Series, pd.Series]): The value to set for the spine.
         """
-        # if not segmentId in self._lineSegments.index:
-        #     raise ValueError(f"Segment with ID {segmentId} not found")
-        validateColumns(value, Segment)
-
         if "t" in value:
             raise ValueError(
                 f"Invalid type for column 't' must be set on the segment key")
@@ -122,61 +56,59 @@ class AnnotationsBaseMut(AnnotationsBase):
             raise ValueError(
                 f"Invalid type for column 'segmentID' must be set on the segment key")
 
-        return self._update(AnnotationType.LineSegment, segmentId, value, replaceLog, skipLog)
+        return self._update("Segment", segmentId, value, replaceLog, skipLog)
 
-    def _update(self, type: AnnotationType, ids: Keys, value: Union[dict, gp.GeoSeries, pd.Series], replaceLog=False, skipLog=False):
-        df = self._getDf(type)
-        ids = [ids] if isinstance(ids, tuple) or isinstance(ids, int) else ids
+    def newUnassignedSpineId(self) -> SpineId:
+        if len(self.points) == 0:
+            return 0
+        return self.points.index.get_level_values(0).max() + 1
 
-        old = df.loc[df.index.intersection(ids) if isinstance(
-            ids[0], tuple) else df.index.get_level_values(0).intersection(ids)].copy()
-        value = pd.Series(value)
+    def newUnassignedSegmentId(self) -> SegmentId:
+        if len(self.segments) == 0:
+            return 0
+        return self.segments.index.get_level_values(0).max() + 1
 
-        # logger.info(f'df:{df} ids:{ids} value:{value}')
+    def connect(self, spineKey: Tuple[SpineId, int], toSpineKey: Tuple[SpineId, int]):
+        if self.points[toSpineKey, "segmentID"] != self.points[spineKey, "segmentID"]:
+            raise ValueError("Cannot connect spines from different segments.")
 
-        updateDataFrame(df, ids, value)
+        # check if the key already exists in the time point
+        existingKey = (toSpineKey[0], spineKey[0])
+        if existingKey in self.points.index:
+            self.disconnect(existingKey)
 
-        op = Op(type, old, df.loc[ids])
-        df.loc[ids, "modified"] = np.datetime64(datetime.datetime.now())
-        df.sort_index(inplace=True)
+        # Propagate the spine ID to all future time points
+        self.updateSpine(range(spineKey, spineKey[0]), Spine(
+            spineID=toSpineKey[0],
+        ))
 
-        if skipLog:
-            return
+    def disconnect(self, spineKey: Tuple[SpineId, int]):
+        newID = self.newUnassignedSpineId()
 
-        # Add the operation to the log
-        if op.isEmpty():
-            if replaceLog:
-                return
+        # Propagate the spine ID change to all future time points
+        self.updateSpine(range(spineKey, spineKey[0]), Spine(
+            spineID=newID,
+        ))
 
-            self._log.createState()
-            return
+    def connectSegment(self, segmentKey: Tuple[SegmentId, int], toSegmentKey: Tuple[SegmentId, int]):
+        if segmentKey[1] == toSegmentKey[1]:
+            raise ValueError(
+                "Cannot connect segments in the same time points.")
 
-        self._log.push(op, replace=replaceLog)
+        # check if the key already exists in the time point
+        existingKey = (toSegmentKey[0], segmentKey[1])
+        if existingKey in self.segments.index:
+            self.disconnectSegment(existingKey)
 
+        # Propagate the segment ID to all future time points
+        self.updateSegment(range(segmentKey, segmentKey[0]), Segment(
+            segmentID=toSegmentKey[0],
+        ))
 
-def updateDataFrame(df: gp.GeoDataFrame, ids: list[Key], value: pd.Series):
-    for (i, id) in enumerate(ids):
-        oldId = id
+    def disconnectSegment(self, segmentKey: Tuple[SegmentId, int]):
+        newID = self.newUnassignedSegmentId()
 
-        # Update indexes when ids change
-        if isinstance(id, tuple):
-            id = list(id)
-            id_changed = False
-            for idx, name in enumerate(df.index.names):
-                if name in value.index:
-                    id[idx] = value[name]
-                    id_changed = True
-            id = tuple(id)
-
-            if id_changed:
-                ids[i] = id
-                df.loc[id, :] = df.loc[oldId, :]
-                df.drop(oldId, inplace=True)
-
-        else:
-            name = df.index.names[0]
-            if name in value.index:
-                ids[i] = id = value[name]
-                df.rename(index={oldId: id}, inplace=True)
-
-        df.loc[id, value.index.values] = value.values
+        # Propagate the segment ID change to all future time points
+        self.updateSegment(range(segmentKey, segmentKey[0]), Segment(
+            segmentID=newID,
+        ))

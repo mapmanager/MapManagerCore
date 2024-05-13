@@ -1,6 +1,5 @@
 "spineID","segmentID","point","anchor","xBackgroundOffset","yBackgroundOffset","z","anchorZ","roiExtend","modified","t"
 0,0,"POINT (431 239)","POINT (425 225.4)",21.0,0.0,31,31,4,0,0
-0,0,"POINT (400 239)","POINT (425 225.4)",21.0,0.0,31,31,4,0,1
 1,0,"POINT (382 250)","POINT (378 236)",21.0,14.0,31.0,31.0,4,0,0
 2,0,"POINT (416 245)","POINT (414 228)",21.0,14.0,31.0,31.0,4,0,0
 3,0,"POINT (447 231)","POINT (444 218.1)",21.0,21.0,31.0,31.0,4,0,0
