@@ -1,1 +1,1 @@
-from .query import QueryAnnotations as Annotations
+from .mutation import AnnotationsBaseMut as Annotations

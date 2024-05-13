@@ -1,10 +1,8 @@
 from io import BytesIO
-import json
 import pandas as pd
-
 from mapmanagercore.config import Metadata
 from .base import ImageLoader, Loader
-from typing import Iterator, Tuple
+from typing import Iterator
 import numpy as np
 import zarr
 import geopandas as gp
@@ -12,17 +10,13 @@ import geopandas as gp
 
 class MMapLoaderLazy(Loader, ImageLoader):
     def __init__(self, path: str):
-        store = zarr.ZipStore(path, mode="r")
-        group = zarr.group(store=store)
+        self.store = zarr.ZipStore(path, mode="r")
+        group = zarr.group(store=self.store)
         points = pd.read_pickle(BytesIO(group["points"][:].tobytes()))
         points = gp.GeoDataFrame(points, geometry="point")
-        points["anchor"] = gp.GeoSeries(points["anchor"])
-        points["point"] = gp.GeoSeries(points["point"])
-
         lineSegments = pd.read_pickle(
             BytesIO(group["lineSegments"][:].tobytes()))
         lineSegments = gp.GeoDataFrame(lineSegments, geometry="segment")
-        lineSegments["segment"] = gp.GeoSeries(lineSegments["segment"])
 
         super().__init__(lineSegments, points)
 
@@ -44,8 +38,12 @@ class MMapLoaderLazy(Loader, ImageLoader):
     def metadata(self, t: int) -> Metadata:
         return self._metadata[t] if t in self._metadata else Metadata()
 
+    def close(self):
+        self.store.close()
+
 
 class MMapLoader(MMapLoaderLazy):
     def __init__(self, path: str):
         super().__init__(path)
-        self._imagesSrcs = {key: value[:] for key, value in self._imagesSrcs.items()}
+        self._imagesSrcs = {key: value[:]
+                            for key, value in self._imagesSrcs.items()}

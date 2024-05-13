@@ -1,9 +1,7 @@
 import warnings
-
 from ...layers.polygon import PolygonLayer
 from ...config import COLORS, CONFIG, TRANSPARENT, SegmentId, SpineId, scaleColors, symbols
 from ...layers import LineLayer, PointLayer, Layer
-from ...layers.utils import dropZ
 from ...benchmark import timer
 import warnings
 from shapely.errors import ShapelyDeprecationWarning
@@ -105,9 +103,9 @@ class AnnotationsLayers(AnnotationsInteractions):
         layers = []
         if editing:
             # only show selected points
-            points = self[self._points["segmentID"] == editingSegmentId]
+            points = self.points[self.points["segmentID"] == editingSegmentId]
         else:
-            points = self
+            points = self.points
 
         visiblePoints = points["z"].between(
             zRange[0], zRange[1], inclusive="left")
@@ -117,11 +115,11 @@ class AnnotationsLayers(AnnotationsInteractions):
         if not editing:
             points = points[visiblePoints | visibleAnchors]
 
-        if len(points._points) == 0:
+        if points.index.empty:
             return layers
 
         colorOn = options["colorOn"] if "colorOn" in options else None
-        colors = points.getColors(colorOn, function=True)
+        colors = self.getColors(colorOn, function=True)
 
         spines = (PointLayer(points["point"])
                   .id("spine")
@@ -173,7 +171,7 @@ class AnnotationsLayers(AnnotationsInteractions):
             layers.extend(labels.splitGhost(
                 visiblePoints, opacity=CONFIG["ghostOpacity"]))
 
-        if selectedSpine in self._points.index:
+        if selectedSpine in self.points.index:
             self._appendRois(selectedSpine, editing, layers)
 
         return layers
@@ -182,22 +180,22 @@ class AnnotationsLayers(AnnotationsInteractions):
     def _appendRois(self, selectedSpine: SpineId, editing: bool, layers: List[Layer]):
         boarderWidth = CONFIG["roiStrokeWidth"]
 
-        headLayer = (PolygonLayer(self[[selectedSpine], "roiHead"])
+        headLayer = (PolygonLayer(self.points[[selectedSpine], "roiHead"])
                      .id("roi-head")
                      .strokeWidth(boarderWidth)
                      .stroke(COLORS["roiHead"]))
 
-        baseLayer = (PolygonLayer(self[[selectedSpine], "roiBase"])
+        baseLayer = (PolygonLayer(self.points[[selectedSpine], "roiBase"])
                      .id("roi-base")
                      .strokeWidth(boarderWidth)
                      .stroke(COLORS["roiBase"]))
 
         backgroundRoiHead = (headLayer
-                             .copy(id="background", series=self[[selectedSpine], "roiHeadBg"])
+                             .copy(id="background", series=self.points[[selectedSpine], "roiHeadBg"])
                              .stroke(COLORS["roiHeadBg"]))
 
         backgroundRoiBase = (baseLayer
-                             .copy(id="background", series=self[[selectedSpine], "roiBaseBg"])
+                             .copy(id="background", series=self.points[[selectedSpine], "roiBaseBg"])
                              .stroke(COLORS["roiBaseBg"]))
         if editing:
             # Add larger interaction targets
@@ -217,11 +215,11 @@ class AnnotationsLayers(AnnotationsInteractions):
 
         if editing:
             # Add the extend interaction target
-            line = PointLayer(self[[selectedSpine], "point"]).toLine(
-                self[[selectedSpine], "anchor"])
+            line = PointLayer(self.points[[selectedSpine], "point"]).toLine(
+                self.points[[selectedSpine], "anchor"])
 
             layers.append(line.copy()
-                          .extend(self[selectedSpine, "roiExtend"])
+                          .extend(self.points[selectedSpine, "roiExtend"])
                           .tail()
                           .radius(1)
                           .id("translate-extend")
@@ -232,7 +230,7 @@ class AnnotationsLayers(AnnotationsInteractions):
                           .onDrag(self.moveRoiExtend))
 
             layers.append(line.copy()
-                          .offset(-self[selectedSpine, "roiRadius"])
+                          .offset(-self.points[selectedSpine, "roiRadius"])
                           .normalize()
                           .tail()
                           .radius(1)
@@ -244,7 +242,7 @@ class AnnotationsLayers(AnnotationsInteractions):
                           .onDrag(self.moveRoiRadius))
 
             layers.append(line
-                          .offset(self[selectedSpine, "roiRadius"])
+                          .offset(self.points[selectedSpine, "roiRadius"])
                           .normalize()
                           .head()
                           .radius(1)
@@ -273,7 +271,7 @@ class AnnotationsLayers(AnnotationsInteractions):
         boarderWidth = CONFIG["segmentLeftRightStrokeWidth"]
 
         def offset(id: int):
-            return self._lineSegments.loc[id, "radius"] / boarderWidth
+            return self.segments[id, "radius"] / boarderWidth
 
         # Render the ghost of the edit
         if editSegId is not None:
@@ -297,7 +295,7 @@ class AnnotationsLayers(AnnotationsInteractions):
         if editSegId is None:
             # Make the click target larger
             layers.append(segment.copy(id="interaction")
-                          .strokeWidth(lambda id: self._lineSegments.loc[id, "radius"])
+                          .strokeWidth(lambda id: self.segments[id, "radius"])
                           .stroke(TRANSPARENT))
 
         # Add the line segment
@@ -307,7 +305,8 @@ class AnnotationsLayers(AnnotationsInteractions):
         return layers
 
     def _segmentGhost(self, segId: SegmentId, showLineSegmentsRadius: bool, layers: List[Layer], segment: LineLayer, boarderWidth: int, offset):
-        segmentSeries = self.segments[segId, "segment"].apply(dropZ)
+        segmentSeries = self.segments[[segId], "segment"].force_2d()
+        # segmentSeries = self.segments[segId, "segment"].force_2d()
         ghost = (segment.copy(segmentSeries, id="ghost")
                  .opacity(CONFIG["ghostOpacity"]))
 
@@ -349,13 +348,13 @@ class AnnotationsLayers(AnnotationsInteractions):
         if colorOn is None:
             if function:
                 return lambda _: COLORS["spine"]
-            return pd.Series([COLORS["spine"]] * len(self._points), index=self.index)
+            return pd.Series([COLORS["spine"]] * len(self.points), index=self.points.index)
 
         categorical = False
-        if colorOn not in self.columnsAttributes:
+        if colorOn not in self.points.columnsAttributes:
             raise ValueError(f"Column {colorOn} has no color attributes.")
 
-        attr = self.columnsAttributes[colorOn]
+        attr = self.points.columnsAttributes[colorOn]
         if "colors" in attr:
             colors = attr["colors"]
         elif "categorical" in attr and attr["categorical"]:
@@ -366,7 +365,7 @@ class AnnotationsLayers(AnnotationsInteractions):
         else:
             colors = COLORS["scalar"]
 
-        values = self[colorOn]
+        values = self.points[colorOn]
         if categorical and not isinstance(colors, dict):
             keys = list(values.unique())
             keys.sort()
@@ -390,10 +389,10 @@ class AnnotationsLayers(AnnotationsInteractions):
         return pd.Series(scaleColors(sample_colorscale(colors, normalized, colortype="tuple"), 255), index=values.index)
 
     def getSymbols(self, shapeOn: str, function=False) -> pd.Series:
-        if shapeOn not in self.columnsAttributes:
+        if shapeOn not in self.points.columnsAttributes:
             raise ValueError(f"Column {shapeOn} has no shape attributes.")
 
-        attr = self.columnsAttributes[shapeOn]
+        attr = self.points.columnsAttributes[shapeOn]
         if "symbols" in attr:
             symbols_ = attr["symbols"]
         elif "categorical" in attr and attr["categorical"]:
@@ -402,7 +401,7 @@ class AnnotationsLayers(AnnotationsInteractions):
             raise ValueError(
                 f"Column {shapeOn} is scalar and cannot be used as a shape.")
 
-        values = self[shapeOn]
+        values = self.points[shapeOn]
         if not isinstance(symbols_, dict):
             keys = list(values.unique())
             keys.sort()

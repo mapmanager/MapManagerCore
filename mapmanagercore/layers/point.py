@@ -3,14 +3,14 @@ import numpy as np
 import geopandas as gp
 from shapely.geometry import LineString
 from .layer import Layer
-from .utils import getCoords, inRange, dropZ
+from .utils import inRange
 
 
 class PointLayer(Layer):
     # clip the shapes z axis
     def clipZ(self, range: Tuple[int, int]) -> Self:
         self.series = self.series[inRange(self.series.z, range=range)]
-        self.series = self.series.apply(dropZ)
+        self.series = self.series.force_2d()
         return self
 
     def toLine(self, points: gp.GeoSeries):
@@ -32,12 +32,11 @@ class PointLayer(Layer):
         return self
 
     def _encodeBin(self):
-        coords = self.series.apply(getCoords)
-        coords = coords.explode()
+        coords = self.series.get_coordinates()
         featureId = coords.index
         coords = coords.reset_index(drop=True)
         return {"points": {
             "ids": featureId,
             "featureIds": coords.index.to_numpy(dtype=np.uint16),
-            "positions": coords.explode().to_numpy(dtype=np.float32),
+            "positions": coords.to_numpy(dtype=np.float32).flatten(),
         }}

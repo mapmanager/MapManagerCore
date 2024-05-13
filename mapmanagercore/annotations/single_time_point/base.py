@@ -1,12 +1,106 @@
-import numpy as np
+# This file predominantly contains classes that are used to represent
+# annotations at a single time point via proxy-ing request to the multi 
+# time-point equivalent of the classes. Note that new functionality should not 
+# be added directly to this file, but rather to the multi time-point or a
+# subclass of the classes in this file.
+
+from collections.abc import Sequence
 import pandas as pd
 import geopandas as gp
-from mapmanagercore.benchmark import timer
-from mapmanagercore.config import Metadata, Segment, SegmentId, Spine, SpineId
-from mapmanagercore.image_slices import ImageSlice
+from ...config import Metadata, SegmentId, SpineId
+from ...schemas import Segment, Spine
+from ...image_slices import ImageSlice
+from ...lazy_geo_pandas.attributes import ColumnAttributes
+from ...lazy_geo_pandas.lazy import LazyGeoFrame
+from ...lazy_geo_pandas.schema import Schema
 from .. import Annotations
-from typing import Any, Tuple, Union
+from typing import Any, Callable, Hashable, List, Self, Tuple, Union
 from copy import copy
+
+
+class SingleTimePointFrame(LazyGeoFrame):
+    def __init__(self, frame: LazyGeoFrame, t: int):
+        if isinstance(frame, SingleTimePointFrame):
+            self._root = copy(frame._root)
+        else:
+            self._root = copy(frame)
+        self._t = t
+
+    def __getitem__(self, items: Any) -> Any:
+        filter = self._root._filterIdx
+        try:
+            self._root._filterIdx = self._root._df.xs(
+                self._t, level=1, drop_level=False).index
+            self._root._currentVersion = -1
+
+            result = self._root[items]
+            if isinstance(result, pd.DataFrame) or isinstance(result, gp.GeoDataFrame) or isinstance(result, pd.Series) or isinstance(result, gp.GeoSeries):
+                if result.index is not None and result.index.nlevels > 1:
+                    result = result.xs(self._t, level=1, drop_level=True)
+
+            if isinstance(result, LazyGeoFrame):
+                return SingleTimePointFrame(result, self._t)
+
+            # extract single values if index is precisely one row
+            if result.shape[0] <= 1:
+                row, _key = self._parseKeyRow(items)
+                if self._root._schema.isIndexType(row):
+                    if result.empty:
+                        return None
+                    return result.values[0]
+
+            return result
+        finally:
+            self._root._filterIdx = filter
+
+    @property
+    def index(self):
+        return self._root.index.droplevel(1)
+
+    def loadData(self, data: gp.GeoDataFrame) -> None:
+        return self._root.loadData(data)
+
+    def addComputed(self, column: str, attribute: ColumnAttributes, func: Callable[[], Union[gp.GeoSeries, gp.GeoDataFrame]], dependencies: Union[List[str], dict[str, list[str]]] = {}, skipUpdate=False) -> None:
+        return self._root.addComputed(column, attribute, func,
+                                      dependencies, skipUpdate)
+
+    def updateComputed(self):
+        return self._root.updateComputed()
+
+    def getFrame(self, key: str):
+        return self._root.getFrame(key)
+
+    def pendingColumns(self) -> list[str]:
+        if len(self._computingColumns) == 0:
+            return []
+        return self._computingColumns[-1]
+
+    @property
+    def columns(self):
+        return self._root._columns
+
+    @property
+    def columnsAttributes(self):
+        return self._root.columnsAttributes
+
+    def undo(self) -> None:
+        return self._root.undo()
+
+    def redo(self) -> None:
+        return self._root.redo()
+
+    def drop(self, id: Union[Hashable, Sequence[Hashable], pd.Index], skipLog=False) -> None:
+        return self._root.drop(id, skipLog)
+
+    def update(self, ids: Union[Hashable, Sequence[Hashable], pd.Index], value: Schema, replaceLog=False, skipLog=False) -> None:
+        if isinstance(ids, list):
+            ids = [(id, self._t) for id in ids]
+        else:
+            ids = (ids, self._t)
+        return self._root.update(ids, value, replaceLog, skipLog)
+
+    def invalidClone(self, depKey: str) -> Union[None, Self]:
+        return self._root.invalidClone(depKey)
 
 
 # note hack to inherit types from Annotations
@@ -17,49 +111,26 @@ class _SingleTimePointAnnotationsBase(Annotations):
     _t: int
 
     def __init__(self, annotations: Annotations, t: int) -> None:
-        self._annotations = annotations
+        self._annotations = copy(annotations)
+
+        self._annotations._segments = SingleTimePointFrame(
+            self._annotations._segments, t)
+        self._annotations._points = SingleTimePointFrame(
+            self._annotations._points, t)
+
         self._t = t
+
+    @property
+    def points(self) -> LazyGeoFrame:
+        return self._annotations.points
+
+    @property
+    def segments(self) -> LazyGeoFrame:
+        return self._annotations.segments
 
     @property
     def timeSeries(self) -> Annotations:
         return self._annotations
-
-    @timer
-    def __getattr__(self, name: str) -> Any:
-        if name == "_points":
-            try:
-                return self._annotations._points.xs(self._t, level=1)
-            except KeyError:
-                empty = self._annotations._lineSegments.head(0)
-                return empty.set_index(empty.index.get_level_values(0), drop=True)
-        if name == "_lineSegments":
-            try:
-                return self._annotations._lineSegments.xs(self._t, level=1)
-            except KeyError:
-                empty = self._annotations._lineSegments.head(0)
-                return empty.set_index(empty.index.get_level_values(0), drop=True)
-        result = getattr(self._annotations, name)
-        return result
-
-    def __getitem__(self, key: Any) -> Any:
-        filtered = copy(self._annotations)
-        filtered._points = filtered._points.xs(
-            self._t, level=1, drop_level=False)
-        filtered._lineSegments = filtered._lineSegments.xs(
-            self._t, level=1, drop_level=False)
-
-        result = filtered[key]
-
-        if isinstance(result, pd.DataFrame) or isinstance(result, gp.GeoDataFrame) or isinstance(result, pd.Series) or isinstance(result, gp.GeoSeries):
-            if result.index is not None and isinstance(result.index, pd.MultiIndex):
-                if result.shape[0] == 1:
-                    if isinstance(key, tuple) and len(key) > 1 and isinstance(key[0], int) and (len(key) == 1 or isinstance(key[1], str)):
-                        return result.values[0]
-                return result.xs(self._t, level=1)
-
-        if isinstance(result, Annotations):
-            return self.__class__(result, self._t)
-        return result
 
 
 Key = SpineId
@@ -67,7 +138,6 @@ Keys = Union[Key, list[Key]]
 
 
 class SingleTimePointAnnotationsBase(_SingleTimePointAnnotationsBase):
-
     def getPixels(self, channel: int, zRange: Tuple[int, int] = None, z: int = None, zSpread: int = 0) -> ImageSlice:
         """
         Loads the image data for a slice.
@@ -83,8 +153,8 @@ class SingleTimePointAnnotationsBase(_SingleTimePointAnnotationsBase):
         """
         return self._annotations.getPixels(self._t, channel, zRange, z, zSpread)
 
-    def getShapePixels(self, shapes: gp.GeoSeries, channel: int = 0, zSpread: int = 0, ids: pd.Index = None, id: str = None) -> pd.Series:
-        return self._annotations.getShapePixels(shapes, channel, zSpread, ids, id, self._t)
+    def getShapePixels(self, shapes: gp.GeoDataFrame, channel: Union[int, List[int]] = 0, zSpread: int = 0, z: int = None) -> pd.Series:
+        return self._annotations.getShapePixels(shapes, channel, zSpread, self._t, z=z)
 
     def _mapKeys(self, keys: Keys) -> Keys:
         if isinstance(keys, list):
@@ -118,4 +188,3 @@ class SingleTimePointAnnotationsBase(_SingleTimePointAnnotationsBase):
 
     def metadata(self) -> Metadata:
         return self._images.metadata(self._t)
-    

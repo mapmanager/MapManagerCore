@@ -1,9 +1,8 @@
 from functools import lru_cache
-import json
-from typing import Iterator, Self, Tuple, Union
+from typing import Iterator, List, Self, Tuple, Union
 import numpy as np
 import pandas as pd
-from ..config import Metadata, Segment, Spine
+from ..config import Metadata
 from ..utils import shapeIndexes
 import geopandas as gp
 import zarr
@@ -105,6 +104,9 @@ class ImageLoader:
         Returns:
           np.ndarray: The fetched slices.
         """
+        if sliceRange[0] == sliceRange[1] - 1:
+            return self.loadSlice(time, channel, sliceRange[0])
+
         return np.max(self._images(time)[channel][sliceRange[0]:sliceRange[1]], axis=0)
 
     def cached(self, maxsize=15) -> Self:
@@ -155,7 +157,7 @@ class ImageLoader:
 
         return slices[x[0]:x[1], y[0]:y[1]]
 
-    def getShapePixels(self, shape: gp.GeoDataFrame, zSpread: int = 0, channel: int = 0):
+    def getShapePixels(self, shape: gp.GeoDataFrame, zSpread: int = 0, channel: Union[int, List[int]] = 0, time=None, z: int = None):
         """
         Retrieve image slices corresponding to the given shape.
 
@@ -169,15 +171,49 @@ class ImageLoader:
         """
         results = []
         indexes = []
-        shape = shape.reset_index()
+        if isinstance(shape, list):
+            shape = gp.GeoDataFrame(shape, columns=["shape"], geometry="shape")
+
+        if isinstance(shape, pd.Series) or isinstance(shape, gp.GeoSeries):
+            shape = shape.to_frame("shape")
+
+        if "t" in shape.index.names:
+            if not "t" in shape.columns:
+                shape.reset_index("t", inplace=True)
+            else:
+                shape.drop("t", axis=1, inplace=True)
+
+        if time is not None:
+            shape["t"] = time
+
+        if not "z" in shape:
+            if z is None:
+                coords = shape["shape"].get_coordinates(include_z=True)
+                shape["z"] = coords["z"].groupby(coords.index).mean()
+            else:
+                shape["z"] = z
+
         shape["z"] = shape["z"].astype(int)
 
+        if isinstance(channel, list):
+            for (t, z), group in shape.groupby(by=["t", "z"]):
+                images = [self.fetchSlices(
+                    t, c, (z - zSpread, z + zSpread + 1)) for c in channel]
+
+                for idx, row in group.iterrows():
+                    xs, ys = shapeIndexes(row["shape"])
+                    xLim, yLim = images[0].shape
+                    xBase = np.clip(xs, 0, xLim-1)
+                    yBase = np.clip(ys, 0, yLim-1)
+
+                    results.append(
+                        [image[xBase, yBase] for image in images])
+                    indexes.append(idx)
+            return pd.DataFrame(results, indexes, columns=channel)
+
         for (t, z), group in shape.groupby(by=["t", "z"]):
-            if zSpread == 0:
-                image = self.loadSlice(t, channel, z)
-            else:
-                image = self.fetchSlices(
-                    t, channel, (z - zSpread, z + zSpread + 1))
+            image = self.fetchSlices(
+                t, channel, (z - zSpread, z + zSpread + 1))
 
             for idx, row in group.iterrows():
                 xs, ys = shapeIndexes(row["shape"])
@@ -187,52 +223,16 @@ class ImageLoader:
                     image[np.clip(xs, 0, xLim-1), np.clip(ys, 0, yLim-1)])
                 indexes.append(idx)
 
-        return pd.Series(results, indexes)
+        return pd.Series(results, indexes, name=channel)
 
+    def close(self):
+        pass
 
-def loadShape(shape: Union[str, BaseGeometry]):
-    if shape is None:
-        return None
-    if isinstance(shape, BaseGeometry):
-        return shape
-    return wkt.loads(shape)
+    def __enter__(self):
+        return self
 
-
-def setColumnTypes(df: pd.DataFrame, types: Union[Segment, Spine]) -> gp.GeoDataFrame:
-    defaults = types.defaults()
-    types = types.__annotations__
-    df = gp.GeoDataFrame(df)
-    for key, valueType in types.items():
-        if issubclass(valueType, np.datetime64):
-            valueType = "datetime64[ns]"
-
-        if key in df.index.names:
-            if int == valueType:
-                valueType = 'Int64'
-
-            if len(df.index.names) == 1:
-                df.index = df.index.astype(valueType)
-            else:
-                i = df.index.names.index(key)
-                df.index = df.index.set_levels(
-                    df.index.levels[i].astype(valueType), level=i)
-            continue
-        if not isinstance(valueType, str) and issubclass(valueType, BaseGeometry):
-            df[key] = gp.GeoSeries(df[key].apply(
-                loadShape)) if key in df.columns else gp.GeoSeries()
-        else:
-            if int == valueType:
-                valueType = 'Int64'
-                if key in df.columns:
-                    df[key] = np.trunc(df[key])
-
-            df[key] = df[key].astype(
-                valueType) if key in df.columns else pd.Series(dtype=valueType)
-
-        if key in defaults:
-            df[key] = df[key].fillna(defaults[key])
-
-    return df
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.close()
 
 
 class Loader:
@@ -241,23 +241,9 @@ class Loader:
             if not isinstance(lineSegments, pd.DataFrame):
                 lineSegments = pd.read_csv(lineSegments, index_col=False)
 
-        lineSegments = setColumnTypes(lineSegments, Segment)
-        if not "segmentID" in lineSegments.index.names or not "t" in lineSegments.index.names:
-            lineSegments.set_index(["segmentID", "t"], drop=True, inplace=True)
-        lineSegments.sort_index(level=0, inplace=True)
-
         if not isinstance(points, gp.GeoDataFrame):
             if not isinstance(points, pd.DataFrame):
                 points = pd.read_csv(points, index_col=False)
-
-        points = setColumnTypes(points, Spine)
-        if not "spineID" in points.index.names or not "t" in points.index.names:
-            points.set_index(["spineID", "t"], drop=True, inplace=True)
-        points.sort_index(level=0, inplace=True)
-
-        lineSegments["modified"] = lineSegments["modified"].astype(
-            'datetime64[ns]')
-        points["modified"] = points["modified"].astype('datetime64[ns]')
 
         self._lineSegments = lineSegments
         self._points = points

@@ -91,6 +91,7 @@ class Layer:
     def _encodeBin(self):
         "abstract"
 
+    @timer
     def encodeBin(self):
         if len(self.series) == 0:
             return {}

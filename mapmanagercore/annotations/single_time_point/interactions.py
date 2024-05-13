@@ -1,12 +1,16 @@
-from typing import Tuple, Union
+from typing import Union
 import numpy as np
 from shapely.geometry import Point
+import shapely
+from mapmanagercore.utils import shapeGrid
 from .segment import AnnotationsSegments
-from ...config import MAX_TRACING_DISTANCE, SegmentId, Spine, SpineId, Segment
+from ...config import MAX_TRACING_DISTANCE, SegmentId, SpineId
+from ...schemas import Segment, Spine
 from ...layers.layer import DragState
 from ...layers.utils import roundPoint
 from shapely.geometry import LineString
 from shapely.ops import split, linemerge
+import geopandas as gp
 
 
 pendingBackgroundRoiTranslation = None
@@ -27,27 +31,61 @@ class AnnotationsInteractions(AnnotationsSegments):
         Returns:
             Point: The nearest anchor point.
         """
-        segment: LineString = self._lineSegments.loc[segmentID, "segment"]
+        segment: LineString = self.segments[segmentID, "segment"]
+        # find the closest point on the segment to the `point`
         minProjection = segment.project(point)
 
-        if brightestPathDistance:
-            segmentLength = int(segment.length)
-            minProjection = int(minProjection)
-            range_ = range(
-                max(minProjection-brightestPathDistance, 0),
-                min(minProjection +
-                    brightestPathDistance + 1, segmentLength))
+        if brightestPathDistance is None:
+            # Default to the closest path
+            anchor = segment.interpolate(minProjection)
+            anchor = roundPoint(anchor, 1)
+            return anchor
 
-            targets = [LineString([point, roundPoint(segment.interpolate(
-                minProjection + distance), 1)]) for distance in range_]
+        segmentLength = int(segment.length)
+        minProjection = int(minProjection)
 
-            brightest = self.getShapePixels(
-                targets, channel=channel, zSpread=zSpread).apply(np.sum).idxmax()
-            return Point(targets[brightest].coords[1])
+        # create a range of distances to search for the brightest path
+        range_ = range(
+            max(minProjection-brightestPathDistance, 0),
+            min(minProjection +
+                brightestPathDistance + 1, segmentLength))
 
-        anchor = segment.interpolate(minProjection)
-        anchor = roundPoint(anchor, 1)
-        return anchor
+        # create a series of line segments from the point to anchors along the range
+        targets = gp.GeoSeries([LineString(
+            [point, roundPoint(segment.interpolate(distance), 1)]) for distance in range_])
+
+        # get the pixel values for each line segment
+        pixels = self.getShapePixels(
+            targets, channel=channel, zSpread=zSpread)
+
+        # Normalize the median brightness by the length of the path to pick the shortest brightest path
+        brightest = (pixels.apply(np.median) / targets.length).idxmax()
+
+        return Point(targets[brightest].coords[1])
+
+    def snapBackgroundOffset(self, spineId: SpineId, channel: int = 0, zSpread: int = 0):
+        roi = self.points[spineId, "roi"]
+        z = self.points[spineId, "z"]
+
+        # create a grid of points to search for the best offset
+        grid = shapeGrid(roi, points=3, overlap=0.1)
+
+        # translate the roi by the grid points
+        candidates = gp.GeoSeries(grid.apply(
+            lambda x: shapely.affinity.translate(roi, x["x"], x["y"]), axis=1))
+
+        # get the pixel values for each candidate
+        pixels = self.getShapePixels(
+            candidates, channel=channel, zSpread=zSpread, z=z)
+
+        # find the candidate with the lowest sum of pixel values
+        offset = grid.iloc[pixels.apply(np.sum).idxmin()]
+
+        # update the spine with the best offset
+        self.updateSpine(spineId, Spine(
+            xBackgroundOffset=offset["x"],
+            yBackgroundOffset=offset["y"],
+        ), replaceLog=True)
 
     def addSpine(self, segmentId: SpineId, x: int, y: int, z: int) -> Union[SpineId, None]:
         """
@@ -62,16 +100,17 @@ class AnnotationsInteractions(AnnotationsSegments):
         anchor = self.nearestAnchor(segmentId, point)
         spineId = self.newUnassignedSpineId()
 
-        self.updateSpine(spineId, {
-            **Spine.defaults(),
-            "segmentID": segmentId,
-            "point": Point(point.x, point.y),
-            "z": int(z),
-            "anchor": Point(anchor.x, anchor.y),
-            "anchorZ": int(anchor.z),
-            "xBackgroundOffset": 0.0,
-            "yBackgroundOffset": 0.0,
-        })
+        self.updateSpine(spineId, Spine.withDefaults(
+            segmentID=segmentId,
+            point=Point(point.x, point.y),
+            z=int(z),
+            anchor=Point(anchor.x, anchor.y),
+            anchorZ=int(anchor.z),
+            xBackgroundOffset=0.0,
+            yBackgroundOffset=0.0,
+        ))
+
+        self.snapBackgroundOffset(spineId)
 
         return spineId
 
@@ -82,7 +121,7 @@ class AnnotationsInteractions(AnnotationsSegments):
         Returns:
             int: new spine's ID.
         """
-        ids = self._annotations._points.index.get_level_values(0)
+        ids = self._annotations.points.index.get_level_values(0)
         if len(ids) == 0:
             return 0
         return ids.max() + 1
@@ -99,10 +138,10 @@ class AnnotationsInteractions(AnnotationsSegments):
         Returns:
             bool: True if the spine was successfully translated, False otherwise.
         """
-        self.updateSpine(spineId, {
-            "point": Point(x, y),
-            "z": z,
-        }, state != DragState.START and state != DragState.MANUAL)
+        self.updateSpine(spineId, Spine(
+            point=Point(x, y),
+            z=z,
+        ), state != DragState.START and state != DragState.MANUAL)
 
         return True
 
@@ -119,13 +158,13 @@ class AnnotationsInteractions(AnnotationsSegments):
         Returns:
             bool: True if the anchor point was successfully translated, False otherwise.
         """
-        point = self._points.loc[spineId]
-        anchor = self.nearestAnchor(point["segmentID"], Point(x, y, z))
+        segmentId = self.points[spineId, "segmentID"]
+        anchor = self.nearestAnchor(segmentId, Point(x, y, z))
 
-        self.updateSpine(spineId, {
-            "anchorZ": int(anchor.z),
-            "anchor": Point(anchor.x, anchor.y),
-        }, state != DragState.START and state != DragState.MANUAL)
+        self.updateSpine(spineId, Spine(
+            anchorZ=int(anchor.z),
+            anchor=Point(anchor.x, anchor.y),
+        ), state != DragState.START and state != DragState.MANUAL)
 
         return True
 
@@ -143,24 +182,27 @@ class AnnotationsInteractions(AnnotationsSegments):
             bool: True if the background ROI was successfully translated, False otherwise.
         """
         if state == DragState.MANUAL:
-            self.updateSpine(spineId, {
-                "xBackgroundOffset": float(x),
-                "yBackgroundOffset": float(y),
-            })
+            self.updateSpine(spineId, Spine(
+                xBackgroundOffset=float(x),
+                yBackgroundOffset=float(y),
+            ))
             return True
 
-        point = self._points.loc[spineId]
+        point = self.points[spineId, [
+            "xBackgroundOffset", "yBackgroundOffset"]]
 
         global pendingBackgroundRoiTranslation
 
         if pendingBackgroundRoiTranslation is None or state == DragState.START:
             pendingBackgroundRoiTranslation = [x, y]
 
-        self.updateSpine(spineId, {
-            "xBackgroundOffset": float(point["xBackgroundOffset"] + x - pendingBackgroundRoiTranslation[0]),
-            "yBackgroundOffset": float(point["yBackgroundOffset"] + y - pendingBackgroundRoiTranslation[1]),
-        }, state != DragState.START and state != DragState.MANUAL)
-        
+        self.updateSpine(spineId, Spine(
+            xBackgroundOffset=float(
+                point["xBackgroundOffset"] + x - pendingBackgroundRoiTranslation[0]),
+            yBackgroundOffset=float(
+                point["yBackgroundOffset"] + y - pendingBackgroundRoiTranslation[1]),
+        ), state != DragState.START and state != DragState.MANUAL)
+
         pendingBackgroundRoiTranslation = None if state == DragState.END else [
             x, y]
 
@@ -180,14 +222,14 @@ class AnnotationsInteractions(AnnotationsSegments):
             bool: True if the ROI extend was successfully translated, False otherwise.
         """
 
-        point = self._points.loc[spineId, "point"]
+        point = self.points[spineId, "point"]
 
-        self.updateSpine(spineId, {
-            "roiExtend": float(point.distance(Point(x, y)))
-        }, state != DragState.START and state != DragState.MANUAL)
+        self.updateSpine(spineId, Spine(
+            roiExtend=float(point.distance(Point(x, y)))
+        ), state != DragState.START and state != DragState.MANUAL)
 
         return True
-    
+
     def moveRoiRadius(self, spineId: SpineId, x: int, y: int, z: int = 0, state: DragState = DragState.MANUAL) -> bool:
         """
         Move the ROI extend for a given spine ID.
@@ -202,11 +244,11 @@ class AnnotationsInteractions(AnnotationsSegments):
             bool: True if the ROI extend was successfully translated, False otherwise.
         """
 
-        point = self._points.loc[spineId, "point"]
+        point = self.points[spineId, "point"]
 
-        self.updateSpine(spineId, {
-            "roiRadius": float(point.distance(Point(x, y)))
-        }, state != DragState.START and state != DragState.MANUAL)
+        self.updateSpine(spineId, Spine(
+            roiRadius=float(point.distance(Point(x, y)))
+        ), state != DragState.START and state != DragState.MANUAL)
 
         return True
 
@@ -225,9 +267,9 @@ class AnnotationsInteractions(AnnotationsSegments):
         """
 
         anchor = self.nearestAnchor(segmentId, Point(x, y))
-        self.updateSegment(segmentId, {
-            "radius": Point(anchor.x, anchor.y).distance(Point(x, y))
-        }, state != DragState.START and state != DragState.MANUAL)
+        self.updateSegment(segmentId, Spine(
+            radius=Point(anchor.x, anchor.y).distance(Point(x, y))
+        ), state != DragState.START and state != DragState.MANUAL)
 
         return True
 
@@ -245,11 +287,10 @@ class AnnotationsInteractions(AnnotationsSegments):
         """
         segmentId = self.newUnassignedSegmentId()
 
-        self.updateSegment(segmentId, {
-            **Segment.defaults(),
-            "segment": LineString([]),
-            "roughTracing": LineString([])
-        })
+        self.updateSegment(segmentId, Segment.withDefaults(
+            segment=LineString([]),
+            roughTracing=LineString([])
+        ))
 
         return segmentId
 
@@ -260,7 +301,7 @@ class AnnotationsInteractions(AnnotationsSegments):
         Returns:
             int: new segment's ID.
         """
-        ids = self._annotations._lineSegments.index.get_level_values(0)
+        ids = self._annotations.segments.index.get_level_values(0)
         if len(ids) == 0:
             return 0
         return ids.max() + 1
@@ -280,8 +321,8 @@ class AnnotationsInteractions(AnnotationsSegments):
             LineString: The updated rough tracing.
         """
 
-        roughTracing: LineString = self._lineSegments.loc[segmentId,
-                                                          "roughTracing"]
+        roughTracing: LineString = self.segments[segmentId,
+                                                 "roughTracing"]
         point = Point(x, y, z)
         snappedPoint = roughTracing.interpolate(roughTracing.project(point))
 
@@ -320,7 +361,7 @@ class AnnotationsInteractions(AnnotationsSegments):
             index (int): The index of the point to move.
         """
         roughTracing = list(
-            self._lineSegments.loc[segmentId, "roughTracing"].coords)
+            self.segments[segmentId, "roughTracing"].coords)
 
         roughTracing[index] = (x, y, z)
         self.updateSegmentWithLiveTracing(
@@ -337,7 +378,7 @@ class AnnotationsInteractions(AnnotationsSegments):
             index (int): The index of the point to delete.
         """
         roughTracing = list(
-            self._lineSegments.loc[segmentId, "roughTracing"].coords)
+            self.segments[segmentId, "roughTracing"].coords)
 
         del roughTracing[index]
         self.updateSegmentWithLiveTracing(segmentId, LineString(roughTracing))
@@ -354,12 +395,10 @@ class AnnotationsInteractions(AnnotationsSegments):
         """
         segment = self.optimizeSegment(roughTracing, live=True)
 
-        update = {
-            "roughTracing": roughTracing
-        }
+        update = Segment(roughTracing=roughTracing)
 
         if segment is not None:
-            update["segment"] = segment
+            update.segment = segment
 
         self.updateSegment(segmentId, update, replaceLog)
 
@@ -371,9 +410,9 @@ class AnnotationsInteractions(AnnotationsSegments):
             segmentId (str): The ID of the segment.
         """
 
-        roughTracing = self._lineSegments.loc[segmentId, "roughTracing"]
-        self.updateSegment(segmentId, {
-            "segment": self.optimizeSegment(roughTracing)
-        }, skipLog=True)
+        roughTracing = self.segments[segmentId, "roughTracing"]
+        self.updateSegment(segmentId, Segment(
+            segment=self.optimizeSegment(roughTracing)
+        ), skipLog=True)
 
         return True
