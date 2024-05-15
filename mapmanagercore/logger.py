@@ -52,6 +52,11 @@ def getLoggerFilePath():
     appName = 'MapManager'
     appDir = user_data_dir(appName)
     logFilePath = os.path.join(appDir, 'mapmanager.log')
+    if not os.path.exists(appDir):
+        os.makedirs(appDir)
+    if not os.path.exists(logFilePath):
+        with open(logFilePath, 'w') as f:
+            f.write('')
     return logFilePath
 
 # setLogLevel()

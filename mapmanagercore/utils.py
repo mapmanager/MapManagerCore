@@ -1,5 +1,6 @@
 import math
 from typing import Union, List
+from typing_extensions import deprecated
 import numpy as np
 from shapely.geometry import Polygon, LineString, GeometryCollection, MultiPolygon
 import shapely
@@ -52,6 +53,7 @@ def shapeGrid(shape, points, overlap=0):
     return generateGrid(width * overlap, height * overlap, points)
 
 # abb
+@deprecated
 def findBrightestIndex(x, y, z,
                         xyzLine : List[List[float]],
                         image: np.ndarray,
@@ -113,6 +115,7 @@ def findBrightestIndex(x, y, z,
     return brightestIndex + firstPoint
 
 # abb
+@deprecated
 def findClosestIndex(x, y, z, xyzLine : List[List[float]]) -> int:
     """Find the closest point to (x,y,z) on line.
     """
@@ -129,6 +132,7 @@ def findClosestIndex(x, y, z, xyzLine : List[List[float]]) -> int:
     return closestIdx
 
 # abb
+@deprecated
 def polygonToMask(poly : shapely.Polygon, nx : int = 1024, ny : int = 1024) -> np.array:
     """Convert a polygon to a binary mask.
     """
@@ -153,6 +157,7 @@ def polygonToMask(poly : shapely.Polygon, nx : int = 1024, ny : int = 1024) -> n
     return polyMask
 
 # abb
+@deprecated
 def _getOffset(distance, numPoints):
     """Get a list of candidate points where mask will be moved.
     
@@ -185,6 +190,7 @@ def _getOffset(distance, numPoints):
     return coordOffsetList
 
 # abb
+@deprecated
 def calculateLowestIntensityOffset(mask, distance, numPoints, img):
     """Get the [x,y] offset of the lowest intensity from a number of candidate positions.
 
@@ -230,6 +236,7 @@ def calculateLowestIntensityOffset(mask, distance, numPoints, img):
     return lowestIntensityOffset
 
 # abb
+@deprecated
 def calculateBackgroundMask(mask, offset):
     """Offset the values of a given mask and return the background mask
         
@@ -256,33 +263,33 @@ def calculateBackgroundMask(mask, offset):
     
     return backgroundMask
 
-def _testPolygonToMask():
-    poly = shapely.Polygon([[5,5], [5,100], [220,320], [250,230]])
+# def _testPolygonToMask():
+#     poly = shapely.Polygon([[5,5], [5,100], [220,320], [250,230]])
 
-    x,y = poly.exterior.xy
-    plt.plot(x, y, 'r')
+#     x,y = poly.exterior.xy
+#     plt.plot(x, y, 'r')
 
-    mask = polygonToMask(poly)
-    plt.imshow(mask)
+#     mask = polygonToMask(poly)
+#     plt.imshow(mask)
 
-    plt.show()
+#     plt.show()
 
-def _testOffsets():
-    distance = 50
-    numPoints = 5
-    offsetList = _getOffset(distance = distance, numPoints = numPoints)
+# def _testOffsets():
+#     distance = 50
+#     numPoints = 5
+#     offsetList = _getOffset(distance = distance, numPoints = numPoints)
     
-    print('offsetList:', offsetList)
+#     print('offsetList:', offsetList)
 
-    xPlot = [offset[0] for offset in offsetList]
-    yPlot = [offset[1] for offset in offsetList]
+#     xPlot = [offset[0] for offset in offsetList]
+#     yPlot = [offset[1] for offset in offsetList]
 
-    plt.plot(xPlot, yPlot, 'o')
-    plt.show()
+#     plt.plot(xPlot, yPlot, 'o')
+#     plt.show()
 
-if __name__ == '__main__':
-    from matplotlib import pyplot as plt
+# if __name__ == '__main__':
+#     from matplotlib import pyplot as plt
 
-    # _testPolygonToMask()
+#     # _testPolygonToMask()
 
-    _testOffsets()
+#     _testOffsets()
