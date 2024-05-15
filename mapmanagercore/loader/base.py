@@ -6,8 +6,6 @@ from ..config import Metadata
 from ..utils import shapeIndexes
 import geopandas as gp
 import zarr
-from shapely.geometry.base import BaseGeometry
-from shapely import wkt
 
 
 class ImageLoader:

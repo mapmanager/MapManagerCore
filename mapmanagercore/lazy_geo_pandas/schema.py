@@ -31,7 +31,10 @@ class Schema:
 
     @classmethod
     def withDefaults(cls, **kwargs):
-        return cls(**cls._defaults, **kwargs)
+        for key, value in cls._defaults.items():
+            if not key in kwargs:
+                kwargs[key] = value
+        return cls(**kwargs)
 
     @classmethod
     def _addAttribute(cls, column: str, attribute: _ColumnAttributes):
@@ -107,9 +110,10 @@ class Schema:
                 df.loc[:, key] = df.loc[:, key].fillna(defaults[key])
 
         if df.index.nlevels != len(cls._index):
-            df.set_index(cls._index, inplace=True, drop=True)
-            if df.index.nlevels > 1:
-                df.sort_index(level=0, inplace=True)
+            if len(cls._index) != 0:
+                df.set_index(cls._index, inplace=True, drop=True)
+                if df.index.nlevels > 1:
+                    df.sort_index(level=0, inplace=True)
 
         return df
 
@@ -143,8 +147,7 @@ def isInstanceExtended(value, expectedType):
         return True
 
     return isinstance(value, expectedType)
-
-
+    
 def schema(index: Union[list[Any], Any], relationships: dict[Schema, dict[str, list[str]]] = {}, properties: dict[str, ColumnAttributes] = {}):
     T = TypeVar('T')
 
@@ -210,6 +213,8 @@ def schema(index: Union[list[Any], Any], relationships: dict[Schema, dict[str, l
         return cls2
     return classWrapper
 
+def seriesSchema(relationships: dict[Schema, dict[str, list[str]]] = {}, properties: dict[str, ColumnAttributes] = {}):
+    return schema([], relationships, properties)
 
 def calculated(dependencies: Union[List[str], dict[str, list[str]]] = {}, **attributes: Unpack[ColumnAttributes]):
     def wrapper(func: Callable[[], Union[pd.Series, pd.DataFrame]]):

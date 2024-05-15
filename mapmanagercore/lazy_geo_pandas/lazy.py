@@ -198,6 +198,7 @@ class SharedState:
 
 T = TypeVar("T", bound=LazyGeoPandas)
 
+
 class LazyGeoFrame(Generic[T]):
     _rootDf: gp.GeoDataFrame
     _state: SharedState
@@ -269,7 +270,7 @@ class LazyGeoFrame(Generic[T]):
 
     def getFrame(self, key: str):
         return self._store.getFrame(key)
-
+    
     def pendingColumns(self) -> list[str]:
         if len(self._computingColumns) == 0:
             return []
@@ -454,6 +455,34 @@ class LazyGeoFrame(Generic[T]):
 
     def toBytes(self):
         return toBytes(self._rootDf)
+
+
+class LazyGeoSeries(LazyGeoFrame[T]):
+    def __init__(self, schema: Schema, data: gp.GeoSeries = None, store: T = SOURCE) -> None:
+        if not data is None:
+            data = data.to_frame(name=0).T
+        super().__init__(schema, data, store)
+        self._fillMissing()
+
+    def _fillMissing(self):
+        if not (0 in self._rootDf.index):
+            self.drop(True)
+
+        current = self._rootDf.loc[0, :].to_dict()
+        if "modified" in current:
+            del current["modified"]
+        self.update(self._schema.withDefaults(**current), skipLog=True)
+
+    def __getitem__(self, items):
+        series = super().__getitem__((0, items))
+        return series.loc[0]
+
+    def drop(self, skipLog=False) -> None:
+        # clear the data and use defaults
+        self.update(self._schema.withDefaults(), skipLog=skipLog)
+
+    def update(self, value: Schema, replaceLog=False, skipLog=False) -> None:
+        return super().update(0, value, replaceLog, skipLog)
 
 
 def mergeDeps(a: dict[str, set[str]],  b: dict[str, set[str]]) -> bool:
