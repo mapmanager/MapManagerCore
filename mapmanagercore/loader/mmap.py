@@ -1,12 +1,15 @@
+import time
 from io import BytesIO
 import pandas as pd
 from mapmanagercore.config import Metadata
 from .base import ImageLoader, Loader
-from typing import Iterator
+from typing import Iterator, Tuple
 import numpy as np
 import zarr
 import geopandas as gp
 
+from mapmanagercore.analysis_params import AnalysisParams
+# from mapmanagercore.logger import logger
 
 class MMapLoaderLazy(Loader, ImageLoader):
     def __init__(self, path: str):
@@ -18,7 +21,11 @@ class MMapLoaderLazy(Loader, ImageLoader):
             BytesIO(group["lineSegments"][:].tobytes()))
         lineSegments = gp.GeoDataFrame(lineSegments, geometry="segment")
 
-        super().__init__(lineSegments, points)
+        # abb analysisparams
+        _analysisParams_json = group.attrs['analysisParams']  # json str
+        analysisParams = AnalysisParams(loadJson=_analysisParams_json)
+
+        super().__init__(lineSegments, points, analysisParams)
 
         self._imagesSrcs = {}
         self._metadata = {}
@@ -40,7 +47,6 @@ class MMapLoaderLazy(Loader, ImageLoader):
 
     def close(self):
         self.store.close()
-
 
 class MMapLoader(MMapLoaderLazy):
     def __init__(self, path: str):

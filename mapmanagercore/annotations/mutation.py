@@ -4,6 +4,8 @@ from ..schemas import Spine, Segment
 from ..config import SegmentId, SpineId
 from .base import AnnotationsBase
 
+from mapmanagercore.logger import logger
+
 Key = Union[SpineId, Tuple[SpineId, int]]
 Keys = Union[Key, list[Key]]
 

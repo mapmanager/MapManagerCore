@@ -7,6 +7,70 @@ from typing import Iterator, Union
 import numpy as np
 
 
+def _createMetaData(imgData : np.ndarray,
+                    maxSlices : int = None,
+                    numChannels : int = 1) -> Metadata:
+    """Get MetaData with a seed image volume.
+    
+    Parameters
+    ----------
+    imgData : np.ndarray
+        Template image/volume to get size and dtype
+    maxSlices : int
+        Maximum number of slices in a timeseries/map.
+        Used when creating one metadata for a timeseries with
+            different number of slices per timepoint.
+    numChannels : int
+        The number of channels in final map,
+            imgData is often just one channel of many
+
+    Notes
+    -----
+    In final version, this can be metadata for one timepoint (multiple channels)?
+    With that, we can remove:
+        MetaData.SizeMetadata.t
+        
+    """
+
+    # from typing import Literal
+    from mapmanagercore.config import Metadata, SizeMetadata, VoxelMetadata, MetadataPhysicalSize
+
+    # time = 0  # on create, always the first timepoint
+    #numChannels = 1  # on first image, always one channel
+
+    dtype = imgData.dtype
+    numSlices, x, y = imgData.shape
+
+    if maxSlices is not None:
+        numSlices = maxSlices
+
+    xVoxel = 1  # 0.12
+    yVoxel = 1  # 0.12
+    zVoxel = 1
+    unit = "pixels"  # "µm"
+
+    xPhysical = x * xVoxel
+    yPhysical = y * yVoxel
+    zPhysical = numSlices * zVoxel
+
+    _metadata = Metadata(
+        size=SizeMetadata(x=x,
+                        y=y,
+                        z=numSlices,
+                        # t=time,  # the timepoint of the image
+                        c=numChannels),  # number of color channels, will have to update as more are added
+        voxel=VoxelMetadata(x=xVoxel,
+                            y=yVoxel,
+                            z=zVoxel),
+        dtype=str(dtype),  # Literal['Uint16'],
+        physicalSize=MetadataPhysicalSize(x=xPhysical,
+                                y=yPhysical,
+                                z=zPhysical,
+                                unit=unit)
+        )
+    
+    return _metadata
+
 class MultiImageLoader(Loader):
     """
     Class for building an MultiImageLoader.
@@ -27,12 +91,12 @@ class MultiImageLoader(Loader):
         from imageio import imread
         return _MultiImageLoader(imread(path))
 
-    def read(self, path, time: int = 0, channel: int = 0):
+    def read(self, path : Union[str, np.ndarray], time: int = 0, channel: int = 0):
         """
         Load an image from the given path and store it in the images array.
 
         Args:
-          path (str): The path to the image file.
+          path (str): Either the path to the image file or a np array.
           time (int): The time index.
           channel (int): The channel index.
         """
@@ -40,7 +104,12 @@ class MultiImageLoader(Loader):
         if time not in self._images:
             self._images[time] = []
 
-        self._images[time].append([channel, imread(path)])
+        if isinstance(path, str):
+            imgData = imread(path)
+        else:
+            imgData = path
+
+        self._images[time].append([channel, imgData])
 
     def readMetadata(self, metadata: Union[Metadata, str], time: int = 0):
         """

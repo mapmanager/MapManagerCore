@@ -17,6 +17,8 @@ from .. import Annotations
 from typing import Any, Callable, Hashable, List, Self, Tuple, Union
 from copy import copy
 
+# abb analysisparams
+from mapmanagercore.analysis_params import AnalysisParams
 
 class SingleTimePointFrame(LazyGeoFrame):
     def __init__(self, frame: LazyGeoFrame, t: int):
@@ -127,6 +129,11 @@ class _SingleTimePointAnnotationsBase(Annotations):
     @property
     def segments(self) -> LazyGeoFrame:
         return self._annotations.segments
+
+    # abb analysisparams
+    @property
+    def analysisParams(self) -> AnalysisParams:
+        return self._annotations._analysisParams
 
     @property
     def timeSeries(self) -> Annotations:

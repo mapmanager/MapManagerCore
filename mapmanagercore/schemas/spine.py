@@ -7,6 +7,8 @@ import geopandas as gp
 from shapely.geometry import LineString, MultiPolygon
 from ..lazy_geo_pd_image import calculatedROI
 
+from mapmanagercore.logger import logger
+
 @schema(
     index=["spineID", "t"],
     relationships={

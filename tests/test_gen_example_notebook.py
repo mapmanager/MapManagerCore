@@ -30,10 +30,18 @@ class TestExamplesNotebook(unittest.TestCase):
             map.save("../data/rr30a_s0us.mmap")
             # loading the map manager from zarr.
             map = MapAnnotations(MMapLoader("../data/rr30a_s0us.mmap").cached())
+            map[:].columns
+            map.segments["segment"].get_coordinates(include_z=True)
+            # spine df for tp 0
+            filtered = map[ map['t']==0 ]
+            filtered[:]
+            sessionID = 0
+            spineID = 25
+            map.deleteSpine((id, sessionID))
             id = map.addSpine(segmentId=(0, 0), x=1,y=2,z=3)
             # map.moveAnchor(spineId=id, x=1, y=1, z=3)
             # map.moveSpine(spineId=id, x=1, y=1, z=3)
-            # map.deleteSpine(id)
+            # map.deleteSpine((id, sessionID)
             # map.undo()
             # map.redo()
             # map.updateSpine(spineId=id, value={
@@ -50,7 +58,8 @@ class TestExamplesNotebook(unittest.TestCase):
             map.segments["segment"].get_coordinates(include_z=True)
             map.segments["segmentLeft"].get_coordinates()
             map.segments["segmentRight"].get_coordinates()
-            map["roi"].get_coordinates()
+            filtered = map[ map['t']==1 ]
+            filtered["roi"].get_coordinates()
             map["roiBase"].get_coordinates()
             slices = map.getPixels(time=0, channel=0, zRange=(18, 36))
             plt.hist(slices.data(), bins=50)
@@ -79,6 +88,7 @@ class TestExamplesNotebook(unittest.TestCase):
             plt.show()
             map["z"].between(10, 40)
             filtered = map[map["z"].between(10, 40)]
+            map[:]
             filtered[:]
             slices = filtered.getPixels(time=0, channel=0)
             

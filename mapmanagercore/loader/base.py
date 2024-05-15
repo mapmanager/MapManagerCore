@@ -7,6 +7,9 @@ from ..utils import shapeIndexes
 import geopandas as gp
 import zarr
 
+from mapmanagercore.analysis_params import AnalysisParams
+
+from mapmanagercore.logger import logger
 
 class ImageLoader:
     """
@@ -102,6 +105,10 @@ class ImageLoader:
         Returns:
           np.ndarray: The fetched slices.
         """
+        
+        # abb fetchSlices() is getting called multiple times when editing one spine?
+        # logger.info(f'=== time:{time} channel:{channel} sliceRange:{sliceRange}')
+
         if sliceRange[0] == sliceRange[1] - 1:
             return self.loadSlice(time, channel, sliceRange[0])
 
@@ -213,6 +220,10 @@ class ImageLoader:
             image = self.fetchSlices(
                 t, channel, (z - zSpread, z + zSpread + 1))
 
+            # logger.info(f'   t:{t} z:{z} image:{image.shape}')
+            # print('group')
+            # print(group)
+
             for idx, row in group.iterrows():
                 xs, ys = shapeIndexes(row["shape"])
                 xLim, yLim = image.shape
@@ -234,7 +245,12 @@ class ImageLoader:
 
 
 class Loader:
-    def __init__(self, lineSegments: Union[str, pd.DataFrame] = pd.DataFrame(), points: Union[str, pd.DataFrame] = pd.DataFrame(), metadata: Union[str, Metadata] = Metadata()):
+    def __init__(self,
+                 lineSegments: Union[str, pd.DataFrame] = pd.DataFrame(),
+                 points: Union[str, pd.DataFrame] = pd.DataFrame(),
+                 metadata: Union[str, Metadata] = Metadata(),
+                 analysisParams: AnalysisParams = AnalysisParams()):
+        
         if not isinstance(lineSegments, gp.GeoDataFrame):
             if not isinstance(lineSegments, pd.DataFrame):
                 lineSegments = pd.read_csv(lineSegments, index_col=False)
@@ -246,6 +262,9 @@ class Loader:
         self._lineSegments = lineSegments
         self._points = points
 
+        # abb analysisparams
+        self._analysisParams : AnalysisParams = analysisParams
+
     def points(self) -> gp.GeoDataFrame:
         return self._points
 
@@ -255,6 +274,9 @@ class Loader:
     def images(self) -> ImageLoader:
         "abstract method"
 
-
+    # abb analysisparams
+    def analysisParams(self) -> AnalysisParams:
+        return self._analysisParams
+    
 def bounds(x: np.array):
     return (x.min(), int(x.max()) + 1)

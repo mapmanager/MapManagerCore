@@ -127,3 +127,16 @@ class Metadata(TypedDict):
     voxel: VoxelMetadata
     dtype: Literal["Uint16"]
     physicalSize: MetadataPhysicalSize
+
+    # abb not sure I like these abbreviated type
+    #   could this be a class with an __init__()
+    #   and have the static member variables as proper self.xxx member variables
+    # def _prettyPrint(self):
+    #     """Convenience to print metadata to terminal.
+    #     """
+    #     retStr = ''
+    #     retStr += f'SizeMetadata: {self.size}' + '\n'
+    #     retStr += f'VoxelMetadata: {self.voxel}' + '\n'
+    #     retStr += f'dtype: {self.dtype}' + '\n'
+    #     retStr += f'MetadataPhysicalSize: {self.physicalSize}' + '\n'
+    #     return retStr

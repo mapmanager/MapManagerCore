@@ -17,7 +17,9 @@ install_requires = [
     'shapely',
     'geopandas==1.0.0a1',
     'scikit-image',
-    'zarr'
+    'zarr',
+    'platformdirs',  # to get platform specific App paths
+    'plotly',
 ]
 
 testRequirements = [
