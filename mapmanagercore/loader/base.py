@@ -107,6 +107,8 @@ class ImageLoader:
         Returns:
           np.ndarray: The fetched slices.
         """
+        logger.info(f'=== time:{time} channel:{channel} sliceRange:{sliceRange}')
+
         if sliceRange[0] == sliceRange[1] - 1:
             return self.loadSlice(time, channel, sliceRange[0])
 
@@ -118,7 +120,7 @@ class ImageLoader:
         """
         cache = lru_cache(maxsize=maxsize)
         self.fetchSlices = cache(self.fetchSlices)
-        self.fetchSlices2 = cache(self.fetchSlices2)
+        # self.fetchSlices2 = cache(self.fetchSlices2)
         return self
 
     def get(self, time: int, channel: int, z: Union[Tuple[int, int], int, np.ndarray], x: Union[Tuple[int, int, np.ndarray], int], y: Union[Tuple[int, int], int, np.ndarray]) -> np.array:
@@ -261,6 +263,9 @@ class Loader:
         self._lineSegments = lineSegments
         self._points = points
 
+        # abb
+        self._analysisParams : AnalysisParams = analysisParams
+
     def points(self) -> gp.GeoDataFrame:
         return self._points
 
@@ -270,6 +275,9 @@ class Loader:
     def images(self) -> ImageLoader:
         "abstract method"
 
-
+    # abb
+    def analysisParams(self) -> AnalysisParams:
+        return self._analysisParams
+    
 def bounds(x: np.array):
     return (x.min(), int(x.max()) + 1)

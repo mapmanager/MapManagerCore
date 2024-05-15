@@ -23,6 +23,9 @@ class AnnotationsBase(LazyImagesGeoPandas):
             Segment, data=loader.segments(), store=self)
         self._points = LazyGeoFrame(Spine, data=loader.points(), store=self)
 
+        # abb
+        self._analysisParams : AnalysisParams = loader.analysisParams()
+
     @property
     def segments(self) -> LazyGeoFrame:
         return self._segments
@@ -30,6 +33,10 @@ class AnnotationsBase(LazyImagesGeoPandas):
     @property
     def points(self) -> LazyGeoFrame:
         return self._points
+    
+    @property
+    def analysisParams(self) -> AnalysisParams:
+        return self._analysisParams
     
     def filterPoints(self, filter: Any):
         c = copy(self)
@@ -85,6 +92,9 @@ class AnnotationsBase(LazyImagesGeoPandas):
                 group.create_dataset("points", data=self.points.toBytes(), dtype=np.uint8)
                 group.create_dataset("lineSegments", data=self.segments.toBytes(), dtype=np.uint8)
                 group.attrs["version"] = 1
+
+                # abb 20240420
+                group.attrs['analysisParams'] = self._analysisParams.getJson()
 
     def __enter__(self):
         self._images = self._images.__enter__()

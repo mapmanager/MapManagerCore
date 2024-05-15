@@ -96,7 +96,7 @@ class MultiImageLoader(Loader):
         Load an image from the given path and store it in the images array.
 
         Args:
-          path (str): The path to the image file.
+          path (str): Either the path to the image file or a np array.
           time (int): The time index.
           channel (int): The channel index.
         """
@@ -104,7 +104,12 @@ class MultiImageLoader(Loader):
         if time not in self._images:
             self._images[time] = []
 
-        self._images[time].append([channel, imread(path)])
+        if isinstance(path, str):
+            imgData = imread(path)
+        else:
+            imgData = path
+
+        self._images[time].append([channel, imgData])
 
     def readMetadata(self, metadata: Union[Metadata, str], time: int = 0):
         """

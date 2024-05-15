@@ -142,7 +142,7 @@ def importStack(folder, oneTimepoint : int = None):
     loader = MultiImageLoader(
         lineSegments=dfGeoLine,
         points=dfGeoPoints,
-        metadata=igorDict['metadata']
+        # metadata=igorDict['metadata']
         )
 
     # append all images to the loader
@@ -151,6 +151,7 @@ def importStack(folder, oneTimepoint : int = None):
         if 1 or _idx == 0:
             loader.read(igorDict['imgCh1'][_idx], time=_idx, channel=0)
             loader.read(igorDict['imgCh2'][_idx], time=_idx, channel=1)
+            loader.readMetadata(igorDict['metadata'])
 
     #
     # make map from loader
@@ -170,6 +171,8 @@ def importStack(folder, oneTimepoint : int = None):
     _totalAdded = 0
     for _idx, sessionID in enumerate(sessionList):
         
+        _oneTimepoint = map.getTimePoint(_idx)
+
         _t = _idx
         dfPoints = igorDict['dfPoints'][_idx]
         
@@ -192,7 +195,8 @@ def importStack(folder, oneTimepoint : int = None):
             print('ADDING SPINE:', 'sessionID:', sessionID, '_count', _count, 'index:', index, 'segmentID:', segmentID, 't:', _t, x, y, z)
 
             # TODO: add spine does not connect anchor properly
-            newSpineID = map.addSpine(segmentId=(segmentID,_t),
+            # newSpineID = _oneTimepoint.addSpine(segmentId=(segmentID,_t),
+            newSpineID = _oneTimepoint.addSpine(segmentId=segmentID,
                                     x=x, y=y, z=z,
                                     #brightestPathDistance=brightestPathDistance,
                                     #channel=channel,
@@ -214,9 +218,10 @@ def importStack(folder, oneTimepoint : int = None):
 
     print('total added spine:', _totalAdded)
     
-    # computer all spine columns (e.g. intensity analysis)
-    print('calling map[:]')
-    map[:]
+    # computer all spine and segment columns (e.g. intensity analysis)
+    print('calling map.points[:] map.segmentsef[:]')
+    map.points[:]
+    map.segments[:]
 
     #
     # save our new map
@@ -262,8 +267,8 @@ if __name__ == '__main__':
     #oneTimepoint = None  # 8 session map
     
     # works
-    # importStack(folder, oneTimepoint=oneTimepoint)
+    importStack(folder, oneTimepoint=oneTimepoint)
 
     # load multi tp core map (created in xxx) and convert spine IDs
     # from igor to core spine id
-    convertRunMap(folder)
+    # convertRunMap(folder)

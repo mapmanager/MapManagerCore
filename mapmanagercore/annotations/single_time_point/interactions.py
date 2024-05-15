@@ -12,12 +12,17 @@ from shapely.geometry import LineString
 from shapely.ops import split, linemerge
 import geopandas as gp
 
+from mapmanagercore.logger import logger
 
 pendingBackgroundRoiTranslation = None
 
 
 class AnnotationsInteractions(AnnotationsSegments):
-    def nearestAnchor(self, segmentID: SegmentId, point: Point, brightestPathDistance: int = None, channel: int = 0, zSpread: int = 0):
+    def nearestAnchor(self, segmentID: SegmentId,
+                      point: Point,
+                      brightestPathDistance: int = None,
+                      channel: int = None,
+                      zSpread: int = None):
         """
         Finds the nearest anchor point on a given line segment to a given point.
 
@@ -31,6 +36,15 @@ class AnnotationsInteractions(AnnotationsSegments):
         Returns:
             Point: The nearest anchor point.
         """
+        # abb
+        # if not specified, get defaults from AnalysisParams()
+        if brightestPathDistance is None:
+            brightestPathDistance = self.analysisParams.getValue('brightestPathDistance')
+        if channel is None:
+            channel = self.analysisParams.getValue('channel')
+        if zSpread is None:
+            zSpread = self.analysisParams.getValue('zSpread')
+            
         segment: LineString = self.segments[segmentID, "segment"]
         # find the closest point on the segment to the `point`
         minProjection = segment.project(point)
@@ -160,6 +174,8 @@ class AnnotationsInteractions(AnnotationsSegments):
         """
         segmentId = self.points[spineId, "segmentID"]
         anchor = self.nearestAnchor(segmentId, Point(x, y, z))
+
+        logger.info(f'segmentId:{segmentId} anchor:{anchor}')
 
         self.updateSpine(spineId, Spine(
             anchorZ=int(anchor.z),
