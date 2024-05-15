@@ -37,8 +37,7 @@ class AnnotationsBaseMut(AnnotationsBase):
         if value.spineID != MISSING_VALUE:
             raise ValueError(
                 f"Invalid type for column 'spineID' must be set on the spine key")
-
-        return self.points.update("Spine", spineId, value, replaceLog, skipLog)
+        return self._update("Spine", spineId, value, replaceLog, skipLog)
 
     def updateSegment(self, segmentId: Keys, value: Segment, replaceLog=False, skipLog=False):
         """
@@ -56,7 +55,7 @@ class AnnotationsBaseMut(AnnotationsBase):
             raise ValueError(
                 f"Invalid type for column 'segmentID' must be set on the segment key")
 
-        return self.segments.update("Segment", segmentId, value, replaceLog, skipLog)
+        return self._update("Segment", segmentId, value, replaceLog, skipLog)
 
     def newUnassignedSpineId(self) -> SpineId:
         if len(self.points) == 0:
