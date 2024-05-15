@@ -23,7 +23,7 @@ class AnnotationsBase(LazyImagesGeoPandas):
             Segment, data=loader.segments(), store=self)
         self._points = LazyGeoFrame(Spine, data=loader.points(), store=self)
 
-        # abb
+        # abb analysisparams
         self._analysisParams : AnalysisParams = loader.analysisParams()
 
     @property
@@ -93,7 +93,7 @@ class AnnotationsBase(LazyImagesGeoPandas):
                 group.create_dataset("lineSegments", data=self.segments.toBytes(), dtype=np.uint8)
                 group.attrs["version"] = 1
 
-                # abb 20240420
+                # abb analysisparams
                 group.attrs['analysisParams'] = self._analysisParams.getJson()
 
     def __enter__(self):

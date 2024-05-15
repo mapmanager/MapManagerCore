@@ -9,7 +9,7 @@ import zarr
 import geopandas as gp
 
 from mapmanagercore.analysis_params import AnalysisParams
-from mapmanagercore.logger import logger
+# from mapmanagercore.logger import logger
 
 class MMapLoaderLazy(Loader, ImageLoader):
     def __init__(self, path: str):
@@ -21,7 +21,7 @@ class MMapLoaderLazy(Loader, ImageLoader):
             BytesIO(group["lineSegments"][:].tobytes()))
         lineSegments = gp.GeoDataFrame(lineSegments, geometry="segment")
 
-        # abb
+        # abb analysisparams
         _analysisParams_json = group.attrs['analysisParams']  # json str
         analysisParams = AnalysisParams(loadJson=_analysisParams_json)
 
@@ -47,14 +47,6 @@ class MMapLoaderLazy(Loader, ImageLoader):
 
     def close(self):
         self.store.close()
-
-    # abb, why is this duplicated in multiimageloader?
-    def fetchSlices2(self, time: int, channel: int, sliceRange: Tuple[int, int]) -> np.ndarray:
-        # _imgData = self._images[time][channel][sliceRange[0]:sliceRange[1]]
-        if isinstance(sliceRange, tuple):
-            return self._images[time][channel][sliceRange[0]:sliceRange[1]]
-        else:
-            return self._images[time][channel][sliceRange]
 
 class MMapLoader(MMapLoaderLazy):
     def __init__(self, path: str):

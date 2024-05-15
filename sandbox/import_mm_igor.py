@@ -46,7 +46,7 @@ def importStack(folder, oneTimepoint : int = None):
     if oneTimepoint is None:
         sessionList = range(numSessions)
     else:
-        sessionList = [0]
+        sessionList = [oneTimepoint]
 
     mapName = os.path.split(folder)[1]
 
@@ -125,7 +125,7 @@ def importStack(folder, oneTimepoint : int = None):
             # print(segmentID, 'n:', n, 'lineString len:', lineString.length, len(lineString.coords))
 
             geoDict = {}
-            geoDict['t'] = sessionID
+            geoDict['t'] = _idx  # !!!
             geoDict['segmentID'] = segmentID
             geoDict['segment'] = lineString
             geoDict['radius'] = 4
@@ -138,6 +138,9 @@ def importStack(folder, oneTimepoint : int = None):
     dfGeoLine = pd.DataFrame(igorDict['dfGeoLineList'])
     dfGeoPoints = pd.DataFrame()
 
+    # print('dfGeoLine:')
+    # print(dfGeoLine)
+
     # make a loader with all segments and no spines
     loader = MultiImageLoader(
         lineSegments=dfGeoLine,
@@ -148,10 +151,12 @@ def importStack(folder, oneTimepoint : int = None):
     # append all images to the loader
     logger.info('appending images')
     for _idx, sessionID in enumerate(sessionList):
-        if 1 or _idx == 0:
-            loader.read(igorDict['imgCh1'][_idx], time=_idx, channel=0)
-            loader.read(igorDict['imgCh2'][_idx], time=_idx, channel=1)
-            loader.readMetadata(igorDict['metadata'])
+        # logger.info(f'appending image time= _idx:{_idx}')
+        # print('   ch1:', igorDict['imgCh1'][_idx].shape)
+        # print('   ch2:', igorDict['imgCh2'][_idx].shape)
+        loader.read(igorDict['imgCh1'][_idx], time=_idx, channel=0)
+        loader.read(igorDict['imgCh2'][_idx], time=_idx, channel=1)
+        loader.readMetadata(igorDict['metadata'], time=_idx)
 
     #
     # make map from loader
@@ -166,11 +171,12 @@ def importStack(folder, oneTimepoint : int = None):
     # list of dict, one dict per session
     # each dict maps original igor spine id to core spine id
     # use this at end to load, convert and then connect spines with igor map
-    sessionMapList = []
+    # sessionMapList = []
 
     _totalAdded = 0
     for _idx, sessionID in enumerate(sessionList):
-        
+        # _idx is t in core, sessionID is from igor
+
         _oneTimepoint = map.getTimePoint(_idx)
 
         _t = _idx
@@ -182,8 +188,11 @@ def importStack(folder, oneTimepoint : int = None):
         dfSpines = dfPoints[ dfPoints['roiType']=='spineROI' ]
 
         # each session needs to map igor spine id to core spine id
-        thisSessionMap = {}  #np.zeros((len(dfSpines)))
+        # thisSessionMap = {}  #np.zeros((len(dfSpines)))
 
+        _n = len(dfSpines)
+        print('=== ADDING SPINE:', 'core t:', _idx, 'igor-sessionID:', sessionID, 'n=', _n)
+      
         _count = 0
         for index, row in dfSpines.iterrows():
             # index is the original row before reducing to spineROI
@@ -192,7 +201,7 @@ def importStack(folder, oneTimepoint : int = None):
             y = row['y']
             z = row['z']
             
-            print('ADDING SPINE:', 'sessionID:', sessionID, '_count', _count, 'index:', index, 'segmentID:', segmentID, 't:', _t, x, y, z)
+            # print('   ADDING SPINE:', 'sessionID:', sessionID, '_count', _count, 'index:', index, 'segmentID:', segmentID, 't:', _t, 'x/y/z', x, y, z)
 
             # TODO: add spine does not connect anchor properly
             # newSpineID = _oneTimepoint.addSpine(segmentId=(segmentID,_t),
@@ -203,24 +212,25 @@ def importStack(folder, oneTimepoint : int = None):
                                     #zSpread=zSpread
                                     )
             
-            print(f'   newSpineID:{newSpineID}')
+            # print(f'   newSpineID:{newSpineID}')
 
             # original spine row is `index`, in core will be newSpineID
             # map to spine id to igor spine id
-            thisSessionMap[index] = newSpineID
+            # thisSessionMap[index] = newSpineID
             
             _count += 1
 
-        sessionMapList.append(thisSessionMap)
+        # sessionMapList.append(thisSessionMap)
 
         _totalAdded += _count
-        print(f'_idx:{_idx} sessionID:{sessionID} add {_count} spines')
+        # print(f'_idx:{_idx} sessionID:{sessionID} add {_count} spines')
 
     print('total added spine:', _totalAdded)
     
     # computer all spine and segment columns (e.g. intensity analysis)
-    print('calling map.points[:] map.segmentsef[:]')
+    print('map.points[:]')
     map.points[:]
+    print('map.segmentsef[:]')
     map.segments[:]
 
     #
@@ -234,9 +244,9 @@ def importStack(folder, oneTimepoint : int = None):
     map.save(savePath)
 
     # make sure we can load the map
-    # print('re-load as map2')
-    # map2 = MapAnnotations(MMapLoader(savePath).cached())
-    # logger.info(f'map2:{map2}')
+    logger.info('re-load as map2')
+    map2 = MapAnnotations(MMapLoader(savePath))
+    logger.info(f'map2:{map2}')
 
     _stopTime = time.time()
     print(f'done, import took {round(_stopTime-_startTime,3)} s')
@@ -256,19 +266,39 @@ def convertRunMap(igorFolder, coreMapPath = 'sandbox/data/rr30a.mmap'):
     igorRunMapPath = os.path.join(igorFolder, igorRunMapPath)
     igorRunMap = np.load(igorRunMapPath)
     print('igorRunMap:', igorRunMap.shape)
+    nSessions = igorRunMap.shape[1]
+    nRows = igorRunMap.shape[0]
 
-    # sandbox/data/rr30a_s1.mmap
+    igorSegMapPath = 'igorSegMapExport.npy'
+    igorSegMapPath = os.path.join(igorFolder, igorSegMapPath)
+    igorSegMap = np.load(igorSegMapPath)
+    print('igorSegMap:', igorSegMap.shape)
+    nSegRows = igorSegMap.shape[0]
+
+    # sandbox/data/rr30a.mmap
+
+    # load the map
+    coreMapPath = '/Users/cudmore/Sites/MapManagerCore/sandbox/data/rr30a.mmap'
+    map = MapAnnotations(MMapLoader(coreMapPath).cached())
+
+    for t in range(nSessions-1):
+        for segRow in range(nSegRows):
+            thisSeg = int(igorSegMap[segRow, t])
+            nextSeg = int(igorSegMap[segRow, t+1])
+            print('t:', t, 'thisSeg:', thisSeg, 'nextSeg:', nextSeg)
+            map.connectSegment(segmentKey=(thisSeg,t), toSegmentKey=(nextSeg, t+1))
 
 if __name__ == '__main__':
     setLogLevel()
     folder = '../PyMapManager-Data/maps/rr30a'
     
-    oneTimepoint = 1  # 1 timepoint (from session 1 in the map)
-    #oneTimepoint = None  # 8 session map
+    # 6 and 7 have error
+    oneTimepoint = 7  # 1 timepoint (from igor)
+    # oneTimepoint = None  # 8 session map
     
     # works
-    importStack(folder, oneTimepoint=oneTimepoint)
+    # importStack(folder, oneTimepoint=oneTimepoint)
 
     # load multi tp core map (created in xxx) and convert spine IDs
     # from igor to core spine id
-    # convertRunMap(folder)
+    convertRunMap(folder)

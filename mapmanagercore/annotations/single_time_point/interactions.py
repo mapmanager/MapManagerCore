@@ -36,7 +36,7 @@ class AnnotationsInteractions(AnnotationsSegments):
         Returns:
             Point: The nearest anchor point.
         """
-        # abb
+        # abb analysisparams
         # if not specified, get defaults from AnalysisParams()
         if brightestPathDistance is None:
             brightestPathDistance = self.analysisParams.getValue('brightestPathDistance')
@@ -77,7 +77,16 @@ class AnnotationsInteractions(AnnotationsSegments):
 
         return Point(targets[brightest].coords[1])
 
-    def snapBackgroundOffset(self, spineId: SpineId, channel: int = 0, zSpread: int = 0):
+    def snapBackgroundOffset(self, spineId: SpineId,
+                             channel: int = None,
+                             zSpread: int = None):
+
+        # abb analysisparams
+        if channel is None:
+            channel = self.analysisParams.getValue('channel')
+        if zSpread is None:
+            zSpread = self.analysisParams.getValue('zSpread')
+
         roi = self.points[spineId, "roi"]
         z = self.points[spineId, "z"]
 
