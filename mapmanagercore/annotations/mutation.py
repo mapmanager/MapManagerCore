@@ -12,14 +12,17 @@ Keys = Union[Key, list[Key]]
 
 class AnnotationsBaseMut(AnnotationsBase):
     def deleteSpine(self, spineId: Keys, skipLog=False) -> None:
-        self._drop(Spine, spineId, skipLog=skipLog)
+        logger.info(f'spineId:{spineId}')
+        # abb
+        # self._drop(Spine, spineId, skipLog=skipLog)
+        self._drop("Spine", spineId, skipLog=skipLog)
 
     def deleteSegment(self, segmentId: Keys, skipLog=False) -> None:
         if not self.segments[:, []].join(self.points[["segmentID"]], on=["segmentID", "t"]).empty:
             raise ValueError(
                 f"Cannot delete segment(s) {segmentId} as it has an attached spine(s)")
 
-        self._drop(Segment, segmentId, skipLog=skipLog)
+        self._drop("Segment", segmentId, skipLog=skipLog)
 
     def updateSpine(self, spineId: Keys, value: Spine, replaceLog=False, skipLog=False):
         """

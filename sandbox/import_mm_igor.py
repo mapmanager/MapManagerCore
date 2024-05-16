@@ -273,9 +273,12 @@ def convertRunMap(igorFolder, coreMapPath = 'sandbox/data/rr30a.mmap'):
     igorSegMapPath = os.path.join(igorFolder, igorSegMapPath)
     igorSegMap = np.load(igorSegMapPath)
     print('igorSegMap:', igorSegMap.shape)
+    print(igorSegMap)
     nSegRows = igorSegMap.shape[0]
 
     # sandbox/data/rr30a.mmap
+
+    return
 
     # load the map
     coreMapPath = '/Users/cudmore/Sites/MapManagerCore/sandbox/data/rr30a.mmap'

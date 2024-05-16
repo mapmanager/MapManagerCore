@@ -11,6 +11,7 @@ from .log import Op, RecordLog
 import geopandas as gp
 from collections.abc import Sequence
 
+from mapmanagercore.logger import logger
 
 class LazyGeoPandas:
     _log: RecordLog[str]
@@ -82,7 +83,7 @@ class LazyGeoPandas:
     def _getDf(self, key: str) -> gp.GeoDataFrame:
         return self._frames[key]._df
 
-    def _drop(self, key: str, id: Union[Hashable, Sequence[Hashable], pd.Index], skipLog=False) -> None:
+    def _drop(self, key: str, ids: Union[Hashable, Sequence[Hashable], pd.Index], skipLog=False) -> None:
         store = self._frames[key]
         df = store._rootDf
 
@@ -93,7 +94,7 @@ class LazyGeoPandas:
             self._log.push(
                 Op(key, deletedData, gp.GeoDataFrame(columns=df.columns)))
 
-        df.drop(id, inplace=True)
+        df.drop(ids, inplace=True)
         store._state.increment()
 
     def _invalidateCached(self, ids: pd.Index, key: str, columns: Iterator[str]):
