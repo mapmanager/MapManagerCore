@@ -18,6 +18,17 @@ pendingBackgroundRoiTranslation = None
 
 
 class AnnotationsInteractions(AnnotationsSegments):
+    
+    # abb
+    def getSpineDistance(self, segmentID: SegmentId,
+                         point: Point):
+        """Add doc string
+        """
+        segment: LineString = self.segments[segmentID, "segment"]
+        # find the closest point on the segment to the `point`
+        minProjection = segment.project(point)
+        return minProjection
+    
     def nearestAnchor(self, segmentID: SegmentId,
                       point: Point,
                       brightestPathDistance: int = None,
@@ -120,7 +131,14 @@ class AnnotationsInteractions(AnnotationsSegments):
         z (int): The z coordinate of the spine.
         """
         point = Point(x, y, z)
+
         anchor = self.nearestAnchor(segmentId, point)
+
+        # write this function, maybe calculate it withinn nearestAnchor()
+        # spineDistance : float = self.getSpineDistance(point, segment)
+        # spineDistance = 123.456  # fake number to debug
+        spineDistance = self.getSpineDistance(segmentId, point)
+
         spineId = self.newUnassignedSpineId()
 
         self.updateSpine(spineId, Spine.withDefaults(
@@ -131,6 +149,8 @@ class AnnotationsInteractions(AnnotationsSegments):
             anchorZ=int(anchor.z),
             xBackgroundOffset=0.0,
             yBackgroundOffset=0.0,
+            # abb
+            spineDistance = spineDistance
         ))
 
         self.snapBackgroundOffset(spineId)
@@ -186,9 +206,14 @@ class AnnotationsInteractions(AnnotationsSegments):
 
         logger.info(f'segmentId:{segmentId} anchor:{anchor}')
 
+        # abb
+        _point = self.points[spineId, "point"]
+        spineDistance = self.getSpineDistance(segmentId, _point)
+
         self.updateSpine(spineId, Spine(
             anchorZ=int(anchor.z),
             anchor=Point(anchor.x, anchor.y),
+            spineDistance=spineDistance,
         ), state != DragState.START and state != DragState.MANUAL)
 
         return True
@@ -310,8 +335,12 @@ class AnnotationsInteractions(AnnotationsSegments):
         Returns:
             int: The ID of the new segment.
         """
+        logger.info('')
+        
         segmentId = self.newUnassignedSegmentId()
 
+        logger.info(f'segmentId:{segmentId}')
+        
         self.updateSegment(segmentId, Segment.withDefaults(
             segment=LineString([]),
             roughTracing=LineString([])

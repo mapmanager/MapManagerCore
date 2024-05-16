@@ -269,6 +269,9 @@ def convertRunMap(igorFolder, coreMapPath = 'sandbox/data/rr30a.mmap'):
     nSessions = igorRunMap.shape[1]
     nRows = igorRunMap.shape[0]
 
+    print(igorRunMap[0:5,:])
+    print(igorRunMap[:-5,:])
+    
     igorSegMapPath = 'igorSegMapExport.npy'
     igorSegMapPath = os.path.join(igorFolder, igorSegMapPath)
     igorSegMap = np.load(igorSegMapPath)
@@ -291,17 +294,29 @@ def convertRunMap(igorFolder, coreMapPath = 'sandbox/data/rr30a.mmap'):
             print('t:', t, 'thisSeg:', thisSeg, 'nextSeg:', nextSeg)
             map.connectSegment(segmentKey=(thisSeg,t), toSegmentKey=(nextSeg, t+1))
 
+def loadForSpineDist():
+    path = 'sandbox/data/rr30a_s0.mmap'
+    map = MapAnnotations(MMapLoader(path))
+    
+    print(map.points.columns)
+    map.points.columnsAttributes
+
+    print(map.points[['segmentID', 'userType', 'point', 'spineDistance', 'spineSide']])
+
 if __name__ == '__main__':
     setLogLevel()
     folder = '../PyMapManager-Data/maps/rr30a'
     
     # 6 and 7 have error
-    oneTimepoint = 7  # 1 timepoint (from igor)
+    oneTimepoint = 0  # 1 timepoint (from igor)
     # oneTimepoint = None  # 8 session map
     
-    # works
-    # importStack(folder, oneTimepoint=oneTimepoint)
+    # 1) works
+    importStack(folder, oneTimepoint=oneTimepoint)
 
-    # load multi tp core map (created in xxx) and convert spine IDs
+    # 2) load multi tp core map (created in xxx) and convert spine IDs
     # from igor to core spine id
-    convertRunMap(folder)
+    # convertRunMap(folder)
+
+    # 3)
+    # loadForSpineDist()

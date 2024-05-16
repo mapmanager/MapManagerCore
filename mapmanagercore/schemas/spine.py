@@ -39,6 +39,21 @@ from mapmanagercore.logger import logger
             "description": "Anchor of the spine",
             "plot": False,
         },
+
+        # abb
+        "spineDistance": {
+            "title": "Spine Distance",
+            "description": "Distance of anchar along the segment",
+            "plot": False,
+        },
+
+        # abb
+        "spineSide": {
+            "title": "Spine Side",
+            "description": "Side of spine w.r.t. segment in ('left', 'right')",
+            "plot": False,
+        },
+
         "xBackgroundOffset": {
             "title": "X Background Offset",
             "description": "X background offset of the spine",
@@ -99,6 +114,11 @@ class Spine:
     segmentID: int
     point: Point
     anchor: Point
+
+    # abb
+    spineDistance: float
+    spineSide: str  # calculate on addSpine and moveSpine
+
     xBackgroundOffset: float
     yBackgroundOffset: float
     z: int
@@ -130,7 +150,7 @@ class Spine:
     @calculated(title="Spine Length", dependencies=["anchor", "point"])
     def spineLength(frame: LazyGeoFrame):
         return gp.GeoSeries(frame["anchor"]).distance(frame["point"])
-
+    
     @calculated(title="Anchor", dependencies=["anchor", "point"], plot=False)
     def anchorLine(frame: LazyGeoFrame):
         return frame[["anchor", "point"]].apply(lambda x: LineString([x["anchor"], x["point"]]), axis=1)
