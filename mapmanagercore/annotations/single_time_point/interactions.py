@@ -31,41 +31,31 @@ class AnnotationsInteractions(AnnotationsSegments):
     
     def nearestAnchor(self, segmentID: SegmentId,
                       point: Point,
-                      brightestPathDistance: int = None,
-                      channel: int = None,
-                      zSpread: int = None,
-                      findBrightest = True):
+                      findBrightest = False):
         """
         Finds the nearest anchor point on a given line segment to a given point.
 
         Args:
             segmentID (SegmentId): The ID of the line segment.
             point (Point): The point to find the nearest anchor to.
-            brightestPathDistance (int): The distance to search for the brightest path. Defaults to None.
-            channel (int): The channel. Defaults to 0.
-            zSpread (int): The z spread. Defaults to 0.
+            findBrightest (bool): Default False, if True then find the brightest anchor using image data.
 
         Returns:
             Point: The nearest anchor point.
-        """
-        # abb analysisparams
-        # if not specified, get defaults from AnalysisParams()
-        if brightestPathDistance is None:
-            brightestPathDistance = self.analysisParams.getValue('brightestPathDistance')
-        if channel is None:
-            channel = self.analysisParams.getValue('channel')
-        if zSpread is None:
-            zSpread = self.analysisParams.getValue('zSpread')
-            
+        """            
         segment: LineString = self.segments[segmentID, "segment"]
         # find the closest point on the segment to the `point`
         minProjection = segment.project(point)
         
-        if not findBrightest or brightestPathDistance is None:
+        if not findBrightest:
             # Default to the closest path
             anchor = segment.interpolate(minProjection)
             anchor = roundPoint(anchor, 1)
             return anchor
+
+        brightestPathDistance = self.analysisParams.getValue('brightestPathDistance')
+        channel = self.analysisParams.getValue('channel')
+        zSpread = self.analysisParams.getValue('zSpread')
 
         segmentLength = int(segment.length)
         minProjection = int(minProjection)
@@ -133,7 +123,7 @@ class AnnotationsInteractions(AnnotationsSegments):
         """
         point = Point(x, y, z)
 
-        anchor = self.nearestAnchor(segmentId, point)
+        anchor = self.nearestAnchor(segmentId, point, findBrightest=True)
 
         # now handled in lazy updates
         # spineDistance = self.getSpineDistance(segmentId, point)
@@ -205,7 +195,7 @@ class AnnotationsInteractions(AnnotationsSegments):
         segmentId = self.points[spineId, "segmentID"]
         
         # when moving, do not find brightest
-        anchor = self.nearestAnchor(segmentId, Point(x, y, z), findBrightest=False)
+        anchor = self.nearestAnchor(segmentId, Point(x, y, z))
 
         logger.info(f'segmentId:{segmentId} anchor:{anchor}')
 
