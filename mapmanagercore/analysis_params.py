@@ -7,7 +7,8 @@ class AnalysisParams():
     def __init__(self, loadJson : str = None):
         
         # self.__version__ = 0.1
-        self.__version__ = 0.1  # switched to dict of dict
+        # self.__version__ = 0.1  # switched to dict of dicts
+        self.__version__ = 0.2  # 20240508 added anchorPointSearchDistance
 
         if loadJson is not None:
             self._dict = json.loads(loadJson)
@@ -66,6 +67,14 @@ class AnalysisParams():
                 'currentValue': 4,
                 'description': 'Radius of segment tracing.'
             },
+
+            # anchor point search distance
+            # 'anchorPointSearchDistance': {
+            #     'defaultValue': 10,
+            #     'currentValue': 10,
+            #     'description': '????.'
+            # },
+
         }
 
     def __getitem__(self, key) -> Optional[object]:

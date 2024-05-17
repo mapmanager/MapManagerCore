@@ -1,9 +1,9 @@
 from typing import Union
-from .query import QueryAnnotations
+from .base import SingleTimePointAnnotationsBase
 from shapely.geometry import LineString
 
 
-class AnnotationsSegments(QueryAnnotations):
+class AnnotationsSegments(SingleTimePointAnnotationsBase):
     def optimizeSegment(self, roughSegment: LineString, live: bool = False) -> Union[LineString, None]:
         if live:
             # TODO: Add brightest path tracing if it is fast enough to run in real time

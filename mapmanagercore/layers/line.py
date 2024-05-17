@@ -2,59 +2,52 @@ from typing import Callable, Self, Tuple, Union
 import numpy as np
 from ..layers.point import PointLayer
 from .layer import Layer
-from .utils import getCoords
 from shapely.geometry import LineString, MultiLineString, Point, Polygon
 from shapely.ops import substring
 import shapely
 import geopandas as gp
 from ..benchmark import timer
-from .polygon import PolygonLayer
 
 
 class MultiLineLayer(Layer):
-    @timer
-    def buffer(self, *args, **kwargs) -> PolygonLayer:
-        self.series = self.series.apply(lambda x: x.buffer(*args, **kwargs))
-        return PolygonLayer(self)
-
     @Layer.setProperty
-    def offset(self, offset: Union[int, Callable[[str], int]]) -> Self:
+    def offset(self, offset: Union[int, Callable[[int], int]]) -> Self:
         ("implemented by decorator", offset)
         return self
 
     @Layer.setProperty
-    def outline(self, outline: Union[int, Callable[[str], int]]) -> Self:
+    def outline(self, outline: Union[int, Callable[[int], int]]) -> Self:
         ("implemented by decorator", outline)
         return self
 
+    @timer
     def normalize(self) -> Self:
         if "offset" in self.properties:
             distance = self.properties["offset"]
             distance = self.series.index.map(
-                lambda x: distance(x) if callable(distance) else distance)
+                lambda x: distance(x))if callable(distance) else distance
             self.series = shapely.offset_curve(self.series, distance=distance)
 
         if "outline" in self.properties:
             distance = self.properties["outline"]
             distance = self.series.index.map(
                 lambda x: distance(x) if callable(distance) else distance)
-            shapely.buffer(self.series, distance=distance, cap_style=2)
+            self.series = gp.GeoSeries(self.series).buffer(
+                distance=distance, cap_style='flat')
 
         return super().normalize()
 
     def _encodeBin(self):
-        coords = self.series.apply(getCoords)
-        featureId = coords.index
+        featureId = self.series.index
+        coords = self.series
         coords = coords.reset_index(drop=True)
-        coords = coords.explode()
-        pathIndices = coords.apply(len).cumsum()
-        coords = coords.explode()
-
+        pathIndices = coords.count_coordinates().cumsum()
+        coords = coords.get_coordinates()
         return {"lines": {
             "ids": featureId,
             "featureIds": coords.index.to_numpy(dtype=np.uint16),
             "pathIndices": np.insert(pathIndices.to_numpy(dtype=np.uint16), 0, 0, axis=0),
-            "positions": coords.explode().to_numpy(dtype=np.float32),
+            "positions": coords.to_numpy(dtype=np.float32).flatten(),
         }}
 
 
@@ -65,19 +58,19 @@ class LineLayer(MultiLineLayer):
         self.series.dropna(inplace=True)
         return MultiLineLayer(self)
 
-    @timer
+    @ timer
     def createSubLine(df: gp.GeoDataFrame, distance: int, linc: str, originc: str) -> Self:
         series = df.apply(lambda d: calcSubLine(
             d[linc], d[originc], distance), axis=1)
         return LineLayer(series)
 
-    @timer
+    @ timer
     def subLine(self, distance: int) -> Self:
         self.series = self.series.apply(lambda d: calcSubLine(
             d, getTail(d), distance))
         return self
 
-    @timer
+    @ timer
     def simplify(self, res: int) -> Self:
         self.series = self.series.simplify(res)
         return self
@@ -96,31 +89,44 @@ class LineLayer(MultiLineLayer):
         points.series = points.series.apply(lambda x: Point(x.coords[-1]))
         return points
 
+    def head(self):
+        points = PointLayer(self)
+        points.series = points.series.apply(lambda x: Point(x.coords[0]))
+        return points
 
+@timer
 def getTail(d):
     return Point(d.coords[1][0], d.coords[1][1])
 
+# abb
+@ timer
+def getSpinePositon(line: LineString, origin: Point):
+    """Get the position of a spine anchor on the segment.
+    """
+    root = line.project(origin)
+    return root
 
-@timer
+@ timer
 def calcSubLine(line: LineLayer, origin: Point, distance: int):
     root = line.project(origin)
     sub = substring(line, start_dist=max(
         root - distance, 0), end_dist=root + distance)
     return sub
 
-
+@timer
 def extend(x: LineString, origin: Point, distance: float) -> Polygon:
     scale = 1 + distance / x.length
     # grow by scaler from one direction
     return shapely.affinity.scale(x, xfact=scale, yfact=scale, origin=origin)
 
-
+@timer
 def pushLine(segment, lines):
     if len(segment) <= 1:
         return
     lines.append(segment)
 
 
+@timer
 def clipLine(line: LineString, zRange: Tuple[int, int]):
     z_min, z_max = zRange
 
@@ -179,12 +185,14 @@ def clipLine(line: LineString, zRange: Tuple[int, int]):
 
 
 # 1 is in and 2 is out
+@timer
 def interpolateAcross(z_min, z_max, p1, p2):
     if p2[2] >= z_max:
         return interpolate(p1, p2, z_max)
     return interpolate(p1, p2, z_min)
 
 
+@timer
 def interpolate(p1, p2, crossZ):
     x1, y1, z1 = p1
     x2, y2, z2 = p2

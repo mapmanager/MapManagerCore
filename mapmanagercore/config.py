@@ -1,8 +1,8 @@
-from enum import Enum
 from typing import List, Self, TypedDict, Tuple, Union, Literal, get_args
 import numpy as np
 from shapely.geometry import LineString, Point
 from plotly.express import colors
+
 
 SpineId = int
 SegmentId = int
@@ -103,51 +103,10 @@ CONFIG: Config = {
 COLORS = CONFIG["colors"]
 
 
-class Segment(TypedDict):
-    segmentID: int
-    segment: LineString
-    roughTracing: LineString
-    radius: int
-    modified: np.datetime64
-    t: int
-
-    def defaults() -> Self:
-        return Segment({
-            "radius": 4.0,
-        })
-
-class Spine(TypedDict):
-    spineID: int
-    t: int
-    segmentID: int
-    point: Point
-    anchor: Point
-    xBackgroundOffset: float
-    yBackgroundOffset: float
-    z: int
-    anchorZ: int
-    roiExtend: float
-    roiRadius: float
-    modified: np.datetime64
-    note: str
-    userType: int
-    accept: bool
-
-    def defaults() -> Self:
-        return Spine({
-            "roiExtend": 4.0,
-            "roiRadius": 4.0,
-            "note": "",
-            "userType": 0,  # 0 represents "no" user type
-            "accept": True,
-        })
-
-
 class SizeMetadata(TypedDict):
     x: int
     y: int
     z: int
-    t: int
     c: int
 
 
