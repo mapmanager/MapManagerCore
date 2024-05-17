@@ -98,6 +98,13 @@ class LineLayer(MultiLineLayer):
 def getTail(d):
     return Point(d.coords[1][0], d.coords[1][1])
 
+# abb
+@ timer
+def getSpinePositon(line: LineString, origin: Point):
+    """Get the position of a spine anchor on the segment.
+    """
+    root = line.project(origin)
+    return root
 
 @ timer
 def calcSubLine(line: LineLayer, origin: Point, distance: int):

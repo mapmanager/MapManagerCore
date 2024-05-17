@@ -134,10 +134,8 @@ class AnnotationsInteractions(AnnotationsSegments):
 
         anchor = self.nearestAnchor(segmentId, point)
 
-        # write this function, maybe calculate it withinn nearestAnchor()
-        # spineDistance : float = self.getSpineDistance(point, segment)
-        # spineDistance = 123.456  # fake number to debug
-        spineDistance = self.getSpineDistance(segmentId, point)
+        # now handled in lazy updates
+        # spineDistance = self.getSpineDistance(segmentId, point)
 
         spineId = self.newUnassignedSpineId()
 
@@ -150,7 +148,7 @@ class AnnotationsInteractions(AnnotationsSegments):
             xBackgroundOffset=0.0,
             yBackgroundOffset=0.0,
             # abb
-            spineDistance = spineDistance
+            # spineDistance = spineDistance
         ))
 
         self.snapBackgroundOffset(spineId)
@@ -206,14 +204,14 @@ class AnnotationsInteractions(AnnotationsSegments):
 
         logger.info(f'segmentId:{segmentId} anchor:{anchor}')
 
-        # abb
-        _point = self.points[spineId, "point"]
-        spineDistance = self.getSpineDistance(segmentId, _point)
+        # abb, now handled dynamically with laze
+        # _point = self.points[spineId, "point"]
+        # spineDistance = self.getSpineDistance(segmentId, _point)
 
         self.updateSpine(spineId, Spine(
             anchorZ=int(anchor.z),
             anchor=Point(anchor.x, anchor.y),
-            spineDistance=spineDistance,
+            # spineDistance=spineDistance,
         ), state != DragState.START and state != DragState.MANUAL)
 
         return True

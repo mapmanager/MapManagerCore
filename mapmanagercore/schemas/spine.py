@@ -1,6 +1,6 @@
 from shapely.geometry import Point
 import numpy as np
-from ..layers.line import calcSubLine, extend
+from ..layers.line import calcSubLine, extend, getSpinePositon
 import shapely
 from ..lazy_geo_pandas import schema, calculated, LazyGeoFrame
 import geopandas as gp
@@ -41,11 +41,11 @@ from mapmanagercore.logger import logger
         },
 
         # abb
-        "spineDistance": {
-            "title": "Spine Distance",
-            "description": "Distance of anchar along the segment",
-            "plot": False,
-        },
+        # "spinePosition": {
+        #     "title": "Spine Position",
+        #     "description": "Position (distance) of an achor on the segment",
+        #     "plot": False,
+        # },
 
         # abb
         "spineSide": {
@@ -116,7 +116,7 @@ class Spine:
     anchor: Point
 
     # abb
-    spineDistance: float
+    # spinePosition: float
     spineSide: str  # calculate on addSpine and moveSpine
 
     xBackgroundOffset: float
@@ -150,6 +150,18 @@ class Spine:
     @calculated(title="Spine Length", dependencies=["anchor", "point"])
     def spineLength(frame: LazyGeoFrame):
         return gp.GeoSeries(frame["anchor"]).distance(frame["point"])
+    
+    # abb
+    @calculated(title="Spine Position", dependencies=["anchor"])
+    def spinePosition(frame: LazyGeoFrame):
+        # position of spine anchor along the segment
+        segmentFrame = frame.getFrame("Segment")
+
+        df = frame[["segmentID", "anchor"]].join(
+            segmentFrame[["segment", "radius"]], on=["segmentID", "t"])
+        
+        _ret = df.apply(lambda d: getSpinePositon(d["segment"], d["anchor"]), axis=1)
+        return _ret
     
     @calculated(title="Anchor", dependencies=["anchor", "point"], plot=False)
     def anchorLine(frame: LazyGeoFrame):
