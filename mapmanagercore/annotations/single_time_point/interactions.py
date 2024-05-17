@@ -33,7 +33,8 @@ class AnnotationsInteractions(AnnotationsSegments):
                       point: Point,
                       brightestPathDistance: int = None,
                       channel: int = None,
-                      zSpread: int = None):
+                      zSpread: int = None,
+                      findBrightest = True):
         """
         Finds the nearest anchor point on a given line segment to a given point.
 
@@ -59,8 +60,8 @@ class AnnotationsInteractions(AnnotationsSegments):
         segment: LineString = self.segments[segmentID, "segment"]
         # find the closest point on the segment to the `point`
         minProjection = segment.project(point)
-
-        if brightestPathDistance is None:
+        
+        if not findBrightest or brightestPathDistance is None:
             # Default to the closest path
             anchor = segment.interpolate(minProjection)
             anchor = roundPoint(anchor, 1)
@@ -186,7 +187,9 @@ class AnnotationsInteractions(AnnotationsSegments):
 
         return True
 
-    def moveAnchor(self, spineId: SpineId, x: int, y: int, z: int, state: DragState = DragState.MANUAL) -> bool:
+    def moveAnchor(self, spineId: SpineId,
+                   x: int, y: int, z: int,
+                   state: DragState = DragState.MANUAL) -> bool:
         """
         Moves the anchor point of a spine to the given x and y coordinates.
 
@@ -200,7 +203,9 @@ class AnnotationsInteractions(AnnotationsSegments):
             bool: True if the anchor point was successfully translated, False otherwise.
         """
         segmentId = self.points[spineId, "segmentID"]
-        anchor = self.nearestAnchor(segmentId, Point(x, y, z))
+        
+        # when moving, do not find brightest
+        anchor = self.nearestAnchor(segmentId, Point(x, y, z), findBrightest=False)
 
         logger.info(f'segmentId:{segmentId} anchor:{anchor}')
 
