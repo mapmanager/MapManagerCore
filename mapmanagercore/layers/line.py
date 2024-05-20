@@ -98,6 +98,36 @@ class LineLayer(MultiLineLayer):
 def getTail(d):
     return Point(d.coords[1][0], d.coords[1][1])
 
+# abj
+def getSide(a: Point, b: Point, c: Point):
+  """ Calculate which side a point (c) is relative to a segment (AB)
+  Args:
+    a: Beginning point of line segment
+    b: End point of line segment
+    c: Point relative to line segment
+  """
+  crossProduct = (b.x - a.x)*(c.y - a.y) - (b.y - a.y)*(c.x - a.x)
+  if crossProduct > 0:
+    return "Right"
+  elif crossProduct < 0:
+    return "Left"
+  else:
+    return "On the Line"
+
+# abj
+@ timer
+def getSpineSide(line: LineString, spine: Point):
+    """ Return a string representing the side at which the spine point is relative to its segment
+
+    Args:
+        Line: segment in the for of a LineString
+        Spine: point
+    """
+    first = Point(line.coords[0])
+    last = Point(line.coords[-1])
+    val = getSide(first, last, spine)
+    return val
+
 # abb
 @ timer
 def getSpinePositon(line: LineString, origin: Point):
