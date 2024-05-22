@@ -13,6 +13,8 @@ from mapmanagercore.analysis_params import AnalysisParams
 
 class MMapLoaderLazy(Loader, ImageLoader):
     def __init__(self, path: str):
+        self._zarrPath = path
+        
         self.store = zarr.ZipStore(path, mode="r")
         group = zarr.group(store=self.store)
         points = pd.read_pickle(BytesIO(group["points"][:].tobytes()))
@@ -33,6 +35,9 @@ class MMapLoaderLazy(Loader, ImageLoader):
             self._imagesSrcs[t] = group[f"img-{t}"]
             self._metadata[t] = group.attrs[f"metadata-{t}"]
 
+    def getZarrPath(self) -> str:
+        return self._zarrPath
+    
     def images(self) -> ImageLoader:
         return self
 

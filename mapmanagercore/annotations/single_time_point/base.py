@@ -17,8 +17,8 @@ from .. import Annotations
 from typing import Any, Callable, Hashable, List, Self, Tuple, Union
 from copy import copy
 
-# abb analysisparams
 from mapmanagercore.analysis_params import AnalysisParams
+from mapmanagercore.logger import logger
 
 class SingleTimePointFrame(LazyGeoFrame):
     def __init__(self, frame: LazyGeoFrame, t: int):
@@ -55,6 +55,10 @@ class SingleTimePointFrame(LazyGeoFrame):
         finally:
             self._root._filterIdx = filter
 
+    # abb
+    def __len__(self):
+        return len(self._root._rootDf)
+    
     @property
     def index(self):
         return self._root.index.droplevel(1)
@@ -122,6 +126,13 @@ class _SingleTimePointAnnotationsBase(Annotations):
 
         self._t = t
 
+    def __str__(self):
+        logger.info('')
+        numTimepoints = len(self._images._imagesSrcs.keys())
+        numPnts = len(self._annotations._points._rootDf)
+        numSegments = len(self._annotations._segments._rootDf)
+        return f't:{numTimepoints}, points:{numPnts} segments:{numSegments}'
+    
     @property
     def points(self) -> LazyGeoFrame:
         return self._annotations.points
@@ -172,7 +183,7 @@ class SingleTimePointAnnotationsBase(_SingleTimePointAnnotationsBase):
     def deleteSpine(self, spineId: Keys, skipLog=False) -> None:
         return self._annotations.deleteSpine(self._mapKeys(spineId), skipLog)
 
-    def deleteSegment(self, segmentId: Keys, skipLog=False) -> None:
+    def deleteSegment(self, segmentId: Keys, skipLog=False) -> bool:
         return self._annotations.deleteSegment(self._mapKeys(segmentId), skipLog)
 
     def updateSegment(self, segmentId: Keys, value: Segment, replaceLog=False, skipLog=False):

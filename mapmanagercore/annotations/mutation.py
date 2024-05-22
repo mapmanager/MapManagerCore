@@ -12,18 +12,23 @@ Keys = Union[Key, list[Key]]
 
 class AnnotationsBaseMut(AnnotationsBase):
     def deleteSpine(self, spineId: Keys, skipLog=False) -> None:
-        logger.info(f'spineId:{spineId}')
-        # abb
-        # self._drop(Spine, spineId, skipLog=skipLog)
         self._drop("Spine", spineId, skipLog=skipLog)
 
-    def deleteSegment(self, segmentId: Keys, skipLog=False) -> None:
-        if not self.segments[:, []].join(self.points[["segmentID"]], on=["segmentID", "t"]).empty:
-            raise ValueError(
-                f"Cannot delete segment(s) {segmentId} as it has an attached spine(s)")
-
+    def deleteSegment(self, segmentId: Keys, skipLog=False) -> bool:
+        # if not self.segments[:, []].join(self.points[["segmentID"]], on=["segmentID", "t"]).empty:
+        #     raise ValueError(
+        #         f"Cannot delete segment(s) {segmentId} as it has an attached spine(s)")
+        
+        if len(self.points) > 0:
+            if len(self.points[self.points["segmentID"] == segmentId[0]]) > 0:
+                # raise ValueError(
+                logger.warning(
+                    f"Cannot delete segment(s) {segmentId} as it has an attached spine(s)")
+                return False
+            
         self._drop("Segment", segmentId, skipLog=skipLog)
-
+        return True
+    
     def updateSpine(self, spineId: Keys, value: Spine, replaceLog=False, skipLog=False):
         """
         Set the spine with the given ID to the specified value.
@@ -44,18 +49,17 @@ class AnnotationsBaseMut(AnnotationsBase):
         return self._update("Spine", spineId, value, replaceLog, skipLog)
 
     def updateSegment(self, segmentId: Keys, value: Segment, replaceLog=False, skipLog=False):
-        """
-        Set the segment with the given ID to the specified value.
+        """Set the segment with the given ID to the specified value.
 
         Parameters:
             segmentId (str): The ID of the spine.
             value (Union[dict, gp.Series, pd.Series]): The value to set for the spine.
         """
-        if "t" in value:
+        if value.t != MISSING_VALUE:
             raise ValueError(
                 f"Invalid type for column 't' must be set on the segment key")
 
-        if "segmentID" in value:
+        if value.segmentID != MISSING_VALUE:
             raise ValueError(
                 f"Invalid type for column 'segmentID' must be set on the segment key")
 

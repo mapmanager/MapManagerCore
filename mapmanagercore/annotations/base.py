@@ -26,6 +26,22 @@ class AnnotationsBase(LazyImagesGeoPandas):
         # abb analysisparams
         self._analysisParams : AnalysisParams = loader.analysisParams()
 
+        self._zarrPath : str = loader.getZarrPath()
+
+    def getZarrPath(self):
+        return self._zarrPath
+    
+    def __str__(self):
+        """Print info about the map.
+        
+        See: _SingleTimePointAnnotationsBase()
+        """
+        zarrPath = self.getZarrPath()
+        numTimepoints = len(self._images._imagesSrcs.keys())
+        numPnts = len(self.points._rootDf)
+        numSegments = len(self.segments._rootDf)
+        return f't:{numTimepoints}, points:{numPnts} segments:{numSegments} zarr:{zarrPath}'
+        
     @property
     def segments(self) -> LazyGeoFrame:
         return self._segments
@@ -85,6 +101,7 @@ class AnnotationsBase(LazyImagesGeoPandas):
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
 
+            logger.info(f'saving to {path}')
             fs = zarr.ZipStore(path, mode="w", compression=compression)
             with fs as store:
                 group = zarr.group(store=store)

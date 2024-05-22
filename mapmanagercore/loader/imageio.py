@@ -72,15 +72,19 @@ def _createMetaData(imgData : np.ndarray,
     return _metadata
 
 class MultiImageLoader(Loader):
-    """
-    Class for building an MultiImageLoader.
+    """Class for building an MultiImageLoader.
     """
 
-    def __init__(self, lineSegments: Union[str, pd.DataFrame] = pd.DataFrame(), points: Union[str, pd.DataFrame] = pd.DataFrame()):
+    def __init__(self,
+                 lineSegments: Union[str, pd.DataFrame] = pd.DataFrame(),
+                 points: Union[str, pd.DataFrame] = pd.DataFrame()):
         super().__init__(lineSegments, points)
         self._images = {}
         self._metadata = {}
 
+    def getZarrPath(self):
+        return 'MultiImageLoader no zarr path'
+    
     def imread(path: str) -> ImageLoader:
         """
         Load an image using imageio.imread.

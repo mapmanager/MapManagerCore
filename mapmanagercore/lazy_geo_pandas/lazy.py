@@ -134,7 +134,7 @@ class LazyGeoPandas:
             old = df.loc[df.index.get_level_values(0).intersection(ids)].copy()
 
         value = pd.Series(value)
-
+        
         updateDataFrame(df, ids, value)
 
         op = Op(key, old, df.loc[ids])
