@@ -15,6 +15,7 @@ import os
 import time
 import numpy as np
 import pandas as pd
+from typing import List
 from shapely.geometry import LineString
 from shapely.ops import linemerge
 
@@ -24,7 +25,7 @@ from mapmanagercore import MapAnnotations, MultiImageLoader, MMapLoader
 from mapmanagercore.loader.imageio import _createMetaData
 from mapmanagercore.logger import logger, setLogLevel
 
-def importStack(folder, oneTimepoint : int = None):
+def importStack(folder, timepoints : List[int] = None):
     """
     folder : str
         Path to Igor folder
@@ -43,10 +44,10 @@ def importStack(folder, oneTimepoint : int = None):
     maxSlices = 80
         
     # oneTimepoint = 0  # set to None to make a map of numSessions
-    if oneTimepoint is None:
+    if timepoints is None:
         sessionList = range(numSessions)
     else:
-        sessionList = [oneTimepoint]
+        sessionList = timepoints
 
     mapName = os.path.split(folder)[1]
 
@@ -235,9 +236,10 @@ def importStack(folder, oneTimepoint : int = None):
 
     #
     # save our new map
-    if oneTimepoint is None:
+    if timepoints is None or len(timepoints)>1:
         mmMapSessionFile = f'rr30a.mmap'
     else:
+        oneTimepoint = timepoints[0]
         mmMapSessionFile = f'rr30a_s{oneTimepoint}.mmap'
     savePath = os.path.join('sandbox', 'data', mmMapSessionFile)
     logger.info(f'saving: {savePath}')
@@ -308,11 +310,11 @@ if __name__ == '__main__':
     folder = '../PyMapManager-Data/maps/rr30a'
     
     # 6 and 7 have error
-    oneTimepoint = 0  # 1 timepoint (from igor)
+    oneTimepoint = [0,1]  # 1 timepoint (from igor)
     # oneTimepoint = None  # 8 session map
     
     # 1) works
-    importStack(folder, oneTimepoint=oneTimepoint)
+    importStack(folder, timepoints=oneTimepoint)
 
     # 2) load multi tp core map (created in xxx) and convert spine IDs
     # from igor to core spine id

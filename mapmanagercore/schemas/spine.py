@@ -171,7 +171,7 @@ class Spine:
         segmentFrame = frame.getFrame("Segment")
         df = frame[["segmentID", "point"]].join(
             segmentFrame[["segment", "radius"]], on=["segmentID", "t"])
-        print(df)
+        # print(df)
         _ret = df.apply(lambda d: getSpineSide(d["segment"], d["point"]), axis=1)
         
         return _ret
