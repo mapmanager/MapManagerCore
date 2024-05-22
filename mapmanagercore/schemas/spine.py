@@ -1,6 +1,6 @@
 from shapely.geometry import Point
 import numpy as np
-from ..layers.line import calcSubLine, extend, getSpinePositon
+from ..layers.line import calcSubLine, extend, getSpinePositon, getSpineSide
 import shapely
 from ..lazy_geo_pandas import schema, calculated, LazyGeoFrame
 import geopandas as gp
@@ -48,11 +48,11 @@ from mapmanagercore.logger import logger
         # },
 
         # abb
-        "spineSide": {
-            "title": "Spine Side",
-            "description": "Side of spine w.r.t. segment in ('left', 'right')",
-            "plot": False,
-        },
+        # "spineSide": {
+        #     "title": "Spine Side",
+        #     "description": "Side of spine w.r.t. segment in ('left', 'right')",
+        #     "plot": False,
+        # },
 
         "xBackgroundOffset": {
             "title": "X Background Offset",
@@ -116,7 +116,8 @@ class Spine:
     anchor: Point
 
     # abb
-    spineSide: str  # calculate on addSpine and moveSpine
+    # spinePosition: float
+    # spineSide: str  # calculate on addSpine and moveSpine
 
     xBackgroundOffset: float
     yBackgroundOffset: float
@@ -160,6 +161,19 @@ class Spine:
             segmentFrame[["segment", "radius"]], on=["segmentID", "t"])
         
         _ret = df.apply(lambda d: getSpinePositon(d["segment"], d["anchor"]), axis=1)
+        return _ret
+    
+    # abj
+    @calculated(title="Spine Side", dependencies=["point"])
+    def spineSide(frame: LazyGeoFrame):
+
+        # do this for all spines
+        segmentFrame = frame.getFrame("Segment")
+        df = frame[["segmentID", "point"]].join(
+            segmentFrame[["segment", "radius"]], on=["segmentID", "t"])
+        print(df)
+        _ret = df.apply(lambda d: getSpineSide(d["segment"], d["point"]), axis=1)
+        
         return _ret
     
     @calculated(title="Anchor", dependencies=["anchor", "point"], plot=False)
