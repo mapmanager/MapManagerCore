@@ -324,6 +324,10 @@ class LazyGeoFrame(Generic[T]):
 
         return row, key
 
+    # abb
+    def __len__(self):
+      return len(self._df)
+      
     def __getitem__(self, items):
         row, key = self._parseKeyRow(items)
 

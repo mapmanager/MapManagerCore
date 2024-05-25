@@ -29,9 +29,10 @@ class AnnotationsInteractions(AnnotationsSegments):
         minProjection = segment.project(point)
         return minProjection
     
+    # abb added findBrightest=False, do not find brightest by default
     def nearestAnchor(self, segmentID: SegmentId,
                       point: Point,
-                      findBrightest = False):
+                      findBrightest : bool = False):
         """Finds the nearest anchor point on a given line segment to a given point.
 
         Args:
@@ -48,12 +49,12 @@ class AnnotationsInteractions(AnnotationsSegments):
         minProjection = segment.project(point)
         
         if np.isnan(minProjection):
-            logger.info(f'minProjection:{minProjection}')
-            logger.info(f'segment:{segment}')
-            logger.info(f'point:{point}')
+            logger.warning(f'minProjection:{minProjection}')
+            logger.warning(f'segment:{segment}')
+            logger.warning(f'point:{point}')
             
         if not findBrightest:
-            # Default to the closest path
+            # Default to the closest point (not brightest)
             anchor = segment.interpolate(minProjection)
             anchor = roundPoint(anchor, 1)
             return anchor
@@ -140,8 +141,6 @@ class AnnotationsInteractions(AnnotationsSegments):
             anchorZ=int(anchor.z),
             xBackgroundOffset=0.0,
             yBackgroundOffset=0.0,
-            # abb
-            # spineDistance = spineDistance
         ))
 
         self.snapBackgroundOffset(spineId)
@@ -196,19 +195,13 @@ class AnnotationsInteractions(AnnotationsSegments):
         """
         segmentId = self.points[spineId, "segmentID"]
         
+        # abb
         # when moving, do not find brightest
         anchor = self.nearestAnchor(segmentId, Point(x, y, z))
-
-        logger.info(f'segmentId:{segmentId} anchor:{anchor}')
-
-        # abb, now handled dynamically with laze
-        # _point = self.points[spineId, "point"]
-        # spineDistance = self.getSpineDistance(segmentId, _point)
 
         self.updateSpine(spineId, Spine(
             anchorZ=int(anchor.z),
             anchor=Point(anchor.x, anchor.y),
-            # spineDistance=spineDistance,
         ), state != DragState.START and state != DragState.MANUAL)
 
         return True

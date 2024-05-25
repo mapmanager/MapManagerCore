@@ -38,6 +38,8 @@ class AnnotationsBaseMut(AnnotationsBase):
             value (Union[dict, gp.Series, pd.Series]): The value to set for the spine.
         """
 
+        # abb, remove this?
+        # When we connect, we want to mutate the multiindex (spineID, t)
         if value.t != MISSING_VALUE:
             raise ValueError(
                 f"Invalid type for column 't' must be set on the spine key")
@@ -76,17 +78,28 @@ class AnnotationsBaseMut(AnnotationsBase):
         return self.segments.index.get_level_values(0).max() + 1
 
     def connect(self, spineKey: Tuple[SpineId, int], toSpineKey: Tuple[SpineId, int]):
-        if self.points[toSpineKey, "segmentID"] != self.points[spineKey, "segmentID"]:
+        
+        # ValueError: Can only compare identically-labeled Series objects
+        # if self.points[toSpineKey, "segmentID"] != self.points[spineKey, "segmentID"]:
+        _segmentID = self.points[spineKey, "segmentID"].values[0]
+        _toSegmentID = self.points[toSpineKey, "segmentID"].values[0]
+        if _toSegmentID != _segmentID:
             raise ValueError("Cannot connect spines from different segments.")
-
+        
         # check if the key already exists in the time point
-        existingKey = (toSpineKey[0], spineKey[0])
+        # existingKey = (toSpineKey[0], spineKey[0])
+        # abb
+        existingKey = (spineKey[0], toSpineKey[1])
         if existingKey in self.points.index:
             self.disconnect(existingKey)
 
         # Propagate the spine ID to all future time points
-        self.updateSpine(range(spineKey, spineKey[0]), Spine(
-            spineID=toSpineKey[0],
+        # self.updateSpine(range(spineKey, spineKey[0]), Spine(
+        #     spineID=toSpineKey[0],
+        # ))
+        # abb
+        self.updateSpine(toSpineKey[0], Spine(
+            spineID=spineKey[0],
         ))
 
     def disconnect(self, spineKey: Tuple[SpineId, int]):

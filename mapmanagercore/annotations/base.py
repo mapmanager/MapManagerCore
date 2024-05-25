@@ -29,8 +29,12 @@ class AnnotationsBase(LazyImagesGeoPandas):
         self._zarrPath : str = loader.getZarrPath()
 
     def getZarrPath(self):
-        return self._zarrPath
-    
+        try:
+            return self._zarrPath
+        except (AttributeError) as e:
+            logger.warning(f'{e}')
+
+    # abb
     def __str__(self):
         """Print info about the map.
         
@@ -40,8 +44,18 @@ class AnnotationsBase(LazyImagesGeoPandas):
         numTimepoints = len(self._images._imagesSrcs.keys())
         numPnts = len(self.points._rootDf)
         numSegments = len(self.segments._rootDf)
-        return f't:{numTimepoints}, points:{numPnts} segments:{numSegments} zarr:{zarrPath}'
         
+        # images
+        # numTimepoints = self.numTimepoints()
+
+        return f't:{numTimepoints}, points:{numPnts} segments:{numSegments} zarr:{zarrPath}'
+    
+    #abb
+    # def numTimepoints(self) -> int:
+    #     """Get the number of timepoints.
+    #     """
+    #     return self._images.shape(t=0)[0]
+    
     @property
     def segments(self) -> LazyGeoFrame:
         return self._segments

@@ -57,7 +57,7 @@ class SingleTimePointFrame(LazyGeoFrame):
 
     # abb
     def __len__(self):
-        return len(self._root._rootDf)
+        return len(self._root._df)
     
     @property
     def index(self):

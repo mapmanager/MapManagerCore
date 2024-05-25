@@ -96,8 +96,8 @@ class MultiImageLoader(Loader):
         return _MultiImageLoader(imread(path))
 
     # abb
-    def getNumTimepoints(self):
-       return len(self._images.keys())
+    # def getNumTimepoints(self):
+    #    return len(self._images.keys())
      
     def read(self, path : Union[str, np.ndarray], time: int = 0, channel: int = 0):
         """

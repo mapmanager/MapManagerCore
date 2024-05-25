@@ -115,10 +115,6 @@ class Spine:
     point: Point
     anchor: Point
 
-    # abb
-    # spinePosition: float
-    # spineSide: str  # calculate on addSpine and moveSpine
-
     xBackgroundOffset: float
     yBackgroundOffset: float
     z: int
