@@ -1,6 +1,6 @@
 from shapely.geometry import Point
 import numpy as np
-from ..layers.line import calcSubLine, extend, getSpinePositon, getSpineSide
+from ..layers.line import calcSubLine, extend, getSpinePositon, getSpineSide, getSpineAngle
 import shapely
 from ..lazy_geo_pandas import schema, calculated, LazyGeoFrame
 import geopandas as gp
@@ -114,6 +114,7 @@ class Spine:
     segmentID: int
     point: Point
     anchor: Point
+    spineAngle: LineString
 
     xBackgroundOffset: float
     yBackgroundOffset: float
@@ -175,6 +176,21 @@ class Spine:
     @calculated(title="Anchor", dependencies=["anchor", "point"], plot=False)
     def anchorLine(frame: LazyGeoFrame):
         return frame[["anchor", "point"]].apply(lambda x: LineString([x["anchor"], x["point"]]), axis=1)
+    
+    # abj
+    @calculated(title="Spine Angle", dependencies=["point"])
+    def angle(frame: LazyGeoFrame):
+        
+        # do this for all spines
+        segmentFrame = frame.getFrame("Segment")
+        df = frame[["segmentID", "point", "anchorLine"]].join(
+            segmentFrame[["segment"]], on=["segmentID", "t"])
+        print("spineAngle df:", df)
+
+        # # Create a dataframe of 
+        _ret = df.apply(lambda d: getSpineAngle(d["segment"], d["anchorLine"]), axis=1)
+        
+        return _ret
 
     @calculated(tile="ROI Base", dependencies={
         "Spine": ["anchor"],
