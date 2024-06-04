@@ -9,11 +9,25 @@ SegmentId = int
 
 Color = Union[Tuple[int, int, int], Tuple[int, int, int, int]]
 
-MAX_TRACING_DISTANCE = None
+MAX_TRACING_DISTANCE = 30
 
 Symbol = Literal[
-    "circle",
-    "cross",
+    'circle',
+    'square',
+    'diamond',
+    'cross',
+    'x',
+    'pentagon',
+    'hexagon',
+    'hexagon2',
+    'octagon',
+    'star',
+    'hexagram',
+    'hourglass',
+    'bowtie',
+    'asterisk',
+    'hash',
+    'arrow'
 ]
 
 symbols = get_args(Symbol)
@@ -82,6 +96,7 @@ CONFIG: Config = {
         "backgroundRoiHead": [255, 255, 255],
         "backgroundRoiBase": [255, 100, 255],
         "segment": [255, 0, 0],
+        "pendingSegment": [255 * 0.5, 255 * 0.5, 255 * 0.5],
         "segmentSelected": [0, 255, 255],
         "segmentEditing": [0, 255, 0],
         "intractable": [0, 255, 0],

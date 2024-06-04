@@ -2,15 +2,15 @@ from typing import Union
 import numpy as np
 from shapely.geometry import Point
 import shapely
-from mapmanagercore.utils import shapeGrid
+from mapmanagercore.utils import injectPoint, shapeGrid
 from .segment import AnnotationsSegments
 from ...config import MAX_TRACING_DISTANCE, SegmentId, SpineId
 from ...schemas import Segment, Spine
 from ...layers.layer import DragState
 from ...layers.utils import roundPoint
 from shapely.geometry import LineString
-from shapely.ops import split, linemerge
 import geopandas as gp
+from shapely.ops import nearest_points
 
 from mapmanagercore.logger import logger
 
@@ -20,6 +20,7 @@ pendingBackgroundRoiTranslation = None
 class AnnotationsInteractions(AnnotationsSegments):
     def nearestAnchor(self, segmentID: SegmentId,
                       point: Point,
+                      useBrightestPath=False,
                       brightestPathDistance: int = None,
                       channel: int = None,
                       zSpread: int = None):
@@ -36,24 +37,26 @@ class AnnotationsInteractions(AnnotationsSegments):
         Returns:
             Point: The nearest anchor point.
         """
-        # abb analysisparams
-        # if not specified, get defaults from AnalysisParams()
-        if brightestPathDistance is None:
-            brightestPathDistance = self.analysisParams.getValue('brightestPathDistance')
-        if channel is None:
-            channel = self.analysisParams.getValue('channel')
-        if zSpread is None:
-            zSpread = self.analysisParams.getValue('zSpread')
-            
+
         segment: LineString = self.segments[segmentID, "segment"]
         # find the closest point on the segment to the `point`
         minProjection = segment.project(point)
 
-        if brightestPathDistance is None:
+        if not useBrightestPath:
             # Default to the closest path
             anchor = segment.interpolate(minProjection)
             anchor = roundPoint(anchor, 1)
             return anchor
+
+        # abb analysisparams
+        # if not specified, get defaults from AnalysisParams()
+        if brightestPathDistance is None:
+            brightestPathDistance = self.analysisParams.getValue(
+                'brightestPathDistance')
+        if channel is None:
+            channel = self.analysisParams.getValue('channel')
+        if zSpread is None:
+            zSpread = self.analysisParams.getValue('zSpread')
 
         segmentLength = int(segment.length)
         minProjection = int(minProjection)
@@ -292,7 +295,7 @@ class AnnotationsInteractions(AnnotationsSegments):
         """
 
         anchor = self.nearestAnchor(segmentId, Point(x, y))
-        self.updateSegment(segmentId, Spine(
+        self.updateSegment(segmentId, Segment(
             radius=Point(anchor.x, anchor.y).distance(Point(x, y))
         ), state != DragState.START and state != DragState.MANUAL)
 
@@ -300,7 +303,7 @@ class AnnotationsInteractions(AnnotationsSegments):
 
     # Segments
 
-    def addSegment(self) -> Union[SegmentId, None]:
+    def newSegment(self) -> Union[SegmentId, None]:
         """
         Generates a new segment.
 
@@ -331,6 +334,19 @@ class AnnotationsInteractions(AnnotationsSegments):
             return 0
         return ids.max() + 1
 
+    def injectSegmentPoint(self, segmentId: SegmentId, x: int, y: int, z: int):
+        segment: LineString = self.segments[segmentId, "segment"]
+        roughTracing: LineString = self.segments[segmentId, "roughTracing"]
+        snappedPoint = segment.interpolate(segment.project(Point(x, y, z)))
+        snappedPoint = Point(snappedPoint.x, snappedPoint.y, z)
+        roughTracing, idx = injectPoint(roughTracing, snappedPoint)
+
+        if roughTracing is None:
+            return None
+
+        self.updateSegmentWithLiveTracing(segmentId, roughTracing.coords, idx)
+        return idx
+
     def appendSegmentPoint(self, segmentId: SegmentId, x: int, y: int, z: int, speculate: bool = False) -> LineString:
         """
         Adds a point to a segment.
@@ -346,33 +362,43 @@ class AnnotationsInteractions(AnnotationsSegments):
             LineString: The updated rough tracing.
         """
 
-        roughTracing: LineString = self.segments[segmentId,
-                                                 "roughTracing"]
+        roughTracing: Union[LineString,
+                            Point] = self.segments[segmentId, "roughTracing"]
         point = Point(x, y, z)
-        snappedPoint = roughTracing.interpolate(roughTracing.project(point))
+        first = len(roughTracing.coords) < 2 or point.distance(
+            Point(roughTracing.coords[0])) < point.distance(Point(roughTracing.coords[-1]))
+        snappedPoint = point if len(roughTracing.coords) == 0 else Point(
+            roughTracing.coords[0 if first else -1])
 
         if MAX_TRACING_DISTANCE is not None and point.distance(snappedPoint) > MAX_TRACING_DISTANCE:
-            # Snap the point to the maximum tracing distance
-            point = LineString([snappedPoint.coords[0], point.coords[0]]).interpolate(
-                MAX_TRACING_DISTANCE)
+            return None
 
-        if roughTracing.coords[0] == snappedPoint.coords[0]:
+        if first:
+            if speculate:
+                return self.optimizeSegment(LineString([
+                    point.coords[0],
+                    roughTracing.coords[0] if len(
+                        roughTracing.coords) > 0 else point.coords[0]
+                ]), live=True)
+
             # Prepend the point to the rough tracing
-            roughTracing = LineString(
-                [point.coords[0]] + list(roughTracing.coords))
-        elif roughTracing.coords[-1] == snappedPoint.coords[0]:
-            # Append the point to the rough tracing
-            roughTracing = LineString(
-                list(roughTracing.coords) + [point.coords[0]])
+            roughTracing = [point.coords[0], *roughTracing.coords]
+            idx = 0
         else:
-            # Add a new point on the rough tracing
-            roughTracing = linemerge(split(roughTracing, snappedPoint).geoms)
+            # Append the point to the rough tracing
+            if speculate:
+                return self.optimizeSegment(LineString([
+                    roughTracing.coords[-1] if len(
+                        roughTracing.coords) > 0 else point.coords[0],
+                    point.coords[0],
+                ]), live=True)
 
-        if speculate:
-            return roughTracing
+            roughTracing = [*roughTracing.coords, point.coords[0]]
+            idx = len(roughTracing) - 1
 
-        self.updateSegmentWithLiveTracing(segmentId, roughTracing)
-        return roughTracing
+        self.updateSegmentWithLiveTracing(
+            segmentId, roughTracing, idx)
+        return 0 if first else len(roughTracing) - 1
 
     def moveSegmentPoint(self, segmentId: SegmentId, x: int, y: int, z: int, index: int, state: DragState = DragState.MANUAL) -> bool:
         """
@@ -390,7 +416,7 @@ class AnnotationsInteractions(AnnotationsSegments):
 
         roughTracing[index] = (x, y, z)
         self.updateSegmentWithLiveTracing(
-            segmentId, LineString(roughTracing), state != DragState.START and state != DragState.MANUAL)
+            segmentId, roughTracing, index, replaceLog=state != DragState.START and state != DragState.MANUAL)
 
         return True
 
@@ -406,20 +432,35 @@ class AnnotationsInteractions(AnnotationsSegments):
             self.segments[segmentId, "roughTracing"].coords)
 
         del roughTracing[index]
-        self.updateSegmentWithLiveTracing(segmentId, LineString(roughTracing))
 
-        return True
+        self.updateSegmentWithLiveTracing(segmentId, roughTracing, index)
 
-    def updateSegmentWithLiveTracing(self, segmentId: SegmentId, roughTracing: LineString, replaceLog: bool = False):
+        if len(roughTracing) == 0:
+            return None
+
+        return index - 1 if index > 0 else 0
+
+    def updateSegmentWithLiveTracing(self, segmentId: SegmentId, roughTracing, updatedIdx, replaceLog: bool = False):
         """
         Updates a segment with live tracing.
 
         Args:
             segmentId (str): The ID of the segment.
-            roughTracing (LineString): The rough tracing.
         """
-        segment = self.optimizeSegment(roughTracing, live=True)
 
+        if len(roughTracing) == 1:
+            self.updateSegment(segmentId, Segment(
+                roughTracing=Point(roughTracing[0]),
+                segment=LineString([])
+            ), replaceLog)
+            return
+
+        roughTracing = LineString(roughTracing)
+        segment = self.segments[segmentId, "segment"]
+        segment = segment if segment is not None and len(
+            segment.coords) > 0 else None
+        segment = self.optimizeSegment(roughTracing, segment, int(
+            updatedIdx), live=True)
         update = Segment(roughTracing=roughTracing)
 
         if segment is not None:
@@ -427,17 +468,5 @@ class AnnotationsInteractions(AnnotationsSegments):
 
         self.updateSegment(segmentId, update, replaceLog)
 
-    def commitSegmentTracing(self, segmentId: SegmentId) -> bool:
-        """
-        Commits the rough tracing of a segment.
-
-        Args:
-            segmentId (str): The ID of the segment.
-        """
-
-        roughTracing = self.segments[segmentId, "roughTracing"]
-        self.updateSegment(segmentId, Segment(
-            segment=self.optimizeSegment(roughTracing)
-        ), skipLog=True)
-
-        return True
+    def onDelete(self):
+        return False

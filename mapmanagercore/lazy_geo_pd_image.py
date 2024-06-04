@@ -93,7 +93,7 @@ class LazyImagesGeoPandas(LazyGeoPandas):
             # abb, ValueError: zero-size array to reduction operation maximum which has no identity
             try:
                 return pd.DataFrame({
-                    f"{name}_ch{channel + 1}_{agg}": pixels.loc[:, channel].apply(lambda x: applyAgg(x, agg)) for agg in aggregates for channel in channels
+                    f"{name}_ch{channel + 1}_{agg}": pixels[channel].apply(lambda x: applyAgg(x, agg)) for agg in aggregates for channel in channels
                 }, index=pixels.index)
             except (ValueError) as e:
                 logger.error(f'ValueError: {e}')

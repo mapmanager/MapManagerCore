@@ -9,6 +9,7 @@ class ColumnAttributes(TypedDict):
     categorical: bool
     divergent: bool
     description: str
+    group: str
     colors: Union[List[Color], Dict[Any, Color]]
     symbols: Union[List[Symbol], Dict[Any, Symbol]]
     plot: bool

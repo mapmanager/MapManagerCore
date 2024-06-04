@@ -12,14 +12,17 @@ Keys = Union[Key, list[Key]]
 
 class AnnotationsBaseMut(AnnotationsBase):
     def deleteSpine(self, spineId: Keys, skipLog=False) -> None:
-        self._drop(Spine, spineId, skipLog=skipLog)
+        self._drop("Spine", spineId, skipLog=skipLog)
 
     def deleteSegment(self, segmentId: Keys, skipLog=False) -> None:
-        if not self.segments[:, []].join(self.points[["segmentID"]], on=["segmentID", "t"]).empty:
-            raise ValueError(
-                f"Cannot delete segment(s) {segmentId} as it has an attached spine(s)")
+        try:
+            if not self.points[["segmentID"]].reset_index().set_index(["segmentID", "t"]).loc[segmentId].empty:
+                raise ValueError(
+                    f"Cannot delete segment(s) {segmentId} as it has an attached spine(s)")
+        except KeyError:
+            pass
 
-        self._drop(Segment, segmentId, skipLog=skipLog)
+        self._drop("Segment", segmentId, skipLog=skipLog)
 
     def updateSpine(self, spineId: Keys, value: Spine, replaceLog=False, skipLog=False):
         """
@@ -30,13 +33,13 @@ class AnnotationsBaseMut(AnnotationsBase):
             value (Union[dict, gp.Series, pd.Series]): The value to set for the spine.
         """
 
-        if value.t != MISSING_VALUE:
-            raise ValueError(
-                f"Invalid type for column 't' must be set on the spine key")
+        # if value.t != MISSING_VALUE:
+        #     raise ValueError(
+        #         f"Invalid type for column 't' must be set on the spine key")
 
-        if value.spineID != MISSING_VALUE:
-            raise ValueError(
-                f"Invalid type for column 'spineID' must be set on the spine key")
+        # if value.spineID != MISSING_VALUE:
+        #     raise ValueError(
+        #         f"Invalid type for column 'spineID' must be set on the spine key")
 
         return self._update("Spine", spineId, value, replaceLog, skipLog)
 
@@ -48,13 +51,13 @@ class AnnotationsBaseMut(AnnotationsBase):
             segmentId (str): The ID of the spine.
             value (Union[dict, gp.Series, pd.Series]): The value to set for the spine.
         """
-        if "t" in value:
-            raise ValueError(
-                f"Invalid type for column 't' must be set on the segment key")
+        # if value.t != MISSING_VALUE:
+        #     raise ValueError(
+        #         f"Invalid type for column 't' must be set on the segment key")
 
-        if "segmentID" in value:
-            raise ValueError(
-                f"Invalid type for column 'segmentID' must be set on the segment key")
+        # if value.segmentID != MISSING_VALUE:
+        #     raise ValueError(
+        #         f"Invalid type for column 'segmentID' must be set on the segment key")
 
         return self._update("Segment", segmentId, value, replaceLog, skipLog)
 
@@ -73,12 +76,12 @@ class AnnotationsBaseMut(AnnotationsBase):
             raise ValueError("Cannot connect spines from different segments.")
 
         # check if the key already exists in the time point
-        existingKey = (toSpineKey[0], spineKey[0])
+        existingKey = (toSpineKey[0], spineKey[1])
         if existingKey in self.points.index:
             self.disconnect(existingKey)
 
         # Propagate the spine ID to all future time points
-        self.updateSpine(range(spineKey, spineKey[0]), Spine(
+        self.updateSpine(slice(spineKey, spineKey[0]), Spine(
             spineID=toSpineKey[0],
         ))
 
@@ -86,7 +89,7 @@ class AnnotationsBaseMut(AnnotationsBase):
         newID = self.newUnassignedSpineId()
 
         # Propagate the spine ID change to all future time points
-        self.updateSpine(range(spineKey, spineKey[0]), Spine(
+        self.updateSpine(slice(spineKey, spineKey[0]), Spine(
             spineID=newID,
         ))
 
@@ -101,7 +104,7 @@ class AnnotationsBaseMut(AnnotationsBase):
             self.disconnectSegment(existingKey)
 
         # Propagate the segment ID to all future time points
-        self.updateSegment(range(segmentKey, segmentKey[0]), Segment(
+        self.updateSegment(slice(segmentKey, segmentKey[0]), Segment(
             segmentID=toSegmentKey[0],
         ))
 
@@ -109,6 +112,6 @@ class AnnotationsBaseMut(AnnotationsBase):
         newID = self.newUnassignedSegmentId()
 
         # Propagate the segment ID change to all future time points
-        self.updateSegment(range(segmentKey, segmentKey[0]), Segment(
+        self.updateSegment(slice(segmentKey, segmentKey[0]), Segment(
             segmentID=newID,
         ))

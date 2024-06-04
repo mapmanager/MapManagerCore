@@ -1,5 +1,7 @@
 from typing import Callable, Self, Tuple, Union
 import numpy as np
+
+from mapmanagercore.utils import count_coordinates
 from ..layers.point import PointLayer
 from .layer import Layer
 from shapely.geometry import LineString, MultiLineString, Point, Polygon
@@ -37,11 +39,12 @@ class MultiLineLayer(Layer):
 
         return super().normalize()
 
+    @timer
     def _encodeBin(self):
-        featureId = self.series.index
-        coords = self.series
+        coords = self.series.explode(index_parts=False)
+        featureId = coords.index
         coords = coords.reset_index(drop=True)
-        pathIndices = coords.count_coordinates().cumsum()
+        pathIndices = count_coordinates(coords).cumsum()
         coords = coords.get_coordinates()
         return {"lines": {
             "ids": featureId,
@@ -52,29 +55,31 @@ class MultiLineLayer(Layer):
 
 
 class LineLayer(MultiLineLayer):
+    @timer
     # clip the shapes z axis
     def clipZ(self, zRange: Tuple[int, int]) -> MultiLineLayer:
-        self.series = self.series.apply(clipLine, zRange=zRange)
+        self.series = clipLines(self.series, zRange)
         self.series.dropna(inplace=True)
         return MultiLineLayer(self)
 
-    @ timer
+    @timer
     def createSubLine(df: gp.GeoDataFrame, distance: int, linc: str, originc: str) -> Self:
         series = df.apply(lambda d: calcSubLine(
             d[linc], d[originc], distance), axis=1)
         return LineLayer(series)
 
-    @ timer
+    @timer
     def subLine(self, distance: int) -> Self:
         self.series = self.series.apply(lambda d: calcSubLine(
             d, getTail(d), distance))
         return self
 
-    @ timer
+    @timer
     def simplify(self, res: int) -> Self:
         self.series = self.series.simplify(res)
         return self
 
+    @timer
     def extend(self, distance=0.5, originIdx=0) -> Self:
         if isinstance(distance, gp.GeoSeries):
             self.series = self.series.combine(distance, lambda x, distance: extend(
@@ -84,27 +89,31 @@ class LineLayer(MultiLineLayer):
                 lambda x: extend(x, x.coords[originIdx], distance=distance))
         return self
 
+    @timer
     def tail(self):
         points = PointLayer(self)
         points.series = points.series.apply(lambda x: Point(x.coords[-1]))
         return points
 
+    @timer
     def head(self):
         points = PointLayer(self)
         points.series = points.series.apply(lambda x: Point(x.coords[0]))
         return points
+
 
 @timer
 def getTail(d):
     return Point(d.coords[1][0], d.coords[1][1])
 
 
-@ timer
+@timer
 def calcSubLine(line: LineLayer, origin: Point, distance: int):
     root = line.project(origin)
     sub = substring(line, start_dist=max(
         root - distance, 0), end_dist=root + distance)
     return sub
+
 
 @timer
 def extend(x: LineString, origin: Point, distance: float) -> Polygon:
@@ -112,11 +121,17 @@ def extend(x: LineString, origin: Point, distance: float) -> Polygon:
     # grow by scaler from one direction
     return shapely.affinity.scale(x, xfact=scale, yfact=scale, origin=origin)
 
+
 @timer
 def pushLine(segment, lines):
     if len(segment) <= 1:
         return
     lines.append(segment)
+
+
+def clipLines(series: gp.GeoSeries, zRange: Tuple[int, int]):
+    # TODO: vectorized
+    return series.apply(clipLine, zRange=zRange)
 
 
 @timer
@@ -138,29 +153,30 @@ def clipLine(line: LineString, zRange: Tuple[int, int]):
 
         # Check if the segment is within the z-coordinate bounds
         if z1InRange:
-            # Include the entire segment in the clipped 2D LineString
             segment.append((p1[0], p1[1]))
 
             if not z2InRange:
                 # The segment exits the bounds
                 point = interpolateAcross(z_min, z_max, p1, line.coords[i+1])
                 segment.append(point)
+                pushLine(segment, lines)
+                segment = []
 
             continue
 
         p2 = line.coords[i+1]
+        if len(segment) != 0:
+            pushLine(segment, lines)
+            segment = []
+
         if z2InRange:
             # The segment enters the bounds
             point = interpolateAcross(z_min, z_max, p2, p1)
             segment.append(point)
         elif (p1[2] < z_min and p2[2] > z_max) or (p2[2] < z_min and p1[2] > z_max):
             # The segment crosses the z bounds; clip and include both parts
-            segment.extend((interpolate(p1, p2, z_min),
-                           interpolate(p1, p2, z_max)))
+            pushLine([interpolate(p1, p2, z_min), interpolate(p1, p2, z_max)], lines)
 
-        if len(segment) != 0:
-            pushLine(segment, lines)
-            segment = []
 
     if zInRange[-1]:
         x, y, z = line.coords[-1]

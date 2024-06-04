@@ -1,11 +1,11 @@
 import math
 from typing import Union, List
-from typing_extensions import deprecated
 import numpy as np
-from shapely.geometry import Polygon, LineString, GeometryCollection, MultiPolygon
+from shapely.geometry import Polygon, LineString, GeometryCollection, MultiPolygon, Point
 import shapely
 import skimage.draw
 import pandas as pd
+import geopandas as gpd
 from .benchmark import timer
 import itertools
 
@@ -52,216 +52,233 @@ def shapeGrid(shape, points, overlap=0):
     overlap = 1 - overlap
     return generateGrid(width * overlap, height * overlap, points)
 
-# abb
-@deprecated
-def findBrightestIndex(x, y, z,
-                        xyzLine : List[List[float]],
-                        image: np.ndarray,
-                        numPnts: int = 5,
-                        lineWidth: int = 1) -> int:
-    """Find the brightest path in an image volume
-        from a point (x,y,z) to a line (xyzLine).
-    
-    Parameters
-    ----------
-    x, y, z
-        coordinate of the point (spine)
-    xyzLine
-        xyz points of the line 
-    image: np.array
-        2D image data
-    numPnts
-        Parameter for the search, seach +/- from closest point (seed point)
-    lineWidth
-        Width of line to calculate each candidate intensity profile
 
-    Returns
-    -------
-    Index on the line which has the brightest path from point to line
-    """
+def set_precision(series: gpd.GeoSeries, *args, **kwargs):
+    return gpd.GeoSeries(shapely.set_precision(series.values, *args, **kwargs), series.index, series.crs)
 
-    closestIndex = findClosestIndex(x, y, z, xyzLine)
-    
-    firstPoint = closestIndex-numPnts
-    lastPoint = closestIndex+numPnts
-    
-    if(firstPoint < 0):
-        firstPoint = 0
-        
-    if(lastPoint > len(xyzLine)):
-        lastPoint = len(xyzLine) - 1
-    
-    # Grab a list of candidate points on the line, loop through temp
-    candidatePoints = xyzLine[firstPoint:lastPoint]
-  
-    brightestIndex = None
-    brightestSum = -1
-    
-    for index, candidatePoint in enumerate(candidatePoints):
-        sourcePoint = np.array([x, y])
-        # sourcePoint = np.array([y, x])
 
-        destPoint = np.array([candidatePoint[0], candidatePoint[1]])
-        # destPoint = np.array([candidatePoint[1], candidatePoint[2]])
+def force_2d(series: gpd.GeoSeries, *args, **kwargs):
+    return gpd.GeoSeries(shapely.force_2d(series.values, *args, **kwargs), series.index, series.crs)
 
-        candidateProfile = skimage.measure.profile_line(image, sourcePoint, destPoint, lineWidth)
-        oneSum = np.sum(candidateProfile)
-        
-        if oneSum > brightestSum:
-            brightestSum = oneSum
-            # Add CurrentIdx to properly offset
-            brightestIndex = index 
-     
-    return brightestIndex + firstPoint
 
-# abb
-@deprecated
-def findClosestIndex(x, y, z, xyzLine : List[List[float]]) -> int:
-    """Find the closest point to (x,y,z) on line.
-    """
-    dist = float('inf')
-    closestIdx = None
-    for idx, point in enumerate(xyzLine):
-        dx = abs(x - point[0])
-        dy = abs(y - point[1])
-        dz = abs(z - point[2])
-        _dist = math.sqrt( dx**2 + dy**2 + dz**2)
-        if _dist < dist:
-            dist = _dist
-            closestIdx = idx
-    return closestIdx
+def count_coordinates(series: gpd.GeoSeries, *args, **kwargs):
+    return pd.Series(shapely.get_num_coordinates(series.values, *args, **kwargs), series.index, series.crs)
 
-# abb
-@deprecated
-def polygonToMask(poly : shapely.Polygon, nx : int = 1024, ny : int = 1024) -> np.array:
-    """Convert a polygon to a binary mask.
-    """
-    from matplotlib.path import Path
 
-    poly = np.array(poly.exterior.coords)
+def union(a: gpd.GeoSeries, b: gpd.GeoSeries, grid_size: int):
+    return gpd.GeoSeries(shapely.union_all([a, b], axis=0, grid_size=grid_size), a.index, a.crs)
 
-    # Create vertex coordinates for each grid cell...
-    # (<0,0> is at the top left of the grid in this system)
-    # y and x's are reversed
-    y, x = np.meshgrid(np.arange(ny), np.arange(nx))
 
-    y, x = y.flatten(), x.flatten()
+# # abb
+# @deprecated
+# def findBrightestIndex(x, y, z,
+#                         xyzLine : List[List[float]],
+#                         image: np.ndarray,
+#                         numPnts: int = 5,
+#                         lineWidth: int = 1) -> int:
+#     """Find the brightest path in an image volume
+#         from a point (x,y,z) to a line (xyzLine).
 
-    points = np.vstack((y,x)).T
+#     Parameters
+#     ----------
+#     x, y, z
+#         coordinate of the point (spine)
+#     xyzLine
+#         xyz points of the line
+#     image: np.array
+#         2D image data
+#     numPnts
+#         Parameter for the search, seach +/- from closest point (seed point)
+#     lineWidth
+#         Width of line to calculate each candidate intensity profile
 
-    polyPath = Path(poly)
-    polyMask = polyPath.contains_points(points, radius=0)
-    polyMask = polyMask.reshape((ny,nx))
-    polyMask = polyMask.astype(int)
+#     Returns
+#     -------
+#     Index on the line which has the brightest path from point to line
+#     """
 
-    return polyMask
+#     closestIndex = findClosestIndex(x, y, z, xyzLine)
 
-# abb
-@deprecated
-def _getOffset(distance, numPoints):
-    """Get a list of candidate points where mask will be moved.
-    
-    Parameters
-    ----------
-    distance
-        Distance between points
-    numPnts
-        Number of points (each side of a square), has to be odd
-        
-    Returns
-    -------
-        List of [x,y] offset pixels [[x, y]]
-    """
-    coordOffsetList = []
+#     firstPoint = closestIndex-numPnts
+#     lastPoint = closestIndex+numPnts
 
-    xStart = - (math.floor(numPoints/2)) * distance
-    xEnd = (math.floor(numPoints/2) + 1) * distance
+#     if(firstPoint < 0):
+#         firstPoint = 0
 
-    yStart = - (math.floor(numPoints/2)) * distance
-    yEnd = (math.floor(numPoints/2) + 1) * distance
+#     if(lastPoint > len(xyzLine)):
+#         lastPoint = len(xyzLine) - 1
 
-    xList = np.arange(xStart, xEnd, distance)
-    yList = np.arange(yStart, yEnd, distance)
+#     # Grab a list of candidate points on the line, loop through temp
+#     candidatePoints = xyzLine[firstPoint:lastPoint]
 
-    for xPoint in xList:
-        for yPoint in yList:
-            coordOffsetList.append([xPoint, yPoint])
+#     brightestIndex = None
+#     brightestSum = -1
 
-    return coordOffsetList
+#     for index, candidatePoint in enumerate(candidatePoints):
+#         sourcePoint = np.array([x, y])
+#         # sourcePoint = np.array([y, x])
 
-# abb
-@deprecated
-def calculateLowestIntensityOffset(mask, distance, numPoints, img):
-    """Get the [x,y] offset of the lowest intensity from a number of candidate positions.
+#         destPoint = np.array([candidatePoint[0], candidatePoint[1]])
+#         # destPoint = np.array([candidatePoint[1], candidatePoint[2]])
 
-    Parameters
-    ----------
-    mask
-        The mask that will be moved around to check for intensity at various positions
-    distance
-        How many steps in the x,y direction the points in the mask will move
-    numPoints
-        (has to be odd) Total number of moves made (total positions that we will check for intensity)
+#         candidateProfile = skimage.measure.profile_line(image, sourcePoint, destPoint, lineWidth)
+#         oneSum = np.sum(candidateProfile)
 
-    Returns
-    -------
-        The [x,y] offset with lowest intensity
-    """
+#         if oneSum > brightestSum:
+#             brightestSum = oneSum
+#             # Add CurrentIdx to properly offset
+#             brightestIndex = index
 
-    offsetList = _getOffset(distance = distance, numPoints = numPoints)
+#     return brightestIndex + firstPoint
 
-    lowestIntensity = math.inf
-    lowestIntensityOffset = 0
-    # lowestIntensityMask = None
-    for offset in offsetList:
-        
-        # logger.info(f'offset: {offset}')
-        
-        currentIntensity = 0
+# # abb
+# @deprecated
+# def findClosestIndex(x, y, z, xyzLine : List[List[float]]) -> int:
+#     """Find the closest point to (x,y,z) on line.
+#     """
+#     dist = float('inf')
+#     closestIdx = None
+#     for idx, point in enumerate(xyzLine):
+#         dx = abs(x - point[0])
+#         dy = abs(y - point[1])
+#         dz = abs(z - point[2])
+#         _dist = math.sqrt( dx**2 + dy**2 + dz**2)
+#         if _dist < dist:
+#             dist = _dist
+#             closestIdx = idx
+#     return closestIdx
 
-        _offsetMask = calculateBackgroundMask(mask, offset)
-        if _offsetMask is None:
-            # given offset is beyond image bounds
-            continue
-    
-        pixelIntensityofMask = img[_offsetMask == 1]
+# # abb
+# @deprecated
+# def polygonToMask(poly : shapely.Polygon, nx : int = 1024, ny : int = 1024) -> np.array:
+#     """Convert a polygon to a binary mask.
+#     """
+#     from matplotlib.path import Path
 
-        totalIntensity = np.sum(pixelIntensityofMask)
-        currentIntensity = totalIntensity
-        if(currentIntensity < lowestIntensity):
-            lowestIntensity = currentIntensity
-            lowestIntensityOffset = offset
-            # lowestIntensityMask = pixelIntensityofMask
+#     poly = np.array(poly.exterior.coords)
 
-    return lowestIntensityOffset
+#     # Create vertex coordinates for each grid cell...
+#     # (<0,0> is at the top left of the grid in this system)
+#     # y and x's are reversed
+#     y, x = np.meshgrid(np.arange(ny), np.arange(nx))
 
-# abb
-@deprecated
-def calculateBackgroundMask(mask, offset):
-    """Offset the values of a given mask and return the background mask
-        
-    Masks will either be the spine or segment/ dendrite mask.
-    """
-    maskCoords = np.argwhere(mask == 1)
-    backgroundPointList = maskCoords + offset
+#     y, x = y.flatten(), x.flatten()
 
-    # Separate into x and y
-    # Construct the 2D mask using the offset background
-    backgroundPointsX = backgroundPointList[:,0]
-    backgroundPointsY = backgroundPointList[:,1]
+#     points = np.vstack((y,x)).T
 
-    backgroundMask = np.zeros(mask.shape, dtype = np.uint8)
+#     polyPath = Path(poly)
+#     polyMask = polyPath.contains_points(points, radius=0)
+#     polyMask = polyMask.reshape((ny,nx))
+#     polyMask = polyMask.astype(int)
 
-    # logger.info(f"backgroundPointsY:{backgroundPointsY}")
-    # logger.info(f"backgroundPointsX:{backgroundPointsX}")
-    
-    try:
-        backgroundMask[backgroundPointsY,backgroundPointsX] = 1
-    except (IndexError) as e:
-        # Account for out of bounds 
-        return None
-    
-    return backgroundMask
+#     return polyMask
+
+# # abb
+# @deprecated
+# def _getOffset(distance, numPoints):
+#     """Get a list of candidate points where mask will be moved.
+
+#     Parameters
+#     ----------
+#     distance
+#         Distance between points
+#     numPnts
+#         Number of points (each side of a square), has to be odd
+
+#     Returns
+#     -------
+#         List of [x,y] offset pixels [[x, y]]
+#     """
+#     coordOffsetList = []
+
+#     xStart = - (math.floor(numPoints/2)) * distance
+#     xEnd = (math.floor(numPoints/2) + 1) * distance
+
+#     yStart = - (math.floor(numPoints/2)) * distance
+#     yEnd = (math.floor(numPoints/2) + 1) * distance
+
+#     xList = np.arange(xStart, xEnd, distance)
+#     yList = np.arange(yStart, yEnd, distance)
+
+#     for xPoint in xList:
+#         for yPoint in yList:
+#             coordOffsetList.append([xPoint, yPoint])
+
+#     return coordOffsetList
+
+# # abb
+# @deprecated
+# def calculateLowestIntensityOffset(mask, distance, numPoints, img):
+#     """Get the [x,y] offset of the lowest intensity from a number of candidate positions.
+
+#     Parameters
+#     ----------
+#     mask
+#         The mask that will be moved around to check for intensity at various positions
+#     distance
+#         How many steps in the x,y direction the points in the mask will move
+#     numPoints
+#         (has to be odd) Total number of moves made (total positions that we will check for intensity)
+
+#     Returns
+#     -------
+#         The [x,y] offset with lowest intensity
+#     """
+
+#     offsetList = _getOffset(distance = distance, numPoints = numPoints)
+
+#     lowestIntensity = math.inf
+#     lowestIntensityOffset = 0
+#     # lowestIntensityMask = None
+#     for offset in offsetList:
+
+#         # logger.info(f'offset: {offset}')
+
+#         currentIntensity = 0
+
+#         _offsetMask = calculateBackgroundMask(mask, offset)
+#         if _offsetMask is None:
+#             # given offset is beyond image bounds
+#             continue
+
+#         pixelIntensityofMask = img[_offsetMask == 1]
+
+#         totalIntensity = np.sum(pixelIntensityofMask)
+#         currentIntensity = totalIntensity
+#         if(currentIntensity < lowestIntensity):
+#             lowestIntensity = currentIntensity
+#             lowestIntensityOffset = offset
+#             # lowestIntensityMask = pixelIntensityofMask
+
+#     return lowestIntensityOffset
+
+# # abb
+# @deprecated
+# def calculateBackgroundMask(mask, offset):
+#     """Offset the values of a given mask and return the background mask
+
+#     Masks will either be the spine or segment/ dendrite mask.
+#     """
+#     maskCoords = np.argwhere(mask == 1)
+#     backgroundPointList = maskCoords + offset
+
+#     # Separate into x and y
+#     # Construct the 2D mask using the offset background
+#     backgroundPointsX = backgroundPointList[:,0]
+#     backgroundPointsY = backgroundPointList[:,1]
+
+#     backgroundMask = np.zeros(mask.shape, dtype = np.uint8)
+
+#     # logger.info(f"backgroundPointsY:{backgroundPointsY}")
+#     # logger.info(f"backgroundPointsX:{backgroundPointsX}")
+
+#     try:
+#         backgroundMask[backgroundPointsY,backgroundPointsX] = 1
+#     except (IndexError) as e:
+#         # Account for out of bounds
+#         return None
+
+#     return backgroundMask
 
 # def _testPolygonToMask():
 #     poly = shapely.Polygon([[5,5], [5,100], [220,320], [250,230]])
@@ -278,7 +295,7 @@ def calculateBackgroundMask(mask, offset):
 #     distance = 50
 #     numPoints = 5
 #     offsetList = _getOffset(distance = distance, numPoints = numPoints)
-    
+
 #     print('offsetList:', offsetList)
 
 #     xPlot = [offset[0] for offset in offsetList]
@@ -293,3 +310,69 @@ def calculateBackgroundMask(mask, offset):
 #     # _testPolygonToMask()
 
 #     _testOffsets()
+
+
+def injectPoint(line, point):
+    distance = line.project(point)
+    currentPosition = 0.0
+    coords = line.coords
+    for i in range(len(coords) - 1):
+        point1 = coords[i]
+        point2 = coords[i + 1]
+        dx = point1[0] - point2[0]
+        dy = point1[1] - point2[1]
+        dz = point1[2] - point2[2]
+        segment_length = (dx**2 + dy**2 + dz**2) ** 0.5
+
+        currentPosition += segment_length
+        if distance == currentPosition:
+            return None, None
+        if distance <= currentPosition:
+            return LineString([*coords[:i+1], point.coords[0], *coords[i+1:]]), i+1
+
+    return LineString([*coords, point.coords[0]]), len(coords)
+
+
+def injectLine(line: LineString, newLine: LineString, leftPoint: Point, rightPoint: Point):
+    if not leftPoint and not rightPoint:
+        return newLine
+
+    if len(newLine.coords) > 0:
+        if leftPoint and newLine.coords[0] != leftPoint.coords[0]:
+            newLine = LineString([leftPoint.coords[0], *newLine.coords])
+        if rightPoint and newLine.coords[-1] != rightPoint.coords[0]:
+            newLine = LineString([*newLine.coords, rightPoint.coords[0]])
+
+    startDistance = line.project(leftPoint) if leftPoint else None
+    endDistance = line.project(rightPoint) if rightPoint else None
+
+    currentPosition = 0.0
+    coords = line.coords
+    startIdx = None
+    endIdx = len(coords)
+    for i in range(len(coords) - 1):
+        point1 = coords[i]
+        point2 = coords[i + 1]
+        dx = point1[0] - point2[0]
+        dy = point1[1] - point2[1]
+        dz = point1[2] - point2[2]
+        segment_length = (dx**2 + dy**2 + dz**2) ** 0.5
+
+        currentPosition += segment_length
+        if startDistance and startIdx is None and startDistance <= currentPosition:
+            startIdx = i + 1
+        if endDistance != None and endDistance <= currentPosition:
+            endIdx = i + 1
+            break
+
+    if not leftPoint:
+        if len(newLine.coords) == 0:
+            return LineString([leftPoint.coords[0], *coords[endIdx:]])
+        return LineString([*newLine.coords, *coords[endIdx:]])
+    if not rightPoint:
+        if len(newLine.coords) == 0:
+            return LineString([*coords[:startIdx], leftPoint.coords[0]])
+        return LineString([*coords[:startIdx], *newLine.coords])
+
+    startIdx = startIdx or 0
+    return LineString([*coords[:startIdx], *newLine.coords, *coords[endIdx:]])

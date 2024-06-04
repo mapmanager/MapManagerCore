@@ -1,9 +1,13 @@
+from dataclasses import dataclass
 import warnings
+
+from mapmanagercore.utils import force_2d
 from ...layers.polygon import PolygonLayer
 from ...config import COLORS, CONFIG, TRANSPARENT, SegmentId, SpineId, scaleColors, symbols
 from ...layers import LineLayer, PointLayer, Layer
 from ...benchmark import timer
 import warnings
+from shapely.geometry import Point, LineString
 from shapely.errors import ShapelyDeprecationWarning
 from .interactions import AnnotationsInteractions
 from typing import List, Tuple
@@ -11,8 +15,8 @@ from typing import List
 from ...layers.layer import Layer
 from typing import List
 import pandas as pd
+import geopandas as gpd
 from typing import TypedDict, Tuple
-from plotly.express.colors import sample_colorscale
 
 
 class AnnotationsSelection(TypedDict):
@@ -25,6 +29,7 @@ class AnnotationsSelection(TypedDict):
     """
     segmentID: SegmentId
     segmentIDEditing: SegmentId
+    segmentIDEditingPath: SegmentId
     spineID: SpineId
 
 
@@ -55,8 +60,34 @@ class AnnotationsOptions(TypedDict):
     symbolOn: str
 
 
+@dataclass
+class SegmentEditState:
+    selectedIndex: int
+    segmentId: SegmentId
+    hoverSegment: LineString
+
+    def __init__(self):
+        self.selectedIndex = None
+        self.segmentId = None
+        self.hoverSegment = None
+
+    def setSelectedIndex(self, index: int):
+        if self.selectedIndex == index:
+            return False
+        self.selectedIndex = index
+        return True
+
+    def clear(self):
+        self.selectedIndex = None
+        self.hoverSegment = None
+
+
 class AnnotationsLayers(AnnotationsInteractions):
     """Annotations Layers Generation"""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.segmentEditState = SegmentEditState()
 
     @timer
     def getAnnotations(self, options: AnnotationsOptions) -> list[Layer]:
@@ -76,16 +107,23 @@ class AnnotationsLayers(AnnotationsInteractions):
 
             zRange = options["zRange"]
             selections = options["annotationSelections"]
+            segmentIDEditingPath = selections["segmentIDEditingPath"]
 
-            if options["showLineSegments"]:
-                layers.extend(self._getSegments(
+            if segmentIDEditingPath:
+                layers.extend(self._getEditingSegment(
                     zRange,
-                    selections["segmentIDEditing"],
-                    selections["segmentID"],
-                    options["showLineSegmentsRadius"]))
+                    segmentIDEditingPath))
+            else:
+                self.segmentEditState.clear()
+                if options["showLineSegments"]:
+                    layers.extend(self._getSegments(
+                        zRange,
+                        selections["segmentIDEditing"],
+                        selections["segmentID"],
+                        options["showLineSegmentsRadius"]))
 
-            if options["showSpines"]:
-                layers.extend(self._getSpines(options))
+                if options["showSpines"]:
+                    layers.extend(self._getSpines(options))
 
             layers = [layer for layer in layers if not layer.empty()]
 
@@ -106,6 +144,8 @@ class AnnotationsLayers(AnnotationsInteractions):
             points = self.points[self.points["segmentID"] == editingSegmentId]
         else:
             points = self.points
+
+        points = points[["point", "anchorLine", "anchor", "z", "anchorZ"]]
 
         visiblePoints = points["z"].between(
             zRange[0], zRange[1], inclusive="left")
@@ -128,9 +168,8 @@ class AnnotationsLayers(AnnotationsInteractions):
 
         labels = None
         if options["showAnchors"] or options["showLabels"]:
-            anchorLines = (spines
-                           .copy(id="anchorLine")
-                           .toLine(points["anchor"])
+            anchorLines = (LineLayer(points["anchorLine"])
+                           .id("anchorLines")
                            .stroke(COLORS["anchorLine"]))
 
             if options["showLabels"]:
@@ -179,23 +218,24 @@ class AnnotationsLayers(AnnotationsInteractions):
     @timer
     def _appendRois(self, selectedSpine: SpineId, editing: bool, layers: List[Layer]):
         boarderWidth = CONFIG["roiStrokeWidth"]
+        points = self.points[[selectedSpine]]
 
-        headLayer = (PolygonLayer(self.points[[selectedSpine], "roiHead"])
+        headLayer = (PolygonLayer(points.loc[[selectedSpine], "roiHead"])
                      .id("roi-head")
                      .strokeWidth(boarderWidth)
                      .stroke(COLORS["roiHead"]))
 
-        baseLayer = (PolygonLayer(self.points[[selectedSpine], "roiBase"])
+        baseLayer = (PolygonLayer(points.loc[[selectedSpine], "roiBase"])
                      .id("roi-base")
                      .strokeWidth(boarderWidth)
                      .stroke(COLORS["roiBase"]))
 
         backgroundRoiHead = (headLayer
-                             .copy(id="background", series=self.points[[selectedSpine], "roiHeadBg"])
+                             .copy(id="background", series=points.loc[[selectedSpine], "roiHeadBg"])
                              .stroke(COLORS["roiHeadBg"]))
 
         backgroundRoiBase = (baseLayer
-                             .copy(id="background", series=self.points[[selectedSpine], "roiBaseBg"])
+                             .copy(id="background", series=points.loc[[selectedSpine], "roiBaseBg"])
                              .stroke(COLORS["roiBaseBg"]))
         if editing:
             # Add larger interaction targets
@@ -215,11 +255,10 @@ class AnnotationsLayers(AnnotationsInteractions):
 
         if editing:
             # Add the extend interaction target
-            line = PointLayer(self.points[[selectedSpine], "point"]).toLine(
-                self.points[[selectedSpine], "anchor"])
+            line = LineLayer(points.loc[[selectedSpine], "anchorLine"])
 
             layers.append(line.copy()
-                          .extend(self.points[selectedSpine, "roiExtend"])
+                          .extend(points.loc[selectedSpine, "roiExtend"])
                           .tail()
                           .radius(1)
                           .id("translate-extend")
@@ -230,7 +269,7 @@ class AnnotationsLayers(AnnotationsInteractions):
                           .onDrag(self.moveRoiExtend))
 
             layers.append(line.copy()
-                          .offset(-self.points[selectedSpine, "roiRadius"])
+                          .offset(-points.loc[selectedSpine, "roiRadius"])
                           .normalize()
                           .tail()
                           .radius(1)
@@ -242,9 +281,9 @@ class AnnotationsLayers(AnnotationsInteractions):
                           .onDrag(self.moveRoiRadius))
 
             layers.append(line
-                          .offset(self.points[selectedSpine, "roiRadius"])
+                          .offset(points.loc[selectedSpine, "roiRadius"])
                           .normalize()
-                          .head()
+                          .tail()
                           .radius(1)
                           .id("translate-radius-left")
                           .fill([255, 255, 255])
@@ -254,9 +293,117 @@ class AnnotationsLayers(AnnotationsInteractions):
                           .onDrag(self.moveRoiRadius))
 
     @timer
+    def _getEditingSegment(self, zRange: Tuple[int, int], editSegPathId: SegmentId) -> List[Layer]:
+        segments = self.segments[editSegPathId, ["roughTracing", "segment"]]
+        self.segmentEditState.segmentId = editSegPathId
+        _, _, x, y = self.shape
+
+        def onClickHitTarget(_, x, y, z):
+            self.segmentEditState.hoverSegment = None
+            index = self.appendSegmentPoint(editSegPathId, x, y, z, False)
+            if index is None:
+                return False
+            self.segmentEditState.setSelectedIndex(index)
+            return True
+
+        def onHoverHitTarget(_, x, y, z):
+            oldSegment = self.appendSegmentPoint(
+                editSegPathId, x, y, z, True)
+
+            if oldSegment is None and self.segmentEditState.hoverSegment is None:
+                return False
+
+            self.segmentEditState.hoverSegment = oldSegment
+            return True
+
+        def onHoverOutHitTarget():
+            if self.segmentEditState.hoverSegment is None:
+                return False
+            self.segmentEditState.hoverSegment = None
+            return True
+
+        hitTarget = (
+            PolygonLayer.box(0, 0, x, y)
+            .id("hitTarget")
+            .fill(TRANSPARENT)
+            .onClick(onClickHitTarget)
+            .onHover(onHoverHitTarget)
+            .onHoverOut(onHoverOutHitTarget)
+        )
+
+        segment = (LineLayer(segments["segment"])
+                   .id("segment")
+                   .clipZ(zRange)
+                   .stroke(COLORS["segment"]))
+
+        segmentGhost = (LineLayer(force_2d(segments["segment"]))
+                        .id("segment-ghost")
+                        .stroke(COLORS["segment"])
+                        .opacity(CONFIG["ghostOpacity"]))
+
+        def addPoint(segId, x, y, z):
+            idx = self.injectSegmentPoint(segId, x, y, z)
+            if idx is None:
+                return False
+
+            self.segmentEditState.setSelectedIndex(idx)
+            return True
+
+        segmentGhost2 = (segmentGhost.copy(id="adder")
+                         .stroke(TRANSPARENT)
+                         .strokeWidth(4)
+                         .opacity(0)
+                         .onClick(addPoint))
+
+        points = gpd.GeoSeries(segments["roughTracing"])
+        points = points.get_coordinates(ignore_index=True, include_z=True)
+        points = points.apply(lambda x: Point(x[0], x[1], x[2]), axis=1)
+
+        def pointColor(sid):
+            if sid == self.segmentEditState.selectedIndex:
+                return COLORS["segmentEditing"]
+            return COLORS["segment"]
+
+        def onDrag(idx, x, y, z, dragState):
+            self.segmentEditState.setSelectedIndex(idx)
+            return self.moveSegmentPoint(editSegPathId, x, y, z, idx, dragState)
+
+        pointsLayer, pointsLayer2 = (PointLayer(gpd.GeoSeries(points))
+                                     .id("roughTracing-points")
+                                     .radius(1)
+                                     .fill(pointColor)
+                                     .fixed()
+                                     .strokeWidth(1)
+                                     .stroke(pointColor)
+                                     .onDrag(onDrag)
+                                     .onClick(lambda idx, x, y, z: self.segmentEditState.setSelectedIndex(idx))
+                                     .splitZ(zRange))
+
+        pointsLayer2 = pointsLayer2.opacity(
+            CONFIG["ghostOpacity"]).id("roughTracing-points-ghost")
+
+        layers = []
+        if self.segmentEditState.hoverSegment:
+            layers.append(
+                LineLayer(force_2d(gpd.GeoSeries(
+                    [self.segmentEditState.hoverSegment])))
+                .id("hover-segment")
+                .stroke(COLORS["pendingSegment"])
+                .opacity(255 * 0.65))
+
+        layers.extend([hitTarget,
+                       segment,
+                       segmentGhost,
+                       segmentGhost2,
+                       pointsLayer,
+                       pointsLayer2
+                       ])
+        return layers
+
+    @timer
     def _getSegments(self, zRange: Tuple[int, int], editSegId: SegmentId, selectedSegId: SegmentId, showLineSegmentsRadius: bool) -> List[Layer]:
         layers = []
-        segments = self.segments
+        segments = self.segments[["segment", "radius"]]
 
         def getStrokeColor(id: SegmentId):
             return COLORS["segmentEditing"] if id == editSegId else (COLORS["segmentSelected"] if id == selectedSegId else COLORS["segment"])
@@ -271,11 +418,11 @@ class AnnotationsLayers(AnnotationsInteractions):
         boarderWidth = CONFIG["segmentLeftRightStrokeWidth"]
 
         def offset(id: int):
-            return self.segments[id, "radius"] / boarderWidth
+            return segments.loc[id, "radius"] / boarderWidth
 
         # Render the ghost of the edit
         if editSegId is not None:
-            self._segmentGhost(editSegId, showLineSegmentsRadius,
+            self._segmentGhost(segments.loc[[editSegId], "segment"], showLineSegmentsRadius,
                                layers, segment, boarderWidth, offset)
 
         if showLineSegmentsRadius:
@@ -295,8 +442,10 @@ class AnnotationsLayers(AnnotationsInteractions):
         if editSegId is None:
             # Make the click target larger
             layers.append(segment.copy(id="interaction")
-                          .strokeWidth(lambda id: self.segments[id, "radius"])
+                          .strokeWidth(lambda id: segments.loc[id, "radius"])
                           .stroke(TRANSPARENT))
+        else:
+            segment = segment.on("edit", "segmentIDEditingPath")
 
         # Add the line segment
         layers.append(segment.strokeWidth(
@@ -304,9 +453,10 @@ class AnnotationsLayers(AnnotationsInteractions):
 
         return layers
 
-    def _segmentGhost(self, segId: SegmentId, showLineSegmentsRadius: bool, layers: List[Layer], segment: LineLayer, boarderWidth: int, offset):
-        segmentSeries = self.segments[[segId], "segment"].force_2d()
-        # segmentSeries = self.segments[segId, "segment"].force_2d()
+    @timer
+    def _segmentGhost(self, segmentSeries, showLineSegmentsRadius: bool, layers: List[Layer], segment: LineLayer, boarderWidth: int, offset):
+        segmentSeries = force_2d(segmentSeries)
+        # segmentSeries = force_2d(self.segments[segId, "segment"])
         ghost = (segment.copy(segmentSeries, id="ghost")
                  .opacity(CONFIG["ghostOpacity"]))
 
@@ -342,74 +492,14 @@ class AnnotationsLayers(AnnotationsInteractions):
                 .onDrag(self.moveSegmentRadius))
 
             # Add the ghost
-        layers.append(ghost)
+        layers.append(ghost.on("edit", "segmentIDEditingPath"))
 
-    def getColors(self, colorOn: str = None, function=False) -> pd.Series:
-        if colorOn is None:
-            if function:
-                return lambda _: COLORS["spine"]
-            return pd.Series([COLORS["spine"]] * len(self.points), index=self.points.index)
+    def onDelete(self):
+        if self.segmentEditState.selectedIndex is None:
+            return super().onDelete()
 
-        categorical = False
-        if colorOn not in self.points.columnsAttributes:
-            raise ValueError(f"Column {colorOn} has no color attributes.")
-
-        attr = self.points.columnsAttributes[colorOn]
-        if "colors" in attr:
-            colors = attr["colors"]
-        elif "categorical" in attr and attr["categorical"]:
-            colors = COLORS["categorical"]
-            categorical = True
-        elif "divergent" in attr and attr["divergent"]:
-            colors = COLORS["divergent"]
-        else:
-            colors = COLORS["scalar"]
-
-        values = self.points[colorOn]
-        if categorical and not isinstance(colors, dict):
-            keys = list(values.unique())
-            keys.sort()
-            originalColors = colors
-            colors = {key: originalColors[i % len(
-                originalColors)] for i, key in enumerate(keys)}
-
-        if isinstance(colors, dict):
-            if function:
-                return lambda x: colors[x]
-            return values.apply(lambda x: colors[values[x]])
-
-        valuesMin = values.min()
-        valuesMax = values.max()
-
-        colors = scaleColors(colors, 1.0/255.0)
-        if function:
-            return lambda x: scaleColors(sample_colorscale(colors, (values[x]-valuesMin)/(valuesMax-valuesMin), colortype="tuple"), 255)
-
-        normalized = (values-valuesMin)/(valuesMax-valuesMin)
-        return pd.Series(scaleColors(sample_colorscale(colors, normalized, colortype="tuple"), 255), index=values.index)
-
-    def getSymbols(self, shapeOn: str, function=False) -> pd.Series:
-        if shapeOn not in self.points.columnsAttributes:
-            raise ValueError(f"Column {shapeOn} has no shape attributes.")
-
-        attr = self.points.columnsAttributes[shapeOn]
-        if "symbols" in attr:
-            symbols_ = attr["symbols"]
-        elif "categorical" in attr and attr["categorical"]:
-            symbols_ = symbols
-        else:
-            raise ValueError(
-                f"Column {shapeOn} is scalar and cannot be used as a shape.")
-
-        values = self.points[shapeOn]
-        if not isinstance(symbols_, dict):
-            keys = list(values.unique())
-            keys.sort()
-            originalSymbols = symbols_
-            symbols_ = {key: originalSymbols[i % len(
-                originalSymbols)] for i, key in enumerate(keys)}
-
-        if function:
-            return lambda x: symbols_[x]
-
-        return values.apply(lambda x: symbols_[x])
+        self.segmentEditState.selectedIndex = self.deleteSegmentPoint(
+            self.segmentEditState.segmentId, self.segmentEditState.selectedIndex)
+        
+        self.segmentEditState.hoverSegment = None
+        return True
