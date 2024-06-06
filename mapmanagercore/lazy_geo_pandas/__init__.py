@@ -1,2 +1,2 @@
-from .schema import schema, calculated
-from .lazy import LazyGeoPandas, LazyGeoFrame
+from .schema import schema, seriesSchema, calculated
+from .lazy import LazyGeoPandas, LazyGeoFrame, LazyGeoSeries

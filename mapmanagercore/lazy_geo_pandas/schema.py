@@ -31,10 +31,19 @@ class Schema:
 
     @classmethod
     def withDefaults(cls, **kwargs):
-        return cls(**cls._defaults, **kwargs)
+        for key, value in cls._defaults.items():
+            if not key in kwargs:
+                kwargs[key] = value
+        return cls(**kwargs)
 
     @classmethod
     def _addAttribute(cls, column: str, attribute: _ColumnAttributes):
+        if not "key" in attribute:
+            attribute["key"] = column
+        if not "title" in attribute:
+            attribute["title"] = column
+        if not "group" in attribute:
+            attribute["group"] = "Other"
         cls._attributes[column] = attribute
 
     # from key schema to current schema
@@ -47,8 +56,7 @@ class Schema:
 
         if not ids is None:
             fromDf = fromDf.loc[ids, :]
-
-        return fromDf.join(toDf, on=keys, how='inner', lsuffix='_from', rsuffix='_to').index
+        return toDf.join(fromDf, on=keys, how='inner', lsuffix='_from', rsuffix='_to').index
 
     # from current schema to key schema
     @classmethod
@@ -61,7 +69,7 @@ class Schema:
         if not ids is None:
             df = df.loc[ids, :]
 
-        found = df.reset_index().loc[:, keys]
+        found = df.reset_index()[keys]
 
         if len(keys) > 1:
             return pd.MultiIndex.from_frame(found)
@@ -74,6 +82,10 @@ class Schema:
         types = cls._annotations
         df = gp.GeoDataFrame(df)
         for key, valueType in types.items():
+
+            if hasattr(valueType, "__args__"):
+                valueType = valueType.__args__[0]
+
             if issubclass(valueType, np.datetime64):
                 valueType = "datetime64[ns]"
 
@@ -107,9 +119,10 @@ class Schema:
                 df.loc[:, key] = df.loc[:, key].fillna(defaults[key])
 
         if df.index.nlevels != len(cls._index):
-            df.set_index(cls._index, inplace=True, drop=True)
-            if df.index.nlevels > 1:
-                df.sort_index(level=0, inplace=True)
+            if len(cls._index) != 0:
+                df.set_index(cls._index, inplace=True, drop=True)
+                if df.index.nlevels > 1:
+                    df.sort_index(level=0, inplace=True)
 
         return df
 
@@ -141,6 +154,9 @@ class Schema:
 def isInstanceExtended(value, expectedType):
     if expectedType == int and isinstance(value, np.int64):
         return True
+
+    if hasattr(expectedType, "__args__"):
+        return any(isInstanceExtended(value, ty) for ty in expectedType.__args__)
 
     return isinstance(value, expectedType)
 
@@ -209,6 +225,10 @@ def schema(index: Union[list[Any], Any], relationships: dict[Schema, dict[str, l
 
         return cls2
     return classWrapper
+
+
+def seriesSchema(relationships: dict[Schema, dict[str, list[str]]] = {}, properties: dict[str, ColumnAttributes] = {}):
+    return schema([], relationships, properties)
 
 
 def calculated(dependencies: Union[List[str], dict[str, list[str]]] = {}, **attributes: Unpack[ColumnAttributes]):

@@ -4,6 +4,8 @@ import io
 from typing import Callable, Dict, Generic, Hashable, Iterator, List, Self, Set, TypeVar, Union
 import numpy as np
 import pandas as pd
+
+from mapmanagercore.benchmark import timer
 from .attributes import _ColumnAttributes, ColumnAttributes
 from .utils import updateDataFrame
 from .schema import MISSING_VALUE, Schema
@@ -94,8 +96,11 @@ class LazyGeoPandas:
             self._log.push(
                 Op(key, deletedData, gp.GeoDataFrame(columns=df.columns)))
 
+        oldLen = df.shape[0]
         df.drop(ids, inplace=True)
-        store._state.increment()
+
+        if oldLen != df.shape[0]:
+            store._state.increment()
 
     def _invalidateCached(self, ids: pd.Index, key: str, columns: Iterator[str]):
         store = self._frames[key]
@@ -111,8 +116,6 @@ class LazyGeoPandas:
             newIds = depStore._schema._reverseMapIds(key, df, store._df, ids)
             df.loc[newIds, columns] = False
 
-        store._state.increment()
-
     def _update(self, key: str, ids: Union[Hashable, Sequence[Hashable], pd.Index], value: Schema, replaceLog=False, skipLog=False):
         store = self._frames[key]
 
@@ -122,28 +125,36 @@ class LazyGeoPandas:
         value = {key: val for key, val in vars(
             value).items() if val is not MISSING_VALUE}
 
-        store._schema.validateColumns(value, dropIndex=True)
-
-        ids = ids if isinstance(ids, pd.Index) or isinstance(
-            ids, list) else [ids]
+        store._schema.validateColumns(value, dropIndex=False)
 
         df = store._df
-        if isinstance(ids, list) and len(ids) > 0 and isinstance(ids[0], tuple):
-            old = df.loc[df.index.intersection(ids)].copy()
+        if isinstance(ids, range) or isinstance(ids, slice):
+            old = df.loc[ids].copy()
+            ids = old.index
         else:
-            old = df.loc[df.index.get_level_values(0).intersection(ids)].copy()
+            ids = ids if isinstance(ids, pd.Index) or isinstance(
+                ids, list) else [ids]
+            if isinstance(ids, list) and len(ids) > 0 and isinstance(ids[0], tuple):
+                old = df.loc[df.index.intersection(ids)].copy()
+            else:
+                old = df.loc[df.index.get_level_values(
+                    0).intersection(ids)].copy()
 
         value = pd.Series(value)
-        
-        updateDataFrame(df, ids, value)
+
+        oldLen = df.shape[0]
+        ids = updateDataFrame(df, ids, value)
 
         op = Op(key, old, df.loc[ids])
+
         df.loc[ids, "modified"] = np.datetime64(datetime.datetime.now())
         df.sort_index(inplace=True)
         if not op.isEmpty():
             changed = op.changed.columns.get_level_values(0).unique()
             self._invalidateCached(ids, key, changed.values)
-        store._state.increment()
+
+        if oldLen != df.shape[0]:
+            store._state.increment()
 
         if skipLog:
             return
@@ -163,22 +174,27 @@ class LazyGeoPandas:
         if op is None:
             return
         store = self.getFrame(op.type)
+        oldLen = store._rootDf.shape[0]
         op.reverse(store._rootDf)
         self._invalidateLogOpChanges(op)
+        if oldLen != store._rootDf.shape[0]:
+            store._state.increment()
 
     def redo(self) -> None:
         op = self._log.redo()
         if op is None:
             return
         store = self.getFrame(op.type)
+        oldLen = store._rootDf.shape[0]
         op.apply(store._rootDf)
         self._invalidateLogOpChanges(op)
+        if oldLen != store._rootDf.shape[0]:
+            store._state.increment()
 
     def _invalidateLogOpChanges(self, op: Op) -> None:
         store = self.getFrame(op.type)
         changedCols = op.changed.columns.get_level_values(0).unique()
         self._invalidateCached(op.changed.index, op.type, changedCols)
-        store._state.increment()
 
 
 SOURCE = LazyGeoPandas()
@@ -199,11 +215,13 @@ class SharedState:
 
 T = TypeVar("T", bound=LazyGeoPandas)
 
+
 class LazyGeoFrame(Generic[T]):
     _rootDf: gp.GeoDataFrame
     _state: SharedState
     _currentVersion: int
     _filterIdx: pd.Index
+    _filterMask: np.ndarray
     _schema: Schema
     _store: T
     _columns: list[str]
@@ -217,6 +235,7 @@ class LazyGeoFrame(Generic[T]):
         self._store = store
         self._columns = []
         self._filterIdx = None
+        self._filterMask = None
         self._state = SharedState()
         self._currentVersion = -1
         self._computingColumns = []
@@ -233,16 +252,35 @@ class LazyGeoFrame(Generic[T]):
     def getStore(self) -> T:
         return self._store
 
+    def _setFilterIndex(self, index: pd.Index):
+        self._currentVersion = self._state.version
+
+        if index is None:
+            self._filterIdx = None
+            self._filterMask = None
+            return
+
+        self._filterIdx = index
+        self._filterMask = self._rootDf.index.isin(index)
+        if np.all(self._filterMask):
+            self._filterMask = None
+
     @property
     def _df(self):
-        if self._filterIdx is None:
+        if self._filterMask is None:
             return self._rootDf
 
         if self._state.version != self._currentVersion:
-            self._dfc = self._rootDf.loc[self._filterIdx]
-            self._currentVersion = self._state.version
+            self._setFilterIndex(self._filterIdx)
 
-        return self._dfc
+        return self._rootDf[self._filterMask]
+
+    def __len__(self):
+        return self._df.shape[0]
+
+    @property
+    def shape(self):
+        return self._df.shape
 
     @property
     def index(self):
@@ -282,8 +320,9 @@ class LazyGeoFrame(Generic[T]):
 
     @property
     def columnsAttributes(self) -> Dict[str, ColumnAttributes]:
-        return self._schema._attributes
+        return {key: {innerKey: innerValue for innerKey, innerValue in value.items() if not innerKey.startswith("_")} for key, value in self._schema._attributes.items()}
 
+    @timer
     def _filter(self, index: pd.Index):
         filtered = copy(self)
         if isinstance(index, pd.Series):
@@ -294,10 +333,11 @@ class LazyGeoFrame(Generic[T]):
         df = self._df.loc[index]
         if isinstance(df, pd.Series):
             df = df.to_frame().T
-        filtered._filterIdx = df.index
+        filtered._setFilterIndex(df.index)
 
         return filtered
 
+    @timer
     def _parseKeyRow(self, items):
         row = None
         key = None
@@ -324,10 +364,7 @@ class LazyGeoFrame(Generic[T]):
 
         return row, key
 
-    # abb
-    def __len__(self):
-      return len(self._df)
-      
+    @timer
     def __getitem__(self, items):
         row, key = self._parseKeyRow(items)
 
@@ -344,13 +381,18 @@ class LazyGeoFrame(Generic[T]):
                 key = filtered.columns
             filtered._insureComputed(key)
 
-        df: pd.DataFrame = filtered._df.loc[:, key]
-        if df.shape[0] < 1:
+        df: pd.DataFrame = filtered._getFiltered(key)
+
+        if len(df) <= 1 and (len(df.shape) == 1 or df.shape[1] < 1):
             if (isinstance(row, tuple) and df.index.nlevels == len(row)) or df.index.nlevels == 1 and self._schema.isIndexType(row):
                 if df.empty:
                     return None
                 return df.values[0]
         return df
+
+    @timer
+    def _getFiltered(self, key):
+        return self._df[key]
 
     def undo(self) -> None:
         self._store.undo()
@@ -368,7 +410,7 @@ class LazyGeoFrame(Generic[T]):
         if depKey not in self._df.columns:
             return None if self._df.empty else self
         else:
-            filter = self._df.loc[:, depKey] != True
+            filter = self._df[depKey] != True
             if not filter.any():
                 return None
             invalid = self._df[filter]
@@ -380,9 +422,10 @@ class LazyGeoFrame(Generic[T]):
             return self
 
         filtered = copy(self)
-        filtered._filterIdx = invalid.index
+        filtered._setFilterIndex(invalid.index)
         return filtered
 
+    @timer
     def _insureComputed(self, columns: Iterator[str]) -> None:
         attributes = self._schema._attributes
         df = self._store.getFrame(self._schema._key)._df
@@ -416,7 +459,7 @@ class LazyGeoFrame(Generic[T]):
                     store = self._store._frames[depStore]
                     ids = invalidClone._schema._mapIds(depStore, store._df)
                     storeClone = copy(store)
-                    storeClone._filterIdx = store._df.loc[ids].index
+                    storeClone._setFilterIndex(store._df.loc[ids].index)
                     storeClone._insureComputed(deps)
 
                 results = attribute["_func"](invalidClone)
@@ -428,8 +471,6 @@ class LazyGeoFrame(Generic[T]):
                     df.loc[results.index, results.columns] = results.values
                 else:
                     df.loc[missingIndex, column] = results
-
-                self._state.increment()
 
                 if len(attribute["_dependencies"]) != 0:
                     df.loc[missingIndex, depKey] = True
@@ -459,6 +500,34 @@ class LazyGeoFrame(Generic[T]):
 
     def toBytes(self):
         return toBytes(self._rootDf)
+
+
+class LazyGeoSeries(LazyGeoFrame[T]):
+    def __init__(self, schema: Schema, data: gp.GeoSeries = None, store: T = SOURCE) -> None:
+        if not data is None:
+            data = data.to_frame(name=0).T
+        super().__init__(schema, data, store)
+        self._fillMissing()
+
+    def _fillMissing(self):
+        if not (0 in self._rootDf.index):
+            self.drop(True)
+
+        current = self._rootDf.loc[0, :].to_dict()
+        if "modified" in current:
+            del current["modified"]
+        self.update(self._schema.withDefaults(**current), skipLog=True)
+
+    def __getitem__(self, items):
+        series = super().__getitem__((0, items))
+        return series.loc[0]
+
+    def drop(self, skipLog=False) -> None:
+        # clear the data and use defaults
+        self.update(self._schema.withDefaults(), skipLog=skipLog)
+
+    def update(self, value: Schema, replaceLog=False, skipLog=False) -> None:
+        return super().update(0, value, replaceLog, skipLog)
 
 
 def mergeDeps(a: dict[str, set[str]],  b: dict[str, set[str]]) -> bool:

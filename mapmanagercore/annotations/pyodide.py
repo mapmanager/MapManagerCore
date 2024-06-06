@@ -31,16 +31,18 @@ class PyodideSingleTimePoint(SingleTimePointAnnotations):
         return json.dumps(self.metadata())
 
     def getSpinePosition(self, spineID: SpineId):
-        if (spineID, self._t) not in self._annotations._points.index:
+        if (spineID, self._t) not in self._annotations.points.index:
             return None
-        return to_js(list(self._annotations._points.loc[(spineID, self._t), "point"].coords)[0])
+        return to_js(list(self._annotations.points[(spineID, self._t), "point"].coords)[0])
 
     def getSegmentsAndSpines(self, options: AnnotationsOptions):
         options = options.to_py()
         z_range = options['zRange']
         index_filter = options["filters"] if "filters" in options else []
         segments = []
-        for (segmentID, points) in self._points.groupby("segmentID"):
+        missingSegments = set(self.segments.index)
+        for (segmentID, points) in self.points[["segmentID", "z"]].groupby("segmentID"):
+            missingSegments.remove(segmentID)
             spines = points.index.to_frame(name="id")
             spines["type"] = "Start"
             spines["invisible"] = ~ inRange(points["z"], z_range)
@@ -50,6 +52,12 @@ class PyodideSingleTimePoint(SingleTimePointAnnotations):
             segments.append({
                 "segmentID": segmentID,
                 "spines": spines.to_dict('records')
+            })
+
+        for segmentId in missingSegments:
+            segments.append({
+                "segmentID": segmentId,
+                "spines": []
             })
 
         return segments
@@ -92,16 +100,34 @@ class PyodideAnnotations(Annotations):
           ImageSlice: The image slice.
         """
         return self.getPixels(time, channel, (zRange[0], zRange[1]))
-    
+
+    def table(self):
+        columns = [key for key, value in self.points.columnsAttributes.items() if value["plot"]]
+        columns.remove("t")
+        df = self.points[columns].reset_index()
+        for i, type in enumerate(df.dtypes):
+            if type == np.integer:
+                df.iloc[:, i] = df.iloc[:, i].astype(int)
+        return df
+
     def getColumn(self, column: str):
-        result = self[column].to_list()
+        if column in self.points.index.names:
+            result = self.points.index.get_level_values(column).to_list()
+        else:
+            result = self.points[column].to_list()
         if len(result) > 1:
             if isinstance(result[0], np.integer):
                 return [int(i) for i in result]
         return result
+
+    def getColors(self, colorOn: str = None):
+        return super().getColors(colorOn).to_list()
     
-    def columnsAttributes_json(self): 
-        return json.dumps(self.columnsAttributes)
+    def getSymbols(self, shapeOn: str = None):
+        return super().getSymbols(shapeOn).to_list()
+
+    def columnsAttributes_json(self):
+        return json.dumps(self.points.columnsAttributes, skipkeys=True)
 
 
 async def loadGeoCsv(path):

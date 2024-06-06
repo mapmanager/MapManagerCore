@@ -71,6 +71,50 @@ def _createMetaData(imgData : np.ndarray,
     
     return _metadata
 
+# class MultiImageLoader(Loader):
+#     """
+#     Class for building an MultiImageLoader.
+#     """
+
+#     # from typing import Literal
+#     from mapmanagercore.config import Metadata, SizeMetadata, VoxelMetadata, MetadataPhysicalSize
+
+#     # time = 0  # on create, always the first timepoint
+#     #numChannels = 1  # on first image, always one channel
+
+#     dtype = imgData.dtype
+#     numSlices, x, y = imgData.shape
+
+#     if maxSlices is not None:
+#         numSlices = maxSlices
+
+#     xVoxel = 1  # 0.12
+#     yVoxel = 1  # 0.12
+#     zVoxel = 1
+#     unit = "pixels"  # "µm"
+
+#     xPhysical = x * xVoxel
+#     yPhysical = y * yVoxel
+#     zPhysical = numSlices * zVoxel
+
+#     _metadata = Metadata(
+#         size=SizeMetadata(x=x,
+#                         y=y,
+#                         z=numSlices,
+#                         # t=time,  # the timepoint of the image
+#                         c=numChannels),  # number of color channels, will have to update as more are added
+#         voxel=VoxelMetadata(x=xVoxel,
+#                             y=yVoxel,
+#                             z=zVoxel),
+#         dtype=str(dtype),  # Literal['Uint16'],
+#         physicalSize=MetadataPhysicalSize(x=xPhysical,
+#                                 y=yPhysical,
+#                                 z=zPhysical,
+#                                 unit=unit)
+#         )
+    
+#     return _metadata
+
 class MultiImageLoader(Loader):
     """Class for building an MultiImageLoader.
     """

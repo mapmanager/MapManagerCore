@@ -2,6 +2,10 @@ from copy import copy
 from typing import Any, Tuple
 import zipfile
 import numpy as np
+import pandas as pd
+
+from mapmanagercore.benchmark import timer
+from mapmanagercore.config import COLORS, scaleColors, symbols
 from ..lazy_geo_pandas import LazyGeoFrame
 from ..schemas import Segment, Spine
 from ..lazy_geo_pd_image import LazyImagesGeoPandas
@@ -9,6 +13,10 @@ from ..image_slices import ImageSlice
 from ..loader.base import ImageLoader, Loader
 import zarr
 import warnings
+from plotly.express.colors import sample_colorscale
+
+from mapmanagercore.analysis_params import AnalysisParams
+from mapmanagercore.logger import logger
 
 from mapmanagercore.analysis_params import AnalysisParams
 from mapmanagercore.logger import logger
@@ -72,7 +80,7 @@ class AnnotationsBase(LazyImagesGeoPandas):
         c = copy(self)
         c._points = c._points[filter]
         return c
-    
+
     def filterSegments(self, filter: Any):
         c = copy(self)
         c._segments = c._segments[filter]
@@ -120,8 +128,10 @@ class AnnotationsBase(LazyImagesGeoPandas):
             with fs as store:
                 group = zarr.group(store=store)
                 self._images.saveTo(group)
-                group.create_dataset("points", data=self.points.toBytes(), dtype=np.uint8)
-                group.create_dataset("lineSegments", data=self.segments.toBytes(), dtype=np.uint8)
+                group.create_dataset(
+                    "points", data=self.points.toBytes(), dtype=np.uint8)
+                group.create_dataset(
+                    "lineSegments", data=self.segments.toBytes(), dtype=np.uint8)
                 group.attrs["version"] = 1
 
                 # abb analysisparams
@@ -130,11 +140,106 @@ class AnnotationsBase(LazyImagesGeoPandas):
     def __enter__(self):
         self._images = self._images.__enter__()
         return self
-    
+
     def __exit__(self, exc_type, exc_value, traceback):
         self._images.__exit__(exc_type, exc_value, traceback)
-        
+
     def close(self):
         self._images.close()
         return
 
+    @timer
+    def getColors(self, colorOn: str = None, function=False) -> pd.Series:
+        if colorOn is None:
+            if function:
+                return lambda _: COLORS["spine"]
+            return pd.Series([COLORS["spine"]] * len(self.points), index=self.points.index)
+
+        categorical = False
+        if colorOn not in self.points.columnsAttributes:
+            raise ValueError(f"Column {colorOn} has no color attributes.")
+
+        attr = self.points.columnsAttributes[colorOn]
+        if "colors" in attr:
+            colors = attr["colors"]
+        elif "categorical" in attr and attr["categorical"]:
+            colors = COLORS["categorical"]
+            categorical = True
+        elif "divergent" in attr and attr["divergent"]:
+            colors = COLORS["divergent"]
+        else:
+            colors = COLORS["scalar"]
+
+        if colorOn in self.points.index.names:
+            values = pd.Series(self.points.index.get_level_values(
+                colorOn).to_list(), index=self.points.index)
+        else:
+            values = self.points[colorOn]
+
+        if categorical and not isinstance(colors, dict):
+            keys = list(values.unique())
+            keys.sort()
+            originalColors = colors
+            colors = {key: originalColors[i % len(
+                originalColors)] for i, key in enumerate(keys)}
+
+        if isinstance(colors, dict):
+            if function:
+                return lambda x: colors[x]
+
+            def extractColor(x):
+                color = colors[x]
+                if isinstance(color, list):
+                    return tuple(color)
+                if isinstance(color, tuple):
+                    return color
+                return color.values[0]
+
+            return values.apply(extractColor)
+
+        valuesMin = values.min()
+        valuesMax = values.max()
+
+        colors = scaleColors(colors, 1.0/255.0)
+        if function:
+            return lambda x: scaleColors(sample_colorscale(colors, (values[x]-valuesMin)/(valuesMax-valuesMin), colortype="tuple"), 255)
+
+        normalized = (values-valuesMin)/(valuesMax-valuesMin)
+        return pd.Series(scaleColors(sample_colorscale(colors, normalized, colortype="tuple"), 255), index=values.index)
+
+    @timer
+    def getSymbols(self, shapeOn: str = None, function=False) -> pd.Series:
+        if shapeOn is None:
+            if function:
+                return lambda _: "circle"
+            return pd.Series(["circle"] * len(self.points), index=self.points.index)
+
+        if shapeOn not in self.points.columnsAttributes:
+            raise ValueError(f"Column {shapeOn} has no shape attributes.")
+
+        attr = self.points.columnsAttributes[shapeOn]
+        if "symbols" in attr:
+            symbols_ = attr["symbols"]
+        elif "categorical" in attr and attr["categorical"]:
+            symbols_ = symbols
+        else:
+            raise ValueError(
+                f"Column {shapeOn} is scalar and cannot be used as a shape.")
+
+        if shapeOn in self.points.index.names:
+            values = pd.Series(self.points.index.get_level_values(
+                shapeOn).to_list(), index=self.points.index)
+        else:
+            values = self.points[shapeOn]
+
+        if not isinstance(symbols_, dict):
+            keys = list(values.unique())
+            keys.sort()
+            originalSymbols = symbols_
+            symbols_ = {key: originalSymbols[i % len(
+                originalSymbols)] for i, key in enumerate(keys)}
+
+        if function:
+            return lambda x: symbols_[x]
+
+        return values.apply(lambda x: symbols_[x])

@@ -1,4 +1,5 @@
-from shapely.geometry import LineString
+from typing import Union
+from shapely.geometry import LineString, Point
 import numpy as np
 from ..lazy_geo_pandas import schema
 
@@ -41,6 +42,6 @@ class Segment:
     segmentID: int
 
     segment: LineString
-    roughTracing: LineString
-    radius: int = 4
+    roughTracing: Union[LineString, Point]
+    radius: float = 4
     modified: np.datetime64

@@ -1,10 +1,13 @@
 import math
 from typing import Union, List
+import math
+from typing import Union, List
 import numpy as np
-from shapely.geometry import Polygon, LineString, GeometryCollection, MultiPolygon
+from shapely.geometry import Polygon, LineString, GeometryCollection, MultiPolygon, Point
 import shapely
 import skimage.draw
 import pandas as pd
+import geopandas as gpd
 from .benchmark import timer
 import itertools
 
@@ -50,6 +53,86 @@ def shapeGrid(shape, points, overlap=0):
     height = maxy - miny
     overlap = 1 - overlap
     return generateGrid(width * overlap, height * overlap, points)
+
+def set_precision(series: gpd.GeoSeries, *args, **kwargs):
+    return gpd.GeoSeries(shapely.set_precision(series.values, *args, **kwargs), series.index, series.crs)
+
+
+def force_2d(series: gpd.GeoSeries, *args, **kwargs):
+    return gpd.GeoSeries(shapely.force_2d(series.values, *args, **kwargs), series.index, series.crs)
+
+
+def count_coordinates(series: gpd.GeoSeries, *args, **kwargs):
+    return pd.Series(shapely.get_num_coordinates(series.values, *args, **kwargs), series.index, series.crs)
+
+
+def union(a: gpd.GeoSeries, b: gpd.GeoSeries, grid_size: int):
+    return gpd.GeoSeries(shapely.union_all([a, b], axis=0, grid_size=grid_size), a.index, a.crs)
+
+def injectPoint(line, point):
+    distance = line.project(point)
+    currentPosition = 0.0
+    coords = line.coords
+    for i in range(len(coords) - 1):
+        point1 = coords[i]
+        point2 = coords[i + 1]
+        dx = point1[0] - point2[0]
+        dy = point1[1] - point2[1]
+        dz = point1[2] - point2[2]
+        segment_length = (dx**2 + dy**2 + dz**2) ** 0.5
+
+        currentPosition += segment_length
+        if distance == currentPosition:
+            return None, None
+        if distance <= currentPosition:
+            return LineString([*coords[:i+1], point.coords[0], *coords[i+1:]]), i+1
+
+    return LineString([*coords, point.coords[0]]), len(coords)
+
+
+def injectLine(line: LineString, newLine: LineString, leftPoint: Point, rightPoint: Point):
+    if not leftPoint and not rightPoint:
+        return newLine
+
+    if len(newLine.coords) > 0:
+        if leftPoint and newLine.coords[0] != leftPoint.coords[0]:
+            newLine = LineString([leftPoint.coords[0], *newLine.coords])
+        if rightPoint and newLine.coords[-1] != rightPoint.coords[0]:
+            newLine = LineString([*newLine.coords, rightPoint.coords[0]])
+
+    startDistance = line.project(leftPoint) if leftPoint else None
+    endDistance = line.project(rightPoint) if rightPoint else None
+
+    currentPosition = 0.0
+    coords = line.coords
+    startIdx = None
+    endIdx = len(coords)
+    for i in range(len(coords) - 1):
+        point1 = coords[i]
+        point2 = coords[i + 1]
+        dx = point1[0] - point2[0]
+        dy = point1[1] - point2[1]
+        dz = point1[2] - point2[2]
+        segment_length = (dx**2 + dy**2 + dz**2) ** 0.5
+
+        currentPosition += segment_length
+        if startDistance and startIdx is None and startDistance <= currentPosition:
+            startIdx = i + 1
+        if endDistance != None and endDistance <= currentPosition:
+            endIdx = i + 1
+            break
+
+    if not leftPoint:
+        if len(newLine.coords) == 0:
+            return LineString([leftPoint.coords[0], *coords[endIdx:]])
+        return LineString([*newLine.coords, *coords[endIdx:]])
+    if not rightPoint:
+        if len(newLine.coords) == 0:
+            return LineString([*coords[:startIdx], leftPoint.coords[0]])
+        return LineString([*coords[:startIdx], *newLine.coords])
+
+    startIdx = startIdx or 0
+    return LineString([*coords[:startIdx], *newLine.coords, *coords[endIdx:]])
 
 # abb
 def findBrightestIndex(x, y, z,

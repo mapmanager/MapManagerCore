@@ -35,6 +35,15 @@ def parseColumns(columns: List[str], prefix: str) -> Tuple[set[int], set[str]]:
     return channels, aggregates
 
 
+def applyAgg(x, agg):
+    try:
+        return getattr(np, agg)(x)
+    except (ValueError) as e:
+        logger.error(f'ValueError: {e}')
+        logger.error(f'  x:{x} agg:{agg}')
+        return np.nan
+
+
 class LazyImagesGeoPandas(LazyGeoPandas):
     # A Lazy geo pandas store with image data
     _images: ImageLoader
@@ -73,27 +82,15 @@ class LazyImagesGeoPandas(LazyGeoPandas):
             # Compute the aggregates over the pixels
             pixels = self.getShapePixels(
                 shapes, channel=channels, zSpread=zSpread)
-            if isinstance(pixels, pd.Series):
-                print('xxx this return')
-                return pixels.apply(lambda x: pd.Series(
-                    {f"{name}_ch{pixels.name + 1}_{agg}": getattr(np, agg)(x) for agg in aggregates}), index=pixels.index)
 
-            # abb, ValueError: zero-size array to reduction operation maximum which has no identity
-            try:
-                _theRet = pd.DataFrame({
-                    f"{name}_ch{channel + 1}_{agg}": pixels[channel].apply(lambda x: getattr(np, agg)(x)) for agg in aggregates for channel in channels
-                }, index=pixels.index)
-            except (ValueError) as e:
-                logger.error(f'ValueError: {e}')
-                logger.error(f'  name:{name} channel:{channels} agg:{aggregates}')
-                # print('pixels.index:')
-                # print(pixels.index)
-                # print('pixels')
-                # print(pixels)
-                return None
-            
-            return _theRet
-        
+            if isinstance(pixels, pd.Series):
+                # one channel was returned
+                return pixels.apply(lambda x: pd.Series(
+                    {f"{name}_ch{pixels.name + 1}_{agg}": applyAgg(x, agg) for agg in aggregates}), index=pixels.index)
+
+            return pd.DataFrame({
+                f"{name}_ch{channel + 1}_{agg}": pixels[channel].apply(lambda x: getattr(np, agg)(x)) for agg in aggregates for channel in channels
+            }, index=pixels.index)
         return wrappedFunc
 
     def addSchema(self, frame: LazyGeoFrame) -> None:
@@ -150,7 +147,7 @@ class LazyImagesGeoPandas(LazyGeoPandas):
 
         return ImageSlice(self._images.fetchSlices(time, channel, (zRange[0], zRange[1] + 1)))
 
-    def getShapePixels(self, shapes: gp.GeoDataFrame, channel: Union[int, List[int]] = 0, zSpread: int = 0, time=None, z: int = None) -> pd.Series:
+    def getShapePixels(self, shapes: gp.GeoDataFrame, channel: Union[int, List[int]] = 0, zSpread: int = 0, time=None, z: int = None) -> Union[pd.Series, pd.DataFrame]:
         return self._images.getShapePixels(shapes, channel=channel, zSpread=zSpread, time=time, z=z)
 
 

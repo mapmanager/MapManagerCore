@@ -3,6 +3,9 @@ import pandas as pd
 
 
 def updateDataFrame(df: gp.GeoDataFrame, ids: pd.Index, value: pd.Series):
+    if isinstance(ids, pd.Index):
+        ids = ids.tolist()
+
     indexes = value.index.intersection(df.index.names)
     indexLess = value.drop(indexes)
     for (i, id) in enumerate(ids):
@@ -31,3 +34,5 @@ def updateDataFrame(df: gp.GeoDataFrame, ids: pd.Index, value: pd.Series):
                 df.rename(index={oldId: id}, inplace=True)
 
         df.loc[id, indexLess.index.values] = indexLess.values
+        
+    return ids

@@ -1,10 +1,13 @@
 from shapely.geometry import Point
 import numpy as np
+
+from mapmanagercore.benchmark import timer
+from mapmanagercore.utils import union
 from ..layers.line import calcSubLine, extend, getSpinePositon, getSpineSide, getSpineAngle
 import shapely
 from ..lazy_geo_pandas import schema, calculated, LazyGeoFrame
 import geopandas as gp
-from shapely.geometry import LineString, MultiPolygon
+from shapely.geometry import LineString, MultiPolygon, Polygon
 from ..lazy_geo_pd_image import calculatedROI
 
 from mapmanagercore.logger import logger
@@ -19,6 +22,7 @@ from mapmanagercore.logger import logger
             "categorical": True,
             "title": "Spine ID",
             "description": "Unique identifier for each spine",
+            "plot": False
         },
         "t": {
             "title": "Time",
@@ -28,6 +32,7 @@ from mapmanagercore.logger import logger
             "categorical": True,
             "title": "Segment ID",
             "description": "Unique identifier for each segment",
+            "plot": False
         },
         "point": {
             "title": "Point",
@@ -65,10 +70,12 @@ from mapmanagercore.logger import logger
         "z": {
             "title": "Z",
             "description": "Z coordinate of the spine",
+            "group": "Coordinate"
         },
         "anchorZ": {
             "title": "Anchor Z",
             "description": "Anchor Z coordinate of the spine",
+            "group": "Anchor Coordinate",
         },
         "modified": {
             "title": "Modified",
@@ -86,6 +93,7 @@ from mapmanagercore.logger import logger
         "note": {
             "title": "Note",
             "description": "Note about the spine",
+            "plot": False
         },
         "userType": {
             "title": "User Type",
@@ -128,23 +136,28 @@ class Spine:
     userType: int = 0
     accept: bool = True
 
-    @calculated(title="x", dependencies=["point"])
+    @calculated(title="X", dependencies=["point"], group="Coordinate")
+    @timer
     def x(frame: LazyGeoFrame):
         return gp.GeoSeries(frame["point"]).x
 
-    @calculated(title="y", dependencies=["point"])
+    @calculated(title="Y", dependencies=["point"], group="Coordinate")
+    @timer
     def y(frame: LazyGeoFrame):
         return gp.GeoSeries(frame["point"]).y
 
-    @calculated(title="Anchor X", dependencies=["anchor"])
+    @calculated(title="Anchor X", dependencies=["anchor"], group="Anchor Coordinate")
+    @timer
     def anchorX(frame: LazyGeoFrame):
         return gp.GeoSeries(frame["anchor"]).x
 
-    @calculated(title="Anchor Y", dependencies=["anchor"])
+    @calculated(title="Anchor Y", dependencies=["anchor"], group="Anchor Coordinate")
+    @timer
     def anchorY(frame: LazyGeoFrame):
         return gp.GeoSeries(frame["anchor"]).y
 
     @calculated(title="Spine Length", dependencies=["anchor", "point"])
+    @timer
     def spineLength(frame: LazyGeoFrame):
         return gp.GeoSeries(frame["anchor"]).distance(frame["point"])
     
@@ -174,6 +187,7 @@ class Spine:
         return _ret
     
     @calculated(title="Anchor", dependencies=["anchor", "point"], plot=False)
+    @timer
     def anchorLine(frame: LazyGeoFrame):
         return frame[["anchor", "point"]].apply(lambda x: LineString([x["anchor"], x["point"]]), axis=1)
     
@@ -196,15 +210,17 @@ class Spine:
         "Spine": ["anchor"],
         "Segment": ["segment", "radius"]
     }, plot=False)
+    @timer
     def roiBase(frame: LazyGeoFrame) -> gp.GeoSeries:
         segmentFrame = frame.getFrame("Segment")
 
         df = frame[["segmentID", "anchor"]].join(
             segmentFrame[["segment", "radius"]], on=["segmentID", "t"])
 
-        return df.apply(lambda d: calcSubLine(d["segment"], d["anchor"], distance=8), axis=1).buffer(df["radius"], cap_style='flat').set_precision(1)
+        return df.apply(lambda d: calcSubLine(d["segment"], d["anchor"], distance=8), axis=1).buffer(df["radius"], cap_style='flat')
 
     @calculated(title="ROI Base Background", dependencies=["roiBase", "xBackgroundOffset", "yBackgroundOffset"], plot=False)
+    @timer
     def roiBaseBg(frame: LazyGeoFrame) -> gp.GeoSeries:
         return frame[["roiBase", "xBackgroundOffset", "yBackgroundOffset"]].apply(
             lambda x: shapely.affinity.translate(
@@ -212,19 +228,23 @@ class Spine:
             axis=1)
 
     @calculated(title="ROI Head", dependencies=["point", "anchor", "roiExtend", "roiRadius", "roiBase"], plot=False)
+    @timer
     def roiHead(frame: LazyGeoFrame) -> gp.GeoSeries:
         def computeRoiHead(x):
             head = extend(LineString([x["anchor"], x["point"]]), origin=x["anchor"],
                           distance=x["roiExtend"]).buffer(x["roiRadius"], cap_style=2)
             head = head.difference(x["roiBase"])
             if isinstance(head, MultiPolygon):
-                head = next(
-                    poly for poly in head.geoms if poly.contains(x["point"]))
+                for poly in head.geoms:
+                    if poly.contains(x["point"]):
+                        return poly
+                return Polygon()
             return head
 
-        return frame[["point", "anchor", "roiExtend", "roiRadius", "roiBase"]].apply(computeRoiHead, axis=1).set_precision(1)
+        return frame[["point", "anchor", "roiExtend", "roiRadius", "roiBase"]].apply(computeRoiHead, axis=1)
 
     @calculated(title="ROI Head Background", dependencies=["roiHead", "xBackgroundOffset", "yBackgroundOffset"], plot=False)
+    @timer
     def roiHeadBg(frame: LazyGeoFrame) -> gp.GeoSeries:
         return frame[["roiHead", "xBackgroundOffset", "yBackgroundOffset"]].apply(
             lambda x: shapely.affinity.translate(
@@ -232,17 +252,21 @@ class Spine:
             axis=1)
 
     @calculated(title="ROI", dependencies=["roiBase", "roiHead"], plot=False)
+    @timer
     def roi(frame: LazyGeoFrame) -> gp.GeoSeries:
-        return frame["roiBase"].union(frame["roiHead"])
+        return union(frame["roiBase"], frame["roiHead"], grid_size=0.25)
 
     @calculated(title="ROI Background", dependencies=["roiBaseBg", "roiHeadBg"], plot=False)
+    @timer
     def roiBg(frame: LazyGeoFrame) -> gp.GeoSeries:
-        return frame["roiBaseBg"].union(frame["roiHeadBg"])
+        return union(frame["roiBaseBg"], frame["roiHeadBg"], grid_size=0.25)
 
-    @calculatedROI(title="Roi", dependencies=["roi", "z"], aggregate=['sum', 'max'])
+    @calculatedROI(title="Roi", dependencies=["roi", "z"], aggregate=['sum', 'max'], group="ROI")
+    @timer
     def roiStats(frame: LazyGeoFrame):
         return frame[["roi", "z"]]
 
-    @calculatedROI(title="Background Roi", dependencies=["roiBg", "z"], aggregate=['sum', 'max'])
+    @calculatedROI(title="Background Roi", dependencies=["roiBg", "z"], aggregate=['sum', 'max'], group="ROI Background")
+    @timer
     def roiStatsBg(frame: LazyGeoFrame):
         return frame[["roiBg", "z"]]

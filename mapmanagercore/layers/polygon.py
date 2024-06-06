@@ -1,12 +1,22 @@
 import numpy as np
+
+from mapmanagercore.benchmark import timer
+from mapmanagercore.utils import count_coordinates
 from .layer import Layer
+import geopandas as gp
+from shapely.geometry import Polygon, Point
+
 
 class PolygonLayer(Layer):
+    def box(minx, miny, maxx, maxy):
+        return PolygonLayer(gp.GeoSeries([Polygon.from_bounds(minx, miny, maxx, maxy)]))
+
+    @timer
     def _encodeBin(self):
         featureId = self.series.index
         coords = self.series
         coords = coords.reset_index(drop=True)
-        polygonIndices = coords.count_coordinates().cumsum()
+        polygonIndices = count_coordinates(coords).cumsum()
         coords = coords.get_coordinates()
 
         return {"polygons": {
