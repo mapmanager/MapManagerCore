@@ -1,4 +1,4 @@
-from typing import Tuple, Union
+from typing import Tuple, Union, Optional
 from mapmanagercore.lazy_geo_pandas.schema import MISSING_VALUE
 from ..schemas import Spine, Segment
 from ..config import SegmentId, SpineId
@@ -16,16 +16,20 @@ class AnnotationsBaseMut(AnnotationsBase):
     def deleteSpine(self, spineId: Keys, skipLog=False) -> None:
         self._drop("Spine", spineId, skipLog=skipLog)
 
-    def deleteSegment(self, segmentId: Keys, skipLog=False) -> None:
+    def deleteSegment(self, segmentId: Keys, skipLog=False) -> bool:
         try:
             if not self.points[["segmentID"]].reset_index().set_index(["segmentID", "t"]).loc[segmentId].empty:
-                raise ValueError(
-                    f"Cannot delete segment(s) {segmentId} as it has an attached spine(s)")
+                # abb
+                logger.info(f'Cannot delete segment(s) {segmentId} as it has an attached spine(s)')
+                return False
+                # raise ValueError(
+                #     f"Cannot delete segment(s) {segmentId} as it has an attached spine(s)")
         except KeyError:
             pass
 
         self._drop("Segment", segmentId, skipLog=skipLog)
-
+        return True
+    
     def updateSpine(self, spineId: Keys, value: Spine, replaceLog=False, skipLog=False):
         """
         Set the spine with the given ID to the specified value.

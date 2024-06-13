@@ -130,10 +130,11 @@ class AnnotationsInteractions(AnnotationsSegments):
         """
         point = Point(x, y, z)
 
+        logger.error(f'1 FutureWarning: The `drop` keyword ...')
         anchor = self.nearestAnchor(segmentId, point, findBrightest=True)
 
         spineId = self.newUnassignedSpineId()
-        
+
         self.updateSpine(spineId, Spine.withDefaults(
             segmentID=segmentId,
             point=Point(point.x, point.y),
@@ -144,6 +145,7 @@ class AnnotationsInteractions(AnnotationsSegments):
             yBackgroundOffset=0.0,
         ))
 
+        logger.error(f'4 FutureWarning: The `drop` keyword ...')
         self.snapBackgroundOffset(spineId)
 
         return spineId

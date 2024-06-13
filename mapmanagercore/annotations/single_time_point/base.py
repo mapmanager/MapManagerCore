@@ -150,7 +150,14 @@ class _SingleTimePointAnnotationsBase:
 
     def __str__(self):
         logger.info('')
-        numTimepoints = len(self._images._imagesSrcs.keys())
+        
+        # get the number of time points
+        numTimepoints = 'abb ???'
+        try:
+            numTimepoints = len(self._images._imagesSrcs.keys())
+        except (AttributeError) as e:
+            logger.error(e)
+
         numPnts = len(self._annotations._points._rootDf)
         numSegments = len(self._annotations._segments._rootDf)
         return f't:{numTimepoints}, points:{numPnts} segments:{numSegments}'

@@ -392,8 +392,17 @@ class LazyGeoFrame(Generic[T]):
 
     @timer
     def _getFiltered(self, key):
-        return self._df[key]
-
+        try:
+            return self._df[key]
+        except(KeyError) as e:
+            # abb
+            logger.error('KeyError requesting key:')
+            print(key)
+            logger.error('available keys are self._df.columns:')
+            print(self._df.columns)
+            logger.error('returning full _df')
+            return self._df
+        
     def undo(self) -> None:
         self._store.undo()
 

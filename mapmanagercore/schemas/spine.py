@@ -181,7 +181,6 @@ class Spine:
         segmentFrame = frame.getFrame("Segment")
         df = frame[["segmentID", "point"]].join(
             segmentFrame[["segment", "radius"]], on=["segmentID", "t"])
-        # print(df)
         _ret = df.apply(lambda d: getSpineSide(d["segment"], d["point"]), axis=1)
         
         return _ret
@@ -199,7 +198,6 @@ class Spine:
         segmentFrame = frame.getFrame("Segment")
         df = frame[["segmentID", "point", "anchorLine"]].join(
             segmentFrame[["segment"]], on=["segmentID", "t"])
-        print("spineAngle df:", df)
 
         # # Create a dataframe of 
         _ret = df.apply(lambda d: getSpineAngle(d["segment"], d["anchorLine"]), axis=1)
