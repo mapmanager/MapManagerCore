@@ -1,20 +1,23 @@
 from typing import Tuple, Union
-from mapmanagercore.lazy_geo_pandas.schema import MISSING_VALUE
 from ..schemas import Spine, Segment
 from ..config import SegmentId, SpineId
 from .base import AnnotationsBase
-
-from mapmanagercore.logger import logger
 
 Key = Union[SpineId, Tuple[SpineId, int]]
 Keys = Union[Key, list[Key]]
 
 
 class AnnotationsBaseMut(AnnotationsBase):
-    def deleteSpine(self, spineId: Keys, skipLog=False) -> None:
+    def deleteSpine(self, spineId: Keys, skipLog=False):
+        """
+        Delete the spine with the given ID.
+        """
         self._drop("Spine", spineId, skipLog=skipLog)
 
-    def deleteSegment(self, segmentId: Keys, skipLog=False) -> None:
+    def deleteSegment(self, segmentId: Keys, skipLog=False):
+        """
+        Delete the segment with the given ID.
+        """
         try:
             if not self.points[["segmentID"]].reset_index().set_index(["segmentID", "t"]).loc[segmentId].empty:
                 raise ValueError(
@@ -26,47 +29,28 @@ class AnnotationsBaseMut(AnnotationsBase):
 
     def updateSpine(self, spineId: Keys, value: Spine, replaceLog=False, skipLog=False):
         """
-        Set the spine with the given ID to the specified value.
-
-        Parameters:
-            spineId (str): The ID of the spine.
-            value (Union[dict, gp.Series, pd.Series]): The value to set for the spine.
+        Set the spine with the given ID to the specified value.            
         """
-
-        # if value.t != MISSING_VALUE:
-        #     raise ValueError(
-        #         f"Invalid type for column 't' must be set on the spine key")
-
-        # if value.spineID != MISSING_VALUE:
-        #     raise ValueError(
-        #         f"Invalid type for column 'spineID' must be set on the spine key")
-
         return self._update("Spine", spineId, value, replaceLog, skipLog)
 
     def updateSegment(self, segmentId: Keys, value: Segment, replaceLog=False, skipLog=False):
         """
         Set the segment with the given ID to the specified value.
-
-        Parameters:
-            segmentId (str): The ID of the spine.
-            value (Union[dict, gp.Series, pd.Series]): The value to set for the spine.
         """
-        # if value.t != MISSING_VALUE:
-        #     raise ValueError(
-        #         f"Invalid type for column 't' must be set on the segment key")
-
-        # if value.segmentID != MISSING_VALUE:
-        #     raise ValueError(
-        #         f"Invalid type for column 'segmentID' must be set on the segment key")
-
         return self._update("Segment", segmentId, value, replaceLog, skipLog)
 
     def newUnassignedSpineId(self) -> SpineId:
+        """
+        Returns a new unassigned spine ID.
+        """
         if len(self.points) == 0:
             return 0
         return self.points.index.get_level_values(0).max() + 1
 
     def newUnassignedSegmentId(self) -> SegmentId:
+        """
+        Returns a new unassigned segment ID.
+        """
         if len(self.segments) == 0:
             return 0
         return self.segments.index.get_level_values(0).max() + 1

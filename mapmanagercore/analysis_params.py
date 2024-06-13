@@ -9,6 +9,7 @@ class AnalysisParams():
         # self.__version__ = 0.1
         # self.__version__ = 0.1  # switched to dict of dicts
         self.__version__ = 0.2  # 20240508 added anchorPointSearchDistance
+        self.__version__ = 0.3  # segmentTracingMaxDistance
 
         if loadJson is not None:
             self._dict = json.loads(loadJson)
@@ -66,6 +67,13 @@ class AnalysisParams():
                 'defaultValue': 4,
                 'currentValue': 4,
                 'description': 'Radius of segment tracing.'
+            },
+            
+            # The distance 
+            'segmentTracingMaxDistance': {
+                'defaultValue': 30,
+                'currentValue': 30,
+                'description': 'Max distance to trace a brightest path with relatively low performance cost.'
             },
 
             # anchor point search distance

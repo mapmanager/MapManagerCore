@@ -4,7 +4,7 @@ import numpy as np
 
 class ImageSlice:
     """
-    Represents an image slice.
+    Represents an image slice with plotting utilities.
     """
 
     def __init__(self, image: np.ndarray):

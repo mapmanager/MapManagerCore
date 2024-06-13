@@ -1,6 +1,5 @@
 from typing import Callable, Self, Tuple, Union
 import numpy as np
-
 from mapmanagercore.utils import count_coordinates
 from ..layers.point import PointLayer
 from .layer import Layer
@@ -175,8 +174,8 @@ def clipLine(line: LineString, zRange: Tuple[int, int]):
             segment.append(point)
         elif (p1[2] < z_min and p2[2] > z_max) or (p2[2] < z_min and p1[2] > z_max):
             # The segment crosses the z bounds; clip and include both parts
-            pushLine([interpolate(p1, p2, z_min), interpolate(p1, p2, z_max)], lines)
-
+            pushLine([interpolate(p1, p2, z_min),
+                     interpolate(p1, p2, z_max)], lines)
 
     if zInRange[-1]:
         x, y, z = line.coords[-1]

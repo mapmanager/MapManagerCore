@@ -3,6 +3,18 @@ import pandas as pd
 
 
 def updateDataFrame(df: gp.GeoDataFrame, ids: pd.Index, value: pd.Series):
+    """
+    Update a GeoDataFrame with new values based on given ids and values.
+
+    Args:
+        df (gp.GeoDataFrame): The GeoDataFrame to be updated.
+        ids (pd.Index): The ids to be updated.
+        value (pd.Series): The new values to be assigned to all the provided ids.
+
+    Returns:
+        list: The updated list of ids normalized to a list.
+    """
+
     if isinstance(ids, pd.Index):
         ids = ids.tolist()
 
@@ -34,5 +46,5 @@ def updateDataFrame(df: gp.GeoDataFrame, ids: pd.Index, value: pd.Series):
                 df.rename(index={oldId: id}, inplace=True)
 
         df.loc[id, indexLess.index.values] = indexLess.values
-        
+
     return ids

@@ -4,14 +4,12 @@ from shapely.geometry import Point
 import shapely
 from mapmanagercore.utils import injectPoint, shapeGrid
 from .segment import AnnotationsSegments
-from ...config import MAX_TRACING_DISTANCE, SegmentId, SpineId
+from ...config import SegmentId, SpineId
 from ...schemas import Segment, Spine
 from ...layers.layer import DragState
 from ...layers.utils import roundPoint
 from shapely.geometry import LineString
 import geopandas as gp
-from shapely.ops import nearest_points
-
 from mapmanagercore.logger import logger
 
 pendingBackgroundRoiTranslation = None
@@ -370,7 +368,10 @@ class AnnotationsInteractions(AnnotationsSegments):
         snappedPoint = point if len(roughTracing.coords) == 0 else Point(
             roughTracing.coords[0 if first else -1])
 
-        if MAX_TRACING_DISTANCE is not None and point.distance(snappedPoint) > MAX_TRACING_DISTANCE:
+        maxTracingDistance = self.analysisParams.getValue(
+            "segmentTracingMaxDistance")
+
+        if maxTracingDistance is not None and point.distance(snappedPoint) > maxTracingDistance:
             return None
 
         if first:

@@ -1,18 +1,13 @@
-from io import BytesIO, StringIO
 import json
 from typing import Tuple
-
 import numpy as np
-
 from ..benchmark import timeAll
 from ..config import SpineId
 from .single_time_point.layers import AnnotationsOptions
-from ..image_slices import ImageSlice
+from ..lazy_geo_pd_images.image_slices import ImageSlice
 from ..layers.utils import inRange
-from ..loader.mmap import MMapLoader
 from ..utils import filterMask
 from . import Annotations
-from pyodide.http import pyfetch
 from pyodide.ffi import to_js
 from .single_time_point import SingleTimePointAnnotations
 
@@ -28,9 +23,11 @@ class PyodideSingleTimePoint(SingleTimePointAnnotations):
         return [layer.encodeBin() for layer in layers]
 
     def metadata_json(self):
-        return json.dumps(self.metadata())
+        """Returns the metadata as a JSON string."""
+        return self.metadata().to_json()
 
     def getSpinePosition(self, spineID: SpineId):
+        """Returns the position of a spine in the current time point."""
         if (spineID, self._t) not in self._annotations.points.index:
             return None
         return to_js(list(self._annotations.points[(spineID, self._t), "point"].coords)[0])
@@ -80,10 +77,6 @@ class PyodideAnnotations(Annotations):
     """ PyodideAnnotations contains pyodide specific helper methods to allow JS to use Annotations.
     """
 
-    async def load(path: str):
-        loader = MMapLoader(path)
-        return PyodideAnnotations(loader)
-
     def timePoint_js(self, time: int):
         return PyodideSingleTimePoint(self, time)
 
@@ -102,7 +95,9 @@ class PyodideAnnotations(Annotations):
         return self.getPixels(time, channel, (zRange[0], zRange[1]))
 
     def table(self):
-        columns = [key for key, value in self.points.columnsAttributes.items() if value["plot"]]
+        """Returns the points as a pandas DataFrame."""
+        columns = [
+            key for key, value in self.points.columnsAttributes.items() if value["plot"]]
         columns.remove("t")
         df = self.points[columns].reset_index()
         for i, type in enumerate(df.dtypes):
@@ -111,6 +106,7 @@ class PyodideAnnotations(Annotations):
         return df
 
     def getColumn(self, column: str):
+        """Returns the values of a column in the points DataFrame."""
         if column in self.points.index.names:
             result = self.points.index.get_level_values(column).to_list()
         else:
@@ -121,21 +117,13 @@ class PyodideAnnotations(Annotations):
         return result
 
     def getColors(self, colorOn: str = None):
+        """Returns the colors of the points in the DataFrame."""
         return super().getColors(colorOn).to_list()
-    
+
     def getSymbols(self, shapeOn: str = None):
+        """Returns the symbols of the points in the DataFrame."""
         return super().getSymbols(shapeOn).to_list()
 
     def columnsAttributes_json(self):
+        """Returns the columnsAttributes as a JSON string."""
         return json.dumps(self.points.columnsAttributes, skipkeys=True)
-
-
-async def loadGeoCsv(path):
-    response = await pyfetch(path)
-    csv_text = await response.text()
-    return StringIO(csv_text)
-
-
-async def fetchBytes(url: str):
-    response = await pyfetch(url)
-    return BytesIO(await response.memoryview())

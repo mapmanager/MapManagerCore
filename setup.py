@@ -20,6 +20,7 @@ install_requires = [
     'zarr',
     'platformdirs',  # to get platform specific App paths
     'plotly',
+    "dataclasses-json",
 ]
 
 testRequirements = [
@@ -31,18 +32,19 @@ testRequirements = [
 
 devRequirements = [
     'jupyter',
-    'ipykernel', # sometimes required by vs code to run jupyter notebooks
+    'ipykernel',  # sometimes required by vs code to run jupyter notebooks
     'matplotlib',
 ]
 
 foundPackages = find_packages(include=['mapmanagercore', 'mapmanagercore.*'])
 
 setup(
-    name='mapmanagercore',  # the package name (on PyPi), still use 'import mapmanagercore'
-    #version=VERSION,
+    # the package name (on PyPi), still use 'import mapmanagercore'
+    name='mapmanagercore',
+    # version=VERSION,
     description='MapManagerCore is a Python library that provides the core functionality for MapManager.',
     long_description=long_description,
-    long_description_content_type = 'text/markdown',
+    long_description_content_type='text/markdown',
     # TODO: assign to url of mapmanagercore
     # url='http://github.com/cudmore/SanPy',
     # how do we specify multiple authors?

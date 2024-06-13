@@ -1,12 +1,12 @@
-# adds image slices to lazy geo pandas
+# Adds image slices to lazy geo pandas
 
-from typing import Callable, List, Tuple, Union, Unpack
+from typing import Callable, List, Self, Tuple, Union, Unpack
 import numpy as np
-from mapmanagercore.image_slices import ImageSlice
+from mapmanagercore.lazy_geo_pd_images.image_slices import ImageSlice
 from mapmanagercore.lazy_geo_pandas.attributes import ColumnAttributes
 from mapmanagercore.lazy_geo_pandas.lazy import LazyGeoFrame
-from .loader.base import ImageLoader
-from .lazy_geo_pandas import LazyGeoPandas
+from mapmanagercore.lazy_geo_pd_images.loader import ImageLoader
+from ..lazy_geo_pandas import LazyGeoPandas
 import geopandas as gp
 import pandas as pd
 
@@ -14,12 +14,20 @@ from mapmanagercore.logger import logger
 
 
 class ImageColumnAttributes(ColumnAttributes):
+    """Attributes for image computed columns."""
+
+    """The list of aggregates function names to compute."""
     _aggregate: list[str]
+
+    """The z spread to use when computing the pixels."""
     zSpread: int
+
+    """The time column to use when computing the pixels."""
     t: str
 
 
 def parseColumns(columns: List[str], prefix: str) -> Tuple[set[int], set[str]]:
+    """Parse the roi computed columns to get the channels and aggregates."""
     channels = set()
     aggregates = set()
     for column in columns:
@@ -37,6 +45,7 @@ def parseColumns(columns: List[str], prefix: str) -> Tuple[set[int], set[str]]:
 
 
 def applyAgg(x, agg):
+    """Apply an aggregate function to the data."""
     try:
         return getattr(np, agg)(x)
     except (ValueError) as e:
@@ -46,17 +55,19 @@ def applyAgg(x, agg):
 
 
 class LazyImagesGeoPandas(LazyGeoPandas):
-    # A Lazy geo pandas store with image data
+    """A Lazy geo pandas store with image data"""
     _images: ImageLoader
 
-    def __init__(self, images: ImageLoader, overrideDefault=True) -> None:
+    def __init__(self, images: ImageLoader, overrideDefault=True):
         super().__init__()
         self._images = images
 
         if overrideDefault:
             LazyGeoPandas.setDefaultStore(self)
 
-    def _genWrappedFunc(self, method, attributes, frame: LazyGeoFrame):
+    def _genWrappedFunc(self, method, attributes, frame: LazyGeoFrame[Self]):
+        """Generate a wrapped function for the computed column."""
+
         name = attributes["key"]
         func = method
 
@@ -65,7 +76,7 @@ class LazyImagesGeoPandas(LazyGeoPandas):
         timeIndexLevel = frame._schema._index.index(
             tColumn) if tColumn in frame._schema._index else None
 
-        def wrappedFunc(frame: LazyGeoFrame):
+        def wrappedFunc(frame: LazyGeoFrame[Self]):
             (channels, aggregates) = parseColumns(
                 frame.pendingColumns(), name)
             if len(channels) == 0 or len(aggregates) == 0:
@@ -99,16 +110,15 @@ class LazyImagesGeoPandas(LazyGeoPandas):
                 logger.error(f'ValueError: {e}')
                 logger.error(
                     f'  name:{name} channel:{channels} agg:{aggregates}')
-                # print('pixels.index:')
-                # print(pixels.index)
-                # print('pixels')
-                # print(pixels)
+
                 return None
 
         return wrappedFunc
 
-    def addSchema(self, frame: LazyGeoFrame) -> None:
-        # inject image computed columns
+    def addSchema(self, frame: LazyGeoFrame[Self]):
+        """Add a schema frame to the store. Essentially, this adds a new data frame to the store."""
+
+        # Inject computed columns that use the image to calculate roi stats
         cls = frame._schema.__bases__[1]
         for method in cls.__dict__.values():
             if not hasattr(method, "_imageComputed"):
@@ -131,7 +141,7 @@ class LazyImagesGeoPandas(LazyGeoPandas):
                         skipUpdate=True
                     )
 
-            frame.updateComputed()
+            frame.updateComputedDependencies()
 
         return super().addSchema(frame)
 
@@ -162,10 +172,34 @@ class LazyImagesGeoPandas(LazyGeoPandas):
         return ImageSlice(self._images.fetchSlices(time, channel, (zRange[0], zRange[1] + 1)))
 
     def getShapePixels(self, shapes: gp.GeoDataFrame, channel: Union[int, List[int]] = 0, zSpread: int = 0, time=None, z: int = None) -> Union[pd.Series, pd.DataFrame]:
+        """ Get the pixels that are in the shapes.
+
+        Args:
+            shapes (gp.GeoDataFrame): The shapes to get the pixels for.
+                Shapes can contain a 't' column to specify the time and/or a 'z' column to specify the z.
+                Alternatively, the time and z can be specified as arguments.
+            channel (Union[int, List[int]], optional): The channel to get the pixels for. Defaults to 0.
+            zSpread (int, optional): The z spread to get the pixels for. Defaults to 0.
+            time ([type], optional): The time to get the pixels for. Defaults to None.
+            z (int, optional): The z to get the pixels for. Defaults to None.
+        """
         return self._images.getShapePixels(shapes, channel=channel, zSpread=zSpread, time=time, z=z)
 
 
-def calculatedROI(dependencies: Union[List[str], dict[str, list[str]]] = {}, aggregate: list[str] = [], **attributes: Unpack[ImageColumnAttributes]):
+def computeROI(dependencies: Union[List[str], dict[str, list[str]]] = {}, aggregate: list[str] = [], **attributes: Unpack[ImageColumnAttributes]):
+    """A decorator that adds image based computed column to the schema.
+
+    Args:
+        dependencies (Union[List[str], dict[str, list[str]], optional):
+            The dependencies for the computed column. Defaults to {}.
+            The dictionary can be used to specify dependencies across different schemas.
+            {"schemaName": ["column1", "column2"], "schemaName2": ["column3", "column4"]}
+        aggregate (list[str], optional): The aggregates to compute. Defaults to [].
+        **attributes (Unpack[ImageColumnAttributes]): The attributes for the computed column.
+
+    Returns:
+        A function that returns a geo pandas data frame with a shape column and a z column.
+    """
     def wrapper(func: Callable[[], Union[pd.Series, pd.DataFrame]]):
         func._imageComputed = {
             "key": func.__name__,

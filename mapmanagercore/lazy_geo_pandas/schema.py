@@ -8,6 +8,10 @@ from .attributes import ColumnAttributes, _ColumnAttributes
 
 
 class MISSING_VALUE:
+    """
+    Represents a missing/unset value.
+    """
+
     def __repr__(self):
         return "unassigned"
 
@@ -19,7 +23,7 @@ MISSING_VALUE = MISSING_VALUE()
 
 
 class Schema:
-    def __init_subclass__(cls) -> None:
+    def __init_subclass__(cls):
         cls._attributes: dict[str, _ColumnAttributes] = {}
         cls._annotations = cls.__annotations__
         cls._key = cls.__name__
@@ -31,6 +35,9 @@ class Schema:
 
     @classmethod
     def withDefaults(cls, **kwargs):
+        """
+        Creates an instance of the schema using default values when values are unset.
+        """
         for key, value in cls._defaults.items():
             if not key in kwargs:
                 kwargs[key] = value
@@ -38,6 +45,9 @@ class Schema:
 
     @classmethod
     def _addAttribute(cls, column: str, attribute: _ColumnAttributes):
+        """
+        Adds a column's attributes to the schema
+        """
         if not "key" in attribute:
             attribute["key"] = column
         if not "title" in attribute:
@@ -46,9 +56,13 @@ class Schema:
             attribute["group"] = "Other"
         cls._attributes[column] = attribute
 
-    # from key schema to current schema
     @classmethod
     def _reverseMapIds(cls, key: str, toDf: gp.GeoDataFrame, fromDf: gp.GeoDataFrame, ids: pd.Index = None):
+        """
+        Maps the ids from the key schema to the current schema.
+        Used to track changes across schemas.
+        If no relationships are defined between the schemas, it will return all ids.
+        """
         if not key in cls._relationships:
             return slice(None)
 
@@ -58,9 +72,13 @@ class Schema:
             fromDf = fromDf.loc[ids, :]
         return toDf.join(fromDf, on=keys, how='inner', lsuffix='_from', rsuffix='_to').index
 
-    # from current schema to key schema
     @classmethod
     def _mapIds(cls, key: str, df: gp.GeoDataFrame, ids: pd.Index = None):
+        """
+        Maps the ids from the current schema to the key schema.
+        Used to track changes across schemas.
+        If no relationship are defined between the schemas, it will return all ids.
+        """
         if not key in cls._relationships:
             return slice(None)
 
@@ -78,6 +96,9 @@ class Schema:
 
     @classmethod
     def setColumnTypes(cls, df: pd.DataFrame) -> gp.GeoDataFrame:
+        """
+        Sets the column types of the dataframe to the types defined by the schema class.
+        """
         defaults = cls._defaults
         types = cls._annotations
         df = gp.GeoDataFrame(df)
@@ -127,12 +148,30 @@ class Schema:
         return df
 
     @classmethod
-    def isIndexType(cls, value: Any, i=0) -> bool:
-        expectedType = cls._annotations[cls._index[i]]
+    def isIndexType(cls, value: Any, level=0) -> bool:
+        """
+        Checks if the value is of the type defined in the schema's index.
+
+        Args:
+            value (Any): The value to be checked.
+            level (int): The index level to be checked.
+
+        Returns:
+            bool: True if the value is of the type defined in the schema's index, False otherwise.
+        """
+        expectedType = cls._annotations[cls._index[level]]
         return isInstanceExtended(value, expectedType)
 
     @classmethod
     def validateColumns(cls, values: dict[str, any], dropIndex: bool = False):
+        """
+        Validates the values to insure they are consistent with the schema.
+
+        Args:
+            values (dict[str, any]): The values to be validated.
+            dropIndex (bool): If True, the index columns will be removed from the values.
+        """
+
         typeColumns = cls._annotations
         if dropIndex:
             for key in cls._index:
@@ -152,6 +191,10 @@ class Schema:
 
 
 def isInstanceExtended(value, expectedType):
+    """
+    Checks if the value is of the expected type.
+    Also checks for numpy int64 type.
+    """
     if expectedType == int and isinstance(value, np.int64):
         return True
 
@@ -162,6 +205,14 @@ def isInstanceExtended(value, expectedType):
 
 
 def schema(index: Union[list[Any], Any], relationships: dict[Schema, dict[str, list[str]]] = {}, properties: dict[str, ColumnAttributes] = {}):
+    """
+    A decorator to define a schema class.
+
+    Args:
+        index (Union[list[Any], Any]): The index of the schema.
+        relationships (dict[Schema, dict[str, list[str]]]): The relationships between this schema and other schemas.
+        properties (dict[str, ColumnAttributes]): The properties of the fields defined by the schema.
+    """
     T = TypeVar('T')
 
     def classWrapper(cls: T):
@@ -228,10 +279,25 @@ def schema(index: Union[list[Any], Any], relationships: dict[Schema, dict[str, l
 
 
 def seriesSchema(relationships: dict[Schema, dict[str, list[str]]] = {}, properties: dict[str, ColumnAttributes] = {}):
+    """
+    A decorator to define a schema class for a series.
+    Differs from schema in that it defines a schema for a series instead of a frame.
+    
+    Args:
+        relationships (dict[Schema, dict[str, list[str]]]): The relationships between this schema and other schemas.
+        properties (dict[str, ColumnAttributes]): The properties of the fields defined by the schema.
+    """
     return schema([], relationships, properties)
 
 
-def calculated(dependencies: Union[List[str], dict[str, list[str]]] = {}, **attributes: Unpack[ColumnAttributes]):
+def compute(dependencies: Union[List[str], dict[str, list[str]]] = {}, **attributes: Unpack[ColumnAttributes]):
+    """
+    A decorator to define a method that computes a column in the schema.
+    
+    Args:
+        dependencies (Union[List[str], dict[str, list[str]]]): The dependencies of the method.
+        attributes (Unpack[ColumnAttributes]): The attributes of the computed column.
+    """
     def wrapper(func: Callable[[], Union[pd.Series, pd.DataFrame]]):
         func._attributes = {
             "key": func.__name__,

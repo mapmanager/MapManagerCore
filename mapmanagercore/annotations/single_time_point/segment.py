@@ -1,5 +1,4 @@
 from typing import Union
-
 from mapmanagercore.utils import injectLine
 from .base import SingleTimePointAnnotationsBase
 from shapely.geometry import LineString, Point
@@ -36,7 +35,7 @@ class AnnotationsSegments(SingleTimePointAnnotationsBase):
                 points), left, right)
         else:
             segment = self.brightestPath(roughSegment, live)
-            
+
         return segment.simplify(0.5)
 
     def brightestPath(self, roughSegment: LineString, live: bool = False):

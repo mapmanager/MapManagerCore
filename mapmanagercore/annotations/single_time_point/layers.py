@@ -1,12 +1,10 @@
 from dataclasses import dataclass
 import warnings
-
 from mapmanagercore.utils import force_2d
 from ...layers.polygon import PolygonLayer
-from ...config import COLORS, CONFIG, TRANSPARENT, SegmentId, SpineId, scaleColors, symbols
+from ...config import Colors, Config, SegmentId, SpineId
 from ...layers import LineLayer, PointLayer, Layer
 from ...benchmark import timer
-import warnings
 from shapely.geometry import Point, LineString
 from shapely.errors import ShapelyDeprecationWarning
 from .interactions import AnnotationsInteractions
@@ -14,7 +12,6 @@ from typing import List, Tuple
 from typing import List
 from ...layers.layer import Layer
 from typing import List
-import pandas as pd
 import geopandas as gpd
 from typing import TypedDict, Tuple
 
@@ -164,51 +161,51 @@ class AnnotationsLayers(AnnotationsInteractions):
         spines = (PointLayer(points["point"])
                   .id("spine")
                   .on("select", "spineID")
-                  .fill(lambda id: COLORS["selectedSpine"] if id == selectedSpine else colors(id)))
+                  .fill(lambda id: Colors.selectedSpine if id == selectedSpine else colors(id)))
 
         labels = None
         if options["showAnchors"] or options["showLabels"]:
             anchorLines = (LineLayer(points["anchorLine"])
                            .id("anchorLines")
-                           .stroke(COLORS["anchorLine"]))
+                           .stroke(Colors.anchorLine))
 
             if options["showLabels"]:
                 labels = (anchorLines
                           .copy(id="label")
-                          .extend(CONFIG["labelOffset"])
+                          .extend(Config.labelOffset)
                           .tail()
                           .label()
-                          .fill(COLORS["label"]))
+                          .fill(Colors.label))
 
             if options["showAnchors"]:
                 layers.extend(anchorLines.splitGhost(
-                    visiblePoints & visibleAnchors, opacity=CONFIG["ghostOpacity"]))
+                    visiblePoints & visibleAnchors, opacity=Config.ghostOpacity))
 
                 anchors = (PointLayer(points["anchor"]).id("anchor")
-                           .fill(COLORS["anchorPoint"]))
+                           .fill(Colors.anchorPoint))
                 if editing:
                     anchors = (anchors.onDrag(self.moveAnchor)
-                               .radius(CONFIG["pointRadiusEditing"]))
+                               .radius(Config.pointRadiusEditing))
                 else:
-                    anchors = anchors.radius(CONFIG["pointRadius"])
+                    anchors = anchors.radius(Config.pointRadius)
 
                 layers.extend(anchors.splitGhost(
-                    visibleAnchors, opacity=CONFIG["ghostOpacity"]))
+                    visibleAnchors, opacity=Config.ghostOpacity))
 
         if editing:
             spines = (spines.onDrag(self.moveSpine)
-                      .radius(CONFIG["pointRadiusEditing"]))
+                      .radius(Config.pointRadiusEditing))
         else:
-            spines = spines.radius(CONFIG["pointRadius"])
+            spines = spines.radius(Config.pointRadius)
 
         # partially show spines that are not in scope with anchors in scope
         layers.extend(spines.splitGhost(
-            visiblePoints, opacity=CONFIG["ghostOpacity"]))
+            visiblePoints, opacity=Config.ghostOpacity))
 
         # render labels
         if options["showLabels"]:
             layers.extend(labels.splitGhost(
-                visiblePoints, opacity=CONFIG["ghostOpacity"]))
+                visiblePoints, opacity=Config.ghostOpacity))
 
         if selectedSpine in self.points.index:
             self._appendRois(selectedSpine, editing, layers)
@@ -217,35 +214,35 @@ class AnnotationsLayers(AnnotationsInteractions):
 
     @timer
     def _appendRois(self, selectedSpine: SpineId, editing: bool, layers: List[Layer]):
-        boarderWidth = CONFIG["roiStrokeWidth"]
+        boarderWidth = Config.roiStrokeWidth
         points = self.points[[selectedSpine]]
 
         headLayer = (PolygonLayer(points.loc[[selectedSpine], "roiHead"])
                      .id("roi-head")
                      .strokeWidth(boarderWidth)
-                     .stroke(COLORS["roiHead"]))
+                     .stroke(Colors.roiHead))
 
         baseLayer = (PolygonLayer(points.loc[[selectedSpine], "roiBase"])
                      .id("roi-base")
                      .strokeWidth(boarderWidth)
-                     .stroke(COLORS["roiBase"]))
+                     .stroke(Colors.roiBase))
 
         backgroundRoiHead = (headLayer
                              .copy(id="background", series=points.loc[[selectedSpine], "roiHeadBg"])
-                             .stroke(COLORS["roiHeadBg"]))
+                             .stroke(Colors.roiHeadBg))
 
         backgroundRoiBase = (baseLayer
                              .copy(id="background", series=points.loc[[selectedSpine], "roiBaseBg"])
-                             .stroke(COLORS["roiBaseBg"]))
+                             .stroke(Colors.roiBaseBg))
         if editing:
             # Add larger interaction targets
             layers.append(backgroundRoiHead.copy(id="translate")
-                          .stroke(TRANSPARENT)
-                          .fill(TRANSPARENT)
+                          .stroke(Colors.transparent)
+                          .fill(Colors.transparent)
                           .onDrag(self.moveBackgroundRoi))
             layers.append(backgroundRoiBase.copy(id="translate")
-                          .fill(TRANSPARENT)
-                          .stroke(TRANSPARENT)
+                          .fill(Colors.transparent)
+                          .stroke(Colors.transparent)
                           .onDrag(self.moveBackgroundRoi))
 
         layers.append(backgroundRoiHead)
@@ -264,7 +261,7 @@ class AnnotationsLayers(AnnotationsInteractions):
                           .id("translate-extend")
                           .fill([255, 255, 255])
                           .fixed()
-                          .stroke(COLORS["roiHead"])
+                          .stroke(Colors.roiHead)
                           .strokeWidth(1)
                           .onDrag(self.moveRoiExtend))
 
@@ -276,7 +273,7 @@ class AnnotationsLayers(AnnotationsInteractions):
                           .id("translate-radius-right")
                           .fill([255, 255, 255])
                           .fixed()
-                          .stroke(COLORS["roiHead"])
+                          .stroke(Colors.roiHead)
                           .strokeWidth(1)
                           .onDrag(self.moveRoiRadius))
 
@@ -288,7 +285,7 @@ class AnnotationsLayers(AnnotationsInteractions):
                           .id("translate-radius-left")
                           .fill([255, 255, 255])
                           .fixed()
-                          .stroke(COLORS["roiHead"])
+                          .stroke(Colors.roiHead)
                           .strokeWidth(1)
                           .onDrag(self.moveRoiRadius))
 
@@ -325,7 +322,7 @@ class AnnotationsLayers(AnnotationsInteractions):
         hitTarget = (
             PolygonLayer.box(0, 0, x, y)
             .id("hitTarget")
-            .fill(TRANSPARENT)
+            .fill(Colors.transparent)
             .onClick(onClickHitTarget)
             .onHover(onHoverHitTarget)
             .onHoverOut(onHoverOutHitTarget)
@@ -334,12 +331,12 @@ class AnnotationsLayers(AnnotationsInteractions):
         segment = (LineLayer(segments["segment"])
                    .id("segment")
                    .clipZ(zRange)
-                   .stroke(COLORS["segment"]))
+                   .stroke(Colors.segment))
 
         segmentGhost = (LineLayer(force_2d(segments["segment"]))
                         .id("segment-ghost")
-                        .stroke(COLORS["segment"])
-                        .opacity(CONFIG["ghostOpacity"]))
+                        .stroke(Colors.segment)
+                        .opacity(Config.ghostOpacity))
 
         def addPoint(segId, x, y, z):
             idx = self.injectSegmentPoint(segId, x, y, z)
@@ -350,7 +347,7 @@ class AnnotationsLayers(AnnotationsInteractions):
             return True
 
         segmentGhost2 = (segmentGhost.copy(id="adder")
-                         .stroke(TRANSPARENT)
+                         .stroke(Colors.transparent)
                          .strokeWidth(4)
                          .opacity(0)
                          .onClick(addPoint))
@@ -361,8 +358,8 @@ class AnnotationsLayers(AnnotationsInteractions):
 
         def pointColor(sid):
             if sid == self.segmentEditState.selectedIndex:
-                return COLORS["segmentEditing"]
-            return COLORS["segment"]
+                return Colors.segmentEditing
+            return Colors.segment
 
         def onDrag(idx, x, y, z, dragState):
             self.segmentEditState.setSelectedIndex(idx)
@@ -380,7 +377,7 @@ class AnnotationsLayers(AnnotationsInteractions):
                                      .splitZ(zRange))
 
         pointsLayer2 = pointsLayer2.opacity(
-            CONFIG["ghostOpacity"]).id("roughTracing-points-ghost")
+            Config.ghostOpacity).id("roughTracing-points-ghost")
 
         layers = []
         if self.segmentEditState.hoverSegment:
@@ -388,7 +385,7 @@ class AnnotationsLayers(AnnotationsInteractions):
                 LineLayer(force_2d(gpd.GeoSeries(
                     [self.segmentEditState.hoverSegment])))
                 .id("hover-segment")
-                .stroke(COLORS["pendingSegment"])
+                .stroke(Colors.pendingSegment)
                 .opacity(255 * 0.65))
 
         layers.extend([hitTarget,
@@ -406,7 +403,7 @@ class AnnotationsLayers(AnnotationsInteractions):
         segments = self.segments[["segment", "radius"]]
 
         def getStrokeColor(id: SegmentId):
-            return COLORS["segmentEditing"] if id == editSegId else (COLORS["segmentSelected"] if id == selectedSegId else COLORS["segment"])
+            return Colors.segmentEditing if id == editSegId else (Colors.segmentSelected if id == selectedSegId else Colors.segment)
 
         segment = (LineLayer(segments["segment"])
                    .id("segment")
@@ -415,7 +412,7 @@ class AnnotationsLayers(AnnotationsInteractions):
                    .on("edit", "segmentIDEditing")
                    .stroke(getStrokeColor))
 
-        boarderWidth = CONFIG["segmentLeftRightStrokeWidth"]
+        boarderWidth = Config.segmentLeftRightStrokeWidth
 
         def offset(id: int):
             return segments.loc[id, "radius"] / boarderWidth
@@ -443,13 +440,13 @@ class AnnotationsLayers(AnnotationsInteractions):
             # Make the click target larger
             layers.append(segment.copy(id="interaction")
                           .strokeWidth(lambda id: segments.loc[id, "radius"])
-                          .stroke(TRANSPARENT))
+                          .stroke(Colors.transparent))
         else:
             segment = segment.on("edit", "segmentIDEditingPath")
 
         # Add the line segment
         layers.append(segment.strokeWidth(
-            lambda id: CONFIG["segmentBoldWidth"] if id == editSegId else CONFIG["segmentWidth"]))
+            lambda id: Config.segmentBoldWidth if id == editSegId else Config.segmentWidth))
 
         return layers
 
@@ -458,7 +455,7 @@ class AnnotationsLayers(AnnotationsInteractions):
         segmentSeries = force_2d(segmentSeries)
         # segmentSeries = force_2d(self.segments[segId, "segment"])
         ghost = (segment.copy(segmentSeries, id="ghost")
-                 .opacity(CONFIG["ghostOpacity"]))
+                 .opacity(Config.ghostOpacity))
 
         if showLineSegmentsRadius:
             # Ghost Left line
@@ -480,14 +477,14 @@ class AnnotationsLayers(AnnotationsInteractions):
                 left.copy(id="interaction")
                 .strokeWidth(boarderWidth * 4)
                 .offset(offset4)
-                .stroke(TRANSPARENT)
+                .stroke(Colors.transparent)
                 .opacity(0.0)
                 .onDrag(self.moveSegmentRadius))
 
             layers.append(right.copy(
                 id="interaction")
                 .offset(lambda id: -offset4(id))
-                .strokeWidth(boarderWidth * 4).stroke(TRANSPARENT)
+                .strokeWidth(boarderWidth * 4).stroke(Colors.transparent)
                 .opacity(0.0)
                 .onDrag(self.moveSegmentRadius))
 
@@ -500,6 +497,6 @@ class AnnotationsLayers(AnnotationsInteractions):
 
         self.segmentEditState.selectedIndex = self.deleteSegmentPoint(
             self.segmentEditState.segmentId, self.segmentEditState.selectedIndex)
-        
+
         self.segmentEditState.hoverSegment = None
         return True

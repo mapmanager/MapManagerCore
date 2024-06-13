@@ -1,5 +1,5 @@
 {
-  "micropip": ["plotly"],
+  "micropip": ["plotly", "dataclasses_json"],
   "loadPackage": [
     "numpy",
     "pandas",
