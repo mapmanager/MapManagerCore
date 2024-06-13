@@ -5,6 +5,7 @@ from .layer import Layer
 import geopandas as gp
 from shapely.geometry import Polygon, Point
 
+from mapmanagercore.logger import logger
 
 class PolygonLayer(Layer):
     def box(minx, miny, maxx, maxy):

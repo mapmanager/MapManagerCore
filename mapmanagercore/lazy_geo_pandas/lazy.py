@@ -13,6 +13,7 @@ from .log import Op, RecordLog
 import geopandas as gp
 from collections.abc import Sequence
 
+from mapmanagercore.logger import logger
 
 class LazyGeoPandas:
     """

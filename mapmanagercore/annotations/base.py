@@ -19,6 +19,8 @@ import geopandas as gp
 
 from mapmanagercore.analysis_params import AnalysisParams
 
+from mapmanagercore.analysis_params import AnalysisParams
+from mapmanagercore.logger import logger
 
 class AnnotationsBase(LazyImagesGeoPandas):
     _images: ImageLoader
@@ -46,6 +48,20 @@ class AnnotationsBase(LazyImagesGeoPandas):
             Segment, data=lineSegments, store=self)
         self._points = LazyGeoFrame(Spine, data=points, store=self)
 
+        self.loader = loader
+
+    # abb
+    def __str__(self):
+        """Print info about the map.
+        
+        See: _SingleTimePointAnnotationsBase()
+        """
+        numTimepoints = len(self._images.timePoints())
+        numPnts = len(self.points._rootDf)
+        numSegments = len(self.segments._rootDf)
+
+        return f't:{numTimepoints}, points:{numPnts} segments:{numSegments} loader:{self.laoder}'
+    
     @property
     def segments(self) -> LazyGeoFrame:
         return self._segments
@@ -53,11 +69,11 @@ class AnnotationsBase(LazyImagesGeoPandas):
     @property
     def points(self) -> LazyGeoFrame:
         return self._points
-
+    
     @property
     def analysisParams(self) -> AnalysisParams:
         return self._analysisParams
-
+    
     def filterPoints(self, filter: Any):
         """
         Filters the points.
@@ -130,6 +146,7 @@ class AnnotationsBase(LazyImagesGeoPandas):
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
 
+            logger.info(f'saving to {path}')
             fs = zarr.ZipStore(path, mode="w", compression=compression)
             with fs as store:
                 group = zarr.group(store=store)

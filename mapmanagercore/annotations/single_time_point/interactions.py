@@ -11,50 +11,56 @@ from ...layers.utils import roundPoint
 from shapely.geometry import LineString
 import geopandas as gp
 from mapmanagercore.logger import logger
+from mapmanagercore.logger import logger
 
 pendingBackgroundRoiTranslation = None
 
 
 class AnnotationsInteractions(AnnotationsSegments):
+    
+    # abb
+    def getSpineDistance(self, segmentID: SegmentId,
+                         point: Point):
+        """Add doc string
+        """
+        segment: LineString = self.segments[segmentID, "segment"]
+        # find the closest point on the segment to the `point`
+        minProjection = segment.project(point)
+        return minProjection
+    
+    # abb added findBrightest=False, do not find brightest by default
     def nearestAnchor(self, segmentID: SegmentId,
                       point: Point,
-                      useBrightestPath=False,
-                      brightestPathDistance: int = None,
-                      channel: int = None,
-                      zSpread: int = None):
-        """
-        Finds the nearest anchor point on a given line segment to a given point.
+                      findBrightest : bool = False):
+        """Finds the nearest anchor point on a given line segment to a given point.
 
         Args:
             segmentID (SegmentId): The ID of the line segment.
             point (Point): The point to find the nearest anchor to.
-            brightestPathDistance (int): The distance to search for the brightest path. Defaults to None.
-            channel (int): The channel. Defaults to 0.
-            zSpread (int): The z spread. Defaults to 0.
+            findBrightest (bool): Default False.
+                If True then find the brightest anchor using image data.
 
         Returns:
             Point: The nearest anchor point.
-        """
-
+        """            
         segment: LineString = self.segments[segmentID, "segment"]
         # find the closest point on the segment to the `point`
         minProjection = segment.project(point)
-
-        if not useBrightestPath:
-            # Default to the closest path
+        
+        if np.isnan(minProjection):
+            logger.warning(f'minProjection:{minProjection}')
+            logger.warning(f'segment:{segment}')
+            logger.warning(f'point:{point}')
+            
+        if not findBrightest:
+            # Default to the closest point (not brightest)
             anchor = segment.interpolate(minProjection)
             anchor = roundPoint(anchor, 1)
             return anchor
 
-        # abb analysisparams
-        # if not specified, get defaults from AnalysisParams()
-        if brightestPathDistance is None:
-            brightestPathDistance = self.analysisParams.getValue(
-                'brightestPathDistance')
-        if channel is None:
-            channel = self.analysisParams.getValue('channel')
-        if zSpread is None:
-            zSpread = self.analysisParams.getValue('zSpread')
+        brightestPathDistance = self.analysisParams.getValue('brightestPathDistance')
+        channel = self.analysisParams.getValue('channel')
+        zSpread = self.analysisParams.getValue('zSpread')
 
         segmentLength = int(segment.length)
         minProjection = int(minProjection)
@@ -121,7 +127,10 @@ class AnnotationsInteractions(AnnotationsSegments):
         z (int): The z coordinate of the spine.
         """
         point = Point(x, y, z)
-        anchor = self.nearestAnchor(segmentId, point)
+
+        logger.error(f'1 FutureWarning: The `drop` keyword ...')
+        anchor = self.nearestAnchor(segmentId, point, findBrightest=True)
+
         spineId = self.newUnassignedSpineId()
 
         self.updateSpine(spineId, Spine.withDefaults(
@@ -134,6 +143,7 @@ class AnnotationsInteractions(AnnotationsSegments):
             yBackgroundOffset=0.0,
         ))
 
+        logger.error(f'4 FutureWarning: The `drop` keyword ...')
         self.snapBackgroundOffset(spineId)
 
         return spineId
@@ -169,7 +179,9 @@ class AnnotationsInteractions(AnnotationsSegments):
 
         return True
 
-    def moveAnchor(self, spineId: SpineId, x: int, y: int, z: int, state: DragState = DragState.MANUAL) -> bool:
+    def moveAnchor(self, spineId: SpineId,
+                   x: int, y: int, z: int,
+                   state: DragState = DragState.MANUAL) -> bool:
         """
         Moves the anchor point of a spine to the given x and y coordinates.
 
@@ -183,6 +195,9 @@ class AnnotationsInteractions(AnnotationsSegments):
             bool: True if the anchor point was successfully translated, False otherwise.
         """
         segmentId = self.points[spineId, "segmentID"]
+        
+        # abb
+        # when moving, do not find brightest
         anchor = self.nearestAnchor(segmentId, Point(x, y, z))
 
         logger.info(f'segmentId:{segmentId} anchor:{anchor}')
@@ -310,9 +325,9 @@ class AnnotationsInteractions(AnnotationsSegments):
 
         Returns:
             int: The ID of the new segment.
-        """
+        """        
         segmentId = self.newUnassignedSegmentId()
-
+        
         self.updateSegment(segmentId, Segment.withDefaults(
             segment=LineString([]),
             roughTracing=LineString([])
@@ -346,8 +361,7 @@ class AnnotationsInteractions(AnnotationsSegments):
         return idx
 
     def appendSegmentPoint(self, segmentId: SegmentId, x: int, y: int, z: int, speculate: bool = False) -> LineString:
-        """
-        Adds a point to a segment.
+        """Adds a point to a segment.
 
         Args:
             segmentId (str): The ID of the segment.

@@ -15,6 +15,7 @@ import os
 import time
 import numpy as np
 import pandas as pd
+from typing import List
 from shapely.geometry import LineString
 from shapely.ops import linemerge
 
@@ -24,7 +25,7 @@ from mapmanagercore import MapAnnotations, MultiImageLoader, MMapLoader
 from mapmanagercore.loader.imageio import _createMetaData
 from mapmanagercore.logger import logger, setLogLevel
 
-def importStack(folder, oneTimepoint : int = None):
+def importStack(folder, timepoints : List[int] = None):
     """
     folder : str
         Path to Igor folder
@@ -43,10 +44,10 @@ def importStack(folder, oneTimepoint : int = None):
     maxSlices = 80
         
     # oneTimepoint = 0  # set to None to make a map of numSessions
-    if oneTimepoint is None:
+    if timepoints is None:
         sessionList = range(numSessions)
     else:
-        sessionList = [oneTimepoint]
+        sessionList = timepoints
 
     mapName = os.path.split(folder)[1]
 
@@ -235,9 +236,10 @@ def importStack(folder, oneTimepoint : int = None):
 
     #
     # save our new map
-    if oneTimepoint is None:
+    if timepoints is None or len(timepoints)>1:
         mmMapSessionFile = f'rr30a.mmap'
     else:
+        oneTimepoint = timepoints[0]
         mmMapSessionFile = f'rr30a_s{oneTimepoint}.mmap'
     savePath = os.path.join('sandbox', 'data', mmMapSessionFile)
     logger.info(f'saving: {savePath}')
@@ -269,13 +271,19 @@ def convertRunMap(igorFolder, coreMapPath = 'sandbox/data/rr30a.mmap'):
     nSessions = igorRunMap.shape[1]
     nRows = igorRunMap.shape[0]
 
+    print(igorRunMap[0:5,:])
+    print(igorRunMap[:-5,:])
+    
     igorSegMapPath = 'igorSegMapExport.npy'
     igorSegMapPath = os.path.join(igorFolder, igorSegMapPath)
     igorSegMap = np.load(igorSegMapPath)
     print('igorSegMap:', igorSegMap.shape)
+    print(igorSegMap)
     nSegRows = igorSegMap.shape[0]
 
     # sandbox/data/rr30a.mmap
+
+    return
 
     # load the map
     coreMapPath = '/Users/cudmore/Sites/MapManagerCore/sandbox/data/rr30a.mmap'
@@ -288,17 +296,29 @@ def convertRunMap(igorFolder, coreMapPath = 'sandbox/data/rr30a.mmap'):
             print('t:', t, 'thisSeg:', thisSeg, 'nextSeg:', nextSeg)
             map.connectSegment(segmentKey=(thisSeg,t), toSegmentKey=(nextSeg, t+1))
 
+def loadForSpineDist():
+    path = 'sandbox/data/rr30a_s0.mmap'
+    map = MapAnnotations(MMapLoader(path))
+    
+    print(map.points.columns)
+    map.points.columnsAttributes
+
+    print(map.points[['segmentID', 'userType', 'point', 'spineDistance', 'spineSide']])
+
 if __name__ == '__main__':
     setLogLevel()
     folder = '../PyMapManager-Data/maps/rr30a'
     
     # 6 and 7 have error
-    oneTimepoint = 7  # 1 timepoint (from igor)
+    oneTimepoint = [0,1]  # 1 timepoint (from igor)
     # oneTimepoint = None  # 8 session map
     
-    # works
-    # importStack(folder, oneTimepoint=oneTimepoint)
+    # 1) works
+    importStack(folder, timepoints=oneTimepoint)
 
-    # load multi tp core map (created in xxx) and convert spine IDs
+    # 2) load multi tp core map (created in xxx) and convert spine IDs
     # from igor to core spine id
-    convertRunMap(folder)
+    # convertRunMap(folder)
+
+    # 3)
+    # loadForSpineDist()

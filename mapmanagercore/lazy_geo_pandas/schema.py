@@ -6,6 +6,7 @@ import geopandas as gp
 from shapely.geometry.base import BaseGeometry
 from .attributes import ColumnAttributes, _ColumnAttributes
 
+from mapmanagercore.logger import logger
 
 class MISSING_VALUE:
     """
@@ -141,6 +142,7 @@ class Schema:
 
         if df.index.nlevels != len(cls._index):
             if len(cls._index) != 0:
+                logger.info('drop=True')
                 df.set_index(cls._index, inplace=True, drop=True)
                 if df.index.nlevels > 1:
                     df.sort_index(level=0, inplace=True)

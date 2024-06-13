@@ -62,7 +62,6 @@ def shapeGrid(shape: BaseGeometry, points: int, overlap=0):
     overlap = 1 - overlap
     return generateGrid(width * overlap, height * overlap, points)
 
-
 def set_precision(series: gpd.GeoSeries, *args, **kwargs):
     """Set the precision of a GeoSeries."""
     return gpd.GeoSeries(shapely.set_precision(series.values, *args, **kwargs), series.index, series.crs)

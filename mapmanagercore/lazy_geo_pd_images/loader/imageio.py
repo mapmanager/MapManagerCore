@@ -12,6 +12,10 @@ class MultiImageLoader(ImageLoader):
     def __init__(self):
         super().__init__()
         self._images = {}
+        self.paths = [] # for logging only
+        
+    def __str__(self):
+        return f"Multi image Loader paths: {self.paths}"
 
     def read(self, path: Union[str, np.ndarray], time: int = 0, channel: int = 0):
         """
@@ -32,6 +36,7 @@ class MultiImageLoader(ImageLoader):
             imgData = path
 
         self._images[time].append([channel, imgData])
+        self.paths.append([time, channel, path])
 
     def readMetadata(self, metadata: Union[Metadata, str], time: int = 0):
         """

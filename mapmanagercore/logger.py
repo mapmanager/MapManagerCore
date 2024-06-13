@@ -42,45 +42,41 @@ def setLogLevel(newLogLevel : str = 'INFO'):
     
     logger.setLevel(logLevel)
 
-# setLogLevel()
+def getLoggerFilePath():
+    """All MapManager code will log to the same place including:
+     - MapManagerCore
+     - MapManagerQt
+    """
+    appName = 'MapManager'
+    try:
+        from platformdirs import user_data_dir  # to get log path
+        appDir = user_data_dir(appName)
+    except ImportError:
+        appDir = os.path.join(os.path.expanduser('~'), '.mapmanager')
+        os.makedirs(appDir, exist_ok=True)
+
+    logFilePath = os.path.join(appDir, 'mapmanager.log')
+    return logFilePath
+
+setLogLevel()
 
 # Create a custom logger with the name as the module name
 logger = logging.getLogger(__name__)
 
 
 handler = logging.StreamHandler(sys.stdout)
-formatter = logging.Formatter('%(levelname)7s - %(filename)s %(funcName)s() line:%(lineno)d -- %(message)s')
 
-try:
-    from platformdirs import user_data_dir  # to get log path
-    def getLoggerFilePath():
-        """All MapManager code will log to the same place including:
-        - MapManagerCore
-        - MapManagerQt
-        """
-        appName = 'MapManager'
-        appDir = user_data_dir(appName)
-        logFilePath = os.path.join(appDir, 'mapmanager.log')
-        if not os.path.exists(appDir):
-            os.makedirs(appDir)
-        if not os.path.exists(logFilePath):
-            with open(logFilePath, 'w') as f:
-                f.write('')
-        return logFilePath
-
-    logFilePath = getLoggerFilePath()
-    f_handler = RotatingFileHandler(logFilePath, maxBytes=2e6, backupCount=1)
-    f_handler.setFormatter(formatter)
-    logger.addHandler(f_handler)
-except:
-    pass
-
+logFilePath = getLoggerFilePath()
+f_handler = RotatingFileHandler(logFilePath, maxBytes=2e6, backupCount=1)
 
 # I want the class name of the caller
 # this gives us the filename _lologger()
 # [%(name)s()]
 # [%(module)s()]
 #formatter = logging.Formatter('%(levelname)7s - [%(module)s()] %(filename)s %(funcName)s() line:%(lineno)d -- %(message)s')
+formatter = logging.Formatter('%(levelname)7s - %(filename)s %(funcName)s() line:%(lineno)d -- %(message)s')
 handler.setFormatter(formatter)
+f_handler.setFormatter(formatter)
 
 logger.addHandler(handler)
+logger.addHandler(f_handler)

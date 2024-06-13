@@ -12,7 +12,6 @@ import pandas as pd
 
 from mapmanagercore.logger import logger
 
-
 class ImageColumnAttributes(ColumnAttributes):
     """Attributes for image computed columns."""
 
@@ -100,19 +99,9 @@ class LazyImagesGeoPandas(LazyGeoPandas):
                 return pixels.apply(lambda x: pd.Series(
                     {f"{name}_ch{pixels.name + 1}_{agg}": applyAgg(x, agg) for agg in aggregates}), index=pixels.index)
 
-            # multiple channels were returned
-            # abb, ValueError: zero-size array to reduction operation maximum which has no identity
-            try:
-                return pd.DataFrame({
-                    f"{name}_ch{channel + 1}_{agg}": pixels[channel].apply(lambda x: applyAgg(x, agg)) for agg in aggregates for channel in channels
-                }, index=pixels.index)
-            except (ValueError) as e:
-                logger.error(f'ValueError: {e}')
-                logger.error(
-                    f'  name:{name} channel:{channels} agg:{aggregates}')
-
-                return None
-
+            return pd.DataFrame({
+                f"{name}_ch{channel + 1}_{agg}": pixels[channel].apply(lambda x: getattr(np, agg)(x)) for agg in aggregates for channel in channels
+            }, index=pixels.index)
         return wrappedFunc
 
     def addSchema(self, frame: LazyGeoFrame[Self]):

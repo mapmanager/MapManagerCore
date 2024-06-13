@@ -3,6 +3,8 @@ from ..schemas import Spine, Segment
 from ..config import SegmentId, SpineId
 from .base import AnnotationsBase
 
+from mapmanagercore.logger import logger
+
 Key = Union[SpineId, Tuple[SpineId, int]]
 Keys = Union[Key, list[Key]]
 
@@ -20,13 +22,17 @@ class AnnotationsBaseMut(AnnotationsBase):
         """
         try:
             if not self.points[["segmentID"]].reset_index().set_index(["segmentID", "t"]).loc[segmentId].empty:
-                raise ValueError(
-                    f"Cannot delete segment(s) {segmentId} as it has an attached spine(s)")
+                # abb
+                logger.info(f'Cannot delete segment(s) {segmentId} as it has an attached spine(s)')
+                return False
+                # raise ValueError(
+                #     f"Cannot delete segment(s) {segmentId} as it has an attached spine(s)")
         except KeyError:
             pass
 
         self._drop("Segment", segmentId, skipLog=skipLog)
-
+        return True
+    
     def updateSpine(self, spineId: Keys, value: Spine, replaceLog=False, skipLog=False):
         """
         Set the spine with the given ID to the specified value.            
@@ -34,8 +40,11 @@ class AnnotationsBaseMut(AnnotationsBase):
         return self._update("Spine", spineId, value, replaceLog, skipLog)
 
     def updateSegment(self, segmentId: Keys, value: Segment, replaceLog=False, skipLog=False):
-        """
-        Set the segment with the given ID to the specified value.
+        """Set the segment with the given ID to the specified value.
+
+        Args:
+            segmentId (str): The ID of the spine.
+            value (Union[dict, gp.Series, pd.Series]): The value to set for the spine.
         """
         return self._update("Segment", segmentId, value, replaceLog, skipLog)
 
@@ -56,9 +65,14 @@ class AnnotationsBaseMut(AnnotationsBase):
         return self.segments.index.get_level_values(0).max() + 1
 
     def connect(self, spineKey: Tuple[SpineId, int], toSpineKey: Tuple[SpineId, int]):
-        if self.points[toSpineKey, "segmentID"] != self.points[spineKey, "segmentID"]:
+        
+        # ValueError: Can only compare identically-labeled Series objects
+        # if self.points[toSpineKey, "segmentID"] != self.points[spineKey, "segmentID"]:
+        _segmentID = self.points[spineKey, "segmentID"].values[0]
+        _toSegmentID = self.points[toSpineKey, "segmentID"].values[0]
+        if _toSegmentID != _segmentID:
             raise ValueError("Cannot connect spines from different segments.")
-
+        
         # check if the key already exists in the time point
         existingKey = (toSpineKey[0], spineKey[1])
         if existingKey in self.points.index:

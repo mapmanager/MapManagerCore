@@ -8,7 +8,8 @@ from shapely.ops import substring
 import shapely
 import geopandas as gp
 from ..benchmark import timer
-
+import math
+from math import pi as PI
 
 class MultiLineLayer(Layer):
     @Layer.setProperty
@@ -105,6 +106,77 @@ class LineLayer(MultiLineLayer):
 def getTail(d):
     return Point(d.coords[1][0], d.coords[1][1])
 
+# abj
+def getSide(a: Point, b: Point, c: Point):
+  """ Calculate which side a point (c) is relative to a segment (AB)
+  Args:
+    a: Beginning point of line segment
+    b: End point of line segment
+    c: Point relative to line segment
+  """
+  crossProduct = (b.x - a.x)*(c.y - a.y) - (b.y - a.y)*(c.x - a.x)
+  if crossProduct > 0:
+    return "Right"
+  elif crossProduct < 0:
+    return "Left"
+  else:
+    return "On the Line"
+
+# abj
+@ timer
+def getSpineSide(line: LineString, spine: Point):
+    """ Return a string representing the side at which the spine point is relative to its segment
+
+    Args:
+        Line: segment in the for of a LineString
+        Spine: point
+    """
+    first = Point(line.coords[0])
+    last = Point(line.coords[-1])
+    val = getSide(first, last, spine)
+    return val
+
+# abj
+@ timer
+def getSpineAngle(segmentLine: LineString, spineLine: LineString):
+    """ Return the angle between the two Lines
+    Line 1: The line formed between the spine head and the anchor point
+    Line 2: The line formed by two points on the segment tracing. 
+    Grab two points, one “up” and the other “down” the segment from the spine anchor point. 
+    I think the anchor point on the segment tracing is our new “position”.
+
+    Args:
+        segmentLine: segment in the for of a LineString
+        spineLine: Linestring of spine head to anchor point
+    """
+    spineLineCoord0 = Point(spineLine.coords[0])
+    spineLineCoord1 = Point(spineLine.coords[1])
+    sl0x = spineLineCoord0.x
+    sl0y = spineLineCoord0.y
+    sl1x = spineLineCoord1.x
+    sl1y = spineLineCoord1.y
+
+    segmentLineCoord0 = Point(segmentLine.coords[0])
+    segmentLineCoord1 = Point(segmentLine.coords[-1])
+    sgl0x = segmentLineCoord0.x
+    sgl0y = segmentLineCoord0.y
+    sgl1x = segmentLineCoord1.x
+    sgl1y = segmentLineCoord1.y
+    
+    m1 = (sl1y-sl0y)/(sl1x-sl0x)
+    m2 = (sgl1y-sgl0y)/(sgl1x-sgl0x)
+
+    angle_rad = math.atan(m1) - math.atan(m2)
+    angle_deg = angle_rad*180/PI
+
+    # Range: 0 - 360
+    # Check for Negative angle and add 360 degrees to determine counter clockwise value
+    if angle_deg < 0:
+        angle_deg = angle_deg + 360 
+
+    # print("m1", m1, "m2", m2, "degree:", angle_deg)
+
+    return angle_deg
 
 @timer
 def calcSubLine(line: LineLayer, origin: Point, distance: int):

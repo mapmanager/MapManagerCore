@@ -27,6 +27,11 @@ class ZarrLoader(ImageLoader):
             images = self.group[f"img-{t}"]
             self._imagesSrcs[t] = images if lazy else images[:]
             self._metadata[t] = Metadata.from_json(self.group.attrs[f"metadata-{t}"])
+            
+        self.path = path
+
+    def __str__(self):
+        return f"Zarr Loader: path: {self.path}"
 
     def timePoints(self) -> Iterator[int]:
         """

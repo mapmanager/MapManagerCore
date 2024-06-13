@@ -23,6 +23,7 @@ from copy import copy
 # abb analysisparams
 from mapmanagercore.analysis_params import AnalysisParams
 
+from mapmanagercore.logger import logger
 
 class SingleTimePointFrame(LazyGeoFrame):
     def __init__(self, frame: LazyGeoFrame, t: int):
@@ -148,6 +149,20 @@ class _SingleTimePointAnnotationsBase:
 
         self._t = t
 
+    def __str__(self):
+        logger.info('')
+        
+        # get the number of time points
+        numTimepoints = 'abb ???'
+        try:
+            numTimepoints = len(self._images._imagesSrcs.keys())
+        except (AttributeError) as e:
+            logger.error(e)
+
+        numPnts = len(self._annotations._points._rootDf)
+        numSegments = len(self._annotations._segments._rootDf)
+        return f't:{numTimepoints}, points:{numPnts} segments:{numSegments}'
+    
     @property
     def points(self) -> LazyGeoFrame:
         return self._points

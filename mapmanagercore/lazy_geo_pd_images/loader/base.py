@@ -36,6 +36,9 @@ class ImageLoader:
 
     def __init__(self):
         self._metadata = {}
+        
+    def __str__(self):
+        return f"ImageLoader: time points: {self.timePoints()}"
 
     def metadata(self, t: int) -> Metadata:
         return self._metadata[t] if t in self._metadata else Metadata()
@@ -67,7 +70,7 @@ class ImageLoader:
         Returns:
           np.dtype: The data type of the image data.
         """
-        np.dtype(str.lower(self.metadata(t)["dtype"]))
+        return np.dtype(str.lower(self.metadata(t)["dtype"]))
 
     def shape(self, t: int) -> Tuple[int, int, int, int]:
         """
