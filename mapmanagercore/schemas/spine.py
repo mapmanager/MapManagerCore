@@ -1,4 +1,3 @@
-from shapely.geometry import Point
 import numpy as np
 from mapmanagercore.benchmark import timer
 from mapmanagercore.utils import union
@@ -6,9 +5,8 @@ from ..layers.line import calcSubLine, extend, getSpineSide, getSpineAngle
 import shapely
 from ..lazy_geo_pandas import schema, compute, LazyGeoFrame
 import geopandas as gp
-from shapely.geometry import LineString, MultiPolygon, Polygon
-from ..lazy_geo_pd_images import computeROI
-
+from shapely.geometry import LineString, MultiPolygon, Polygon, Point
+from ..lazy_geo_pd_images import aggregateROI
 
 @schema(
     index=["spineID", "t"],
@@ -250,12 +248,12 @@ class Spine:
 
     # Image based ROI computed stats
 
-    @computeROI(title="Roi", dependencies=["roi", "z"], aggregate=['sum', 'max'], group="ROI")
+    @aggregateROI(title="Roi", dependencies=["roi", "z"], aggregate=['sum', 'max'], group="ROI")
     @timer
     def roiStats(frame: LazyGeoFrame):
         return frame[["roi", "z"]]
 
-    @computeROI(title="Background Roi", dependencies=["roiBg", "z"], aggregate=['sum', 'max'], group="ROI Background")
+    @aggregateROI(title="Background Roi", dependencies=["roiBg", "z"], aggregate=['sum', 'max'], group="ROI Background")
     @timer
     def roiStatsBg(frame: LazyGeoFrame):
         return frame[["roiBg", "z"]]

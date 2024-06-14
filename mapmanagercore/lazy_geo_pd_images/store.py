@@ -175,7 +175,7 @@ class LazyImagesGeoPandas(LazyGeoPandas):
         return self._images.getShapePixels(shapes, channel=channel, zSpread=zSpread, time=time, z=z)
 
 
-def computeROI(dependencies: Union[List[str], dict[str, list[str]]] = {}, aggregate: list[str] = [], **attributes: Unpack[ImageColumnAttributes]):
+def aggregateROI(dependencies: Union[List[str], dict[str, list[str]]] = {}, aggregate: list[str] = [], **attributes: Unpack[ImageColumnAttributes]):
     """A decorator that adds image based computed column to the schema.
 
     Args:
