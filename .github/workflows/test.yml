@@ -1,36 +1,36 @@
-# name: Test (cudmore)
+name: Test (cudmore)
 
-# on:
-#   pull_request:
-#     branches: [main]
-#   push:
-#     branches: [main]
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
 
-# permissions:
-#   contents: read
+permissions:
+  contents: read
 
-# jobs:
-#   test:
-#     runs-on: ubuntu-latest
-#     strategy:
-#       matrix:
-#         platform: [ubuntu-latest, windows-latest, macos-latest]
-#         # python-version: ["3.9", "3.10", "3.11"]
-#         python-version: ["3.11"]
-#     steps:
-#     - uses: actions/checkout@v3
-#     - name: Set up Python ${{ matrix.python-version }}
-#       uses: actions/setup-python@v4
-#       with:
-#         python-version: ${{ matrix.python-version }}
-#         cache: pip
-#         cache-dependency-path: setup.py
-#     - name: Install dependencies
-#       run: |
-#         pip install -e .
-#         pip install '.[tests]'
-#     - name: Test and generate coverage report
-#       run: |
-#         pytest --cov=./tests --cov-report=xml
-#     - name: Upload coverage to Codecov
-#       uses: codecov/codecov-action@v3
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        platform: [ubuntu-latest, windows-latest, macos-latest]
+        # python-version: ["3.9", "3.10", "3.11"]
+        python-version: ["3.11"]
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: pip
+        cache-dependency-path: setup.py
+    - name: Install dependencies
+      run: |
+        pip install -e .
+        pip install '.[tests]'
+    # - name: Test and generate coverage report
+    #   run: |
+    #     pytest --cov=./tests --cov-report=xml
+    # - name: Upload coverage to Codecov
+    #   uses: codecov/codecov-action@v3
