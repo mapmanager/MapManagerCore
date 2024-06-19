@@ -1,11 +1,14 @@
 import unittest
+
 from mapmanagercore.annotations.mutation import AnnotationsBaseMut
-from mapmanagercore.loader.base import Loader
+from mapmanagercore import MultiImageLoader
+# from mapmanagercore.loader.base import Loader
 
 class TestAnnotationsBaseMut(unittest.TestCase):
 
     def new(self):
-        return AnnotationsBaseMut(Loader())
+        return AnnotationsBaseMut(MultiImageLoader())
+        # return AnnotationsBaseMut(Loader())
 
     def test_undo_redo_simple_spine(self):
         annotations = self.new()
