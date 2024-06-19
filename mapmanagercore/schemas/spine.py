@@ -177,7 +177,7 @@ class Spine:
         return frame[["anchor", "point"]].apply(lambda x: LineString([x["anchor"], x["point"]]), axis=1)
 
     # abj
-    @calculated(title="Spine Angle", dependencies=["point"])
+    @compute(title="Spine Angle", dependencies=["point"])
     def angle(frame: LazyGeoFrame):
         
         # do this for all spines
