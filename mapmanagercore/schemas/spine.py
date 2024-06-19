@@ -122,7 +122,8 @@ class Spine:
     segmentID: int
     point: Point
     anchor: Point
-    spineAngle: LineString
+    # abb removed
+    # spineAngle: LineString
 
     xBackgroundOffset: float
     yBackgroundOffset: float
@@ -192,7 +193,7 @@ class Spine:
     
     # abj
     @calculated(title="Spine Angle", dependencies=["point"])
-    def angle(frame: LazyGeoFrame):
+    def spineAngle(frame: LazyGeoFrame):
         
         # do this for all spines
         segmentFrame = frame.getFrame("Segment")
