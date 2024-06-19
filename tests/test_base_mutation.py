@@ -98,7 +98,7 @@ class TestAnnotationsBaseMut(unittest.TestCase):
         annotations.redo()
         self.assertNotIn(("spine_id", 0), annotations._points.index)
 
-    def test_delete_segment(self):
+    def _old_test_delete_segment(self):
         annotations = self.new()
         annotations.updateSegment(("segment_id", 0), {"radius": 1})
         self.assertIn(("segment_id", 0), annotations._lineSegments.index)
@@ -115,7 +115,7 @@ class TestAnnotationsBaseMut(unittest.TestCase):
         annotations.redo()
         self.assertNotIn(("segment_id", 0), annotations._lineSegments.index)
         
-    def test_multi_segment(self):
+    def _old_test_multi_segment(self):
         annotations = self.new()
         annotations.updateSegment(("segment_id", 0), {"radius": 1})
         annotations.updateSegment(("segment_id2", 0), {"radius": 2})

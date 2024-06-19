@@ -14,7 +14,8 @@ class TestExamplesNotebook(unittest.TestCase):
             # Create an image loader
             loader = MultiImageLoader(
                 lineSegments="../data/rr30a_s0u/line_segments.csv",
-                points="../data/rr30a_s0u/points.csv")
+                points="../data/rr30a_s0u/points.csv",
+                metadata="../data/rr30a_s0u/metadata.json",)
             
             # add image channels to the loader
             loader.read("../data/rr30a_s0u/t0/rr30a_s0_ch1.tif", channel=0)
@@ -26,17 +27,36 @@ class TestExamplesNotebook(unittest.TestCase):
             # Create the annotation map
             map = MapAnnotations(loader)
             
+            # map.addSegment(t=0)
+            
             # save the annotation map
-            map.save("../data/rr30a_s0us.mmap")
+            map.save("../data/rr30a_s0u.mmap")
+            map.metadata()
+            map.images.shape()
+            map.columns
             # loading the map manager from zarr.
-            map = MapAnnotations(MMapLoader("../data/rr30a_s0us.mmap").cached())
+            map = MapAnnotations(MMapLoader("../data/rr30a_s0u.mmap").cached())
+            map._points.columns
+            xySpine = map._points['point'].get_coordinates()
+            xyAnchor = map._points['anchor'].get_coordinates()
+            
+            map._points.columns
+            xySpine['z'] = map._points['z']
+            xySpine['segmentID'] = map._points['segmentID']
+            xySpine['userType'] = map._points['userType']
+            xySpine['accept'] = map._points['accept']
+            xySpine['note'] = map._points['note']
+            
+            xySpine['anchorX'] = xyAnchor['x']
+            xySpine['anchorY'] = xyAnchor['y']
+            xySpine
             map[:].columns
             map.segments["segment"].get_coordinates(include_z=True)
             # spine df for tp 0
             filtered = map[ map['t']==0 ]
             filtered[:]
             sessionID = 0
-            spineID = 25
+            spineID = 4
             map.deleteSpine((id, sessionID))
             id = map.addSpine(segmentId=(0, 0), x=1,y=2,z=3)
             # map.moveAnchor(spineId=id, x=1, y=1, z=3)
@@ -57,7 +77,7 @@ class TestExamplesNotebook(unittest.TestCase):
             map[1, "note"]
             map.segments["segment"].get_coordinates(include_z=True)
             map.segments["segmentLeft"].get_coordinates()
-            map.segments["segmentRight"].get_coordinates()
+            map.segments["segmentRight"].get_coordinates(include_z=True)
             filtered = map[ map['t']==1 ]
             filtered["roi"].get_coordinates()
             map["roiBase"].get_coordinates()
