@@ -11,15 +11,19 @@ install_requires = [
     'asyncio',
     'tifffile',
     'imagecodecs',  # required for compression
-    'plotly',  # required for compression
+    # 'plotly',  # required for compression
     'numpy',
     'pandas',
     'shapely',
+    # 'geopandas==1.0.0a1',  # removed 20240608
     'geopandas',
     'scikit-image',
     'zarr',
     'platformdirs',  # to get platform specific App paths
     'plotly',
+    'brightest-path-lib',
+    #'bioimage',
+    #
 ]
 
 testRequirements = [

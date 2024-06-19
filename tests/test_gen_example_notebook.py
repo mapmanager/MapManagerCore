@@ -4,6 +4,7 @@ import os
 
 class TestExamplesNotebook(unittest.TestCase):
 
+
     def test_notebook(self):
         wd = os.curdir
         os.chdir(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../examples/'))

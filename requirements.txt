@@ -1,7 +1,7 @@
 numpy
 pandas
 scikit-image
-geopandas
+geopandas==1.0.0a1
 shapely
 imagecodecs
 plotly
