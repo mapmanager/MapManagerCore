@@ -9,9 +9,10 @@ import pandas as pd
 import geopandas as gp
 
 from mapmanagercore.benchmark import timer
-from ...config import Metadata, SegmentId, SpineId
+from mapmanagercore.lazy_geo_pd_images.metadata import Metadata
+from ...config import SegmentId, SpineId
 from ...schemas import Segment, Spine
-from ...image_slices import ImageSlice
+from ...lazy_geo_pd_images.image_slices import ImageSlice
 from ...lazy_geo_pandas.attributes import ColumnAttributes
 from ...lazy_geo_pandas.lazy import LazyGeoFrame
 from ...lazy_geo_pandas.schema import Schema
@@ -35,6 +36,7 @@ class SingleTimePointFrame(LazyGeoFrame):
         self._t = t
         self._refreshIndex()
 
+    @timer
     def _refreshIndex(self):
         if self._root._state.version == self._currentVersion:
             return
@@ -77,23 +79,22 @@ class SingleTimePointFrame(LazyGeoFrame):
         self._refreshIndex()
         return self._root.index.droplevel(1)
 
-    def loadData(self, data: gp.GeoDataFrame) -> None:
+    def loadData(self, data: gp.GeoDataFrame):
         return self._root.loadData(data)
 
-    def addComputed(self, column: str, attribute: ColumnAttributes, func: Callable[[], Union[gp.GeoSeries, gp.GeoDataFrame]], dependencies: Union[List[str], dict[str, list[str]]] = {}, skipUpdate=False) -> None:
+    def addComputed(self, column: str, attribute: ColumnAttributes, func: Callable[[], Union[gp.GeoSeries, gp.GeoDataFrame]], dependencies: Union[List[str], dict[str, list[str]]] = {}, skipUpdate=False):
         return self._root.addComputed(column, attribute, func,
                                       dependencies, skipUpdate)
 
-    def updateComputed(self):
-        return self._root.updateComputed()
+    def updateComputedDependencies(self):
+        return self._root.updateComputedDependencies()
 
     def getFrame(self, key: str):
         return self._root.getFrame(key)
 
     def pendingColumns(self) -> list[str]:
-        if len(self._computingColumns) == 0:
-            return []
-        return self._computingColumns[-1]
+        """Returns the columns that are currently being computed."""
+        return [] if len(self._computingColumns) == 0 else self._computingColumns[-1]
 
     @property
     def columns(self):
@@ -111,16 +112,16 @@ class SingleTimePointFrame(LazyGeoFrame):
     def __len__(self):
         return self.shape[0]
 
-    def undo(self) -> None:
+    def undo(self):
         return self._root.undo()
 
-    def redo(self) -> None:
+    def redo(self):
         return self._root.redo()
 
-    def drop(self, id: Union[Hashable, Sequence[Hashable], pd.Index], skipLog=False) -> None:
+    def drop(self, id: Union[Hashable, Sequence[Hashable], pd.Index], skipLog=False):
         return self._root.drop(id, skipLog)
 
-    def update(self, ids: Union[Hashable, Sequence[Hashable], pd.Index], value: Schema, replaceLog=False, skipLog=False) -> None:
+    def update(self, ids: Union[Hashable, Sequence[Hashable], pd.Index], value: Schema, replaceLog=False, skipLog=False):
         if isinstance(ids, list):
             ids = [(id, self._t) for id in ids]
         else:
@@ -138,7 +139,7 @@ class _SingleTimePointAnnotationsBase:
     _annotations: Annotations
     _t: int
 
-    def __init__(self, annotations: Annotations, t: int) -> None:
+    def __init__(self, annotations: Annotations, t: int):
         self._annotations = copy(annotations)
 
         self._segments = SingleTimePointFrame(
@@ -213,10 +214,10 @@ class SingleTimePointAnnotationsBase(_SingleTimePointAnnotationsBase):
         else:
             return (keys, self._t)
 
-    def deleteSpine(self, spineId: Keys, skipLog=False) -> None:
+    def deleteSpine(self, spineId: Keys, skipLog=False):
         return self._annotations.deleteSpine(self._mapKeys(spineId), skipLog)
 
-    def deleteSegment(self, segmentId: Keys, skipLog=False) -> bool:
+    def deleteSegment(self, segmentId: Keys, skipLog=False):
         return self._annotations.deleteSegment(self._mapKeys(segmentId), skipLog)
 
     def updateSegment(self, segmentId: Keys, value: Segment, replaceLog=False, skipLog=False):

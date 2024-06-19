@@ -38,6 +38,8 @@ from ..lazy_geo_pandas import schema
     }
 )
 class Segment:
+    """A schema representing a segment"""
+    
     t: int
     segmentID: int
 

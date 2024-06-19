@@ -1,5 +1,4 @@
 import numpy as np
-
 from mapmanagercore.benchmark import timer
 from mapmanagercore.utils import count_coordinates
 from .layer import Layer

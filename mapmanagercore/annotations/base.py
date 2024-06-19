@@ -1,22 +1,23 @@
 from copy import copy
-from typing import Any, Tuple
+from io import BytesIO
+from typing import Any, Tuple, Union
 import zipfile
 import numpy as np
 import pandas as pd
 
 from mapmanagercore.benchmark import timer
-from mapmanagercore.config import COLORS, scaleColors, symbols
+from mapmanagercore.config import Colors, scaleColors, symbols
+from mapmanagercore.lazy_geo_pd_images.loader.zarr import ZarrLoader
 from ..lazy_geo_pandas import LazyGeoFrame
 from ..schemas import Segment, Spine
-from ..lazy_geo_pd_image import LazyImagesGeoPandas
-from ..image_slices import ImageSlice
-from ..loader.base import ImageLoader, Loader
+from ..lazy_geo_pd_images import LazyImagesGeoPandas, ImageLoader
+from ..lazy_geo_pd_images.image_slices import ImageSlice
 import zarr
 import warnings
 from plotly.express.colors import sample_colorscale
+import geopandas as gp
 
 from mapmanagercore.analysis_params import AnalysisParams
-from mapmanagercore.logger import logger
 
 from mapmanagercore.analysis_params import AnalysisParams
 from mapmanagercore.logger import logger
@@ -24,23 +25,30 @@ from mapmanagercore.logger import logger
 class AnnotationsBase(LazyImagesGeoPandas):
     _images: ImageLoader
 
-    def __init__(self, loader: Loader):
-        super().__init__(loader.images())
+    def __init__(self,
+                 loader: ImageLoader,
+                 lineSegments: Union[str, pd.DataFrame] = pd.DataFrame(),
+                 points: Union[str, pd.DataFrame] = pd.DataFrame(),
+                 analysisParams: AnalysisParams = AnalysisParams()):
 
-        self._segments = LazyGeoFrame(
-            Segment, data=loader.segments(), store=self)
-        self._points = LazyGeoFrame(Spine, data=loader.points(), store=self)
+        super().__init__(loader)
+
+        if not isinstance(lineSegments, gp.GeoDataFrame):
+            if not isinstance(lineSegments, pd.DataFrame):
+                lineSegments = pd.read_csv(lineSegments, index_col=False)
+
+        if not isinstance(points, gp.GeoDataFrame):
+            if not isinstance(points, pd.DataFrame):
+                points = pd.read_csv(points, index_col=False)
 
         # abb analysisparams
-        self._analysisParams : AnalysisParams = loader.analysisParams()
+        self._analysisParams: AnalysisParams = analysisParams
 
-        self._zarrPath : str = loader.getZarrPath()
+        self._segments = LazyGeoFrame(
+            Segment, data=lineSegments, store=self)
+        self._points = LazyGeoFrame(Spine, data=points, store=self)
 
-    def getZarrPath(self):
-        try:
-            return self._zarrPath
-        except (AttributeError) as e:
-            logger.warning(f'{e}')
+        self.loader = loader
 
     # abb
     def __str__(self):
@@ -48,21 +56,11 @@ class AnnotationsBase(LazyImagesGeoPandas):
         
         See: _SingleTimePointAnnotationsBase()
         """
-        zarrPath = self.getZarrPath()
-        numTimepoints = len(self._images._imagesSrcs.keys())
+        numTimepoints = len(self._images.timePoints())
         numPnts = len(self.points._rootDf)
         numSegments = len(self.segments._rootDf)
-        
-        # images
-        # numTimepoints = self.numTimepoints()
 
-        return f't:{numTimepoints}, points:{numPnts} segments:{numSegments} zarr:{zarrPath}'
-    
-    #abb
-    # def numTimepoints(self) -> int:
-    #     """Get the number of timepoints.
-    #     """
-    #     return self._images.shape(t=0)[0]
+        return f't:{numTimepoints}, points:{numPnts} segments:{numSegments} loader:{self.laoder}'
     
     @property
     def segments(self) -> LazyGeoFrame:
@@ -77,16 +75,25 @@ class AnnotationsBase(LazyImagesGeoPandas):
         return self._analysisParams
     
     def filterPoints(self, filter: Any):
+        """
+        Filters the points.
+        """
         c = copy(self)
         c._points = c._points[filter]
         return c
 
     def filterSegments(self, filter: Any):
+        """
+        Filters the segments.
+        """
         c = copy(self)
         c._segments = c._segments[filter]
         return c
 
     def getTimePoint(self, time: int):
+        """
+        Returns the annotations for a single time point.
+        """
         from .single_time_point import SingleTimePointAnnotations
         return SingleTimePointAnnotations(self, time)
 
@@ -115,10 +122,26 @@ class AnnotationsBase(LazyImagesGeoPandas):
 
         return super().getPixels(time, channel, zRange)
 
+    # Serialization
+
+    @classmethod
+    def load(cls, path: str, lazy=False):
+        loader = ZarrLoader(path, lazy=lazy)
+        points = pd.read_pickle(BytesIO(loader.group["points"][:].tobytes()))
+        points = gp.GeoDataFrame(points, geometry="point")
+        lineSegments = pd.read_pickle(
+            BytesIO(loader.group["lineSegments"][:].tobytes()))
+        lineSegments = gp.GeoDataFrame(lineSegments, geometry="segment")
+
+        # abb analysisparams
+        _analysisParams_json = loader.group.attrs['analysisParams']  # json str
+        analysisParams = AnalysisParams(loadJson=_analysisParams_json)
+
+        return cls(loader, lineSegments, points, analysisParams)
+
     def save(self, path: str, compression=zipfile.ZIP_STORED):
         if not path.endswith(".mmap"):
-            raise ValueError(
-                "Invalid file format. Please provide a path ending with '.mmap'.")
+            path += ".mmap"
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
@@ -137,6 +160,8 @@ class AnnotationsBase(LazyImagesGeoPandas):
                 # abb analysisparams
                 group.attrs['analysisParams'] = self._analysisParams.getJson()
 
+    # Context manager
+
     def __enter__(self):
         self._images = self._images.__enter__()
         return self
@@ -148,12 +173,17 @@ class AnnotationsBase(LazyImagesGeoPandas):
         self._images.close()
         return
 
+    # Utility functions
+
     @timer
     def getColors(self, colorOn: str = None, function=False) -> pd.Series:
+        """
+        Returns the colors of the points.
+        """
         if colorOn is None:
             if function:
-                return lambda _: COLORS["spine"]
-            return pd.Series([COLORS["spine"]] * len(self.points), index=self.points.index)
+                return lambda _: Colors.spine
+            return pd.Series([Colors.spine] * len(self.points), index=self.points.index)
 
         categorical = False
         if colorOn not in self.points.columnsAttributes:
@@ -163,12 +193,12 @@ class AnnotationsBase(LazyImagesGeoPandas):
         if "colors" in attr:
             colors = attr["colors"]
         elif "categorical" in attr and attr["categorical"]:
-            colors = COLORS["categorical"]
+            colors = Colors.categorical
             categorical = True
         elif "divergent" in attr and attr["divergent"]:
-            colors = COLORS["divergent"]
+            colors = Colors.divergent
         else:
-            colors = COLORS["scalar"]
+            colors = Colors.scalar
 
         if colorOn in self.points.index.names:
             values = pd.Series(self.points.index.get_level_values(
@@ -209,6 +239,9 @@ class AnnotationsBase(LazyImagesGeoPandas):
 
     @timer
     def getSymbols(self, shapeOn: str = None, function=False) -> pd.Series:
+        """
+        Returns the symbols of the points.
+        """
         if shapeOn is None:
             if function:
                 return lambda _: "circle"

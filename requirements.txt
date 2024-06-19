@@ -7,3 +7,4 @@ imagecodecs
 plotly
 zarr
 Blosc
+dataclasses-json

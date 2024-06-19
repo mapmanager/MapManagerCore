@@ -36,9 +36,21 @@ class Op(Generic[T]):
         self.added = after.loc[after.index.difference(commonIndexes).values]
 
     def isEmpty(self) -> bool:
+        """
+        Checks if the operation is empty (no op).
+        """
         return self.deleted.empty and self.added.empty and self.changed.empty
 
     def update(self, operation: Op) -> bool:
+        """
+        Updates the operation by merging the new operation.
+
+        Args:
+            operation (Op): The new operation to be merged.
+
+        Returns:
+            bool: True if the operation has been merged, False otherwise.
+        """
         if self.type != operation.type:
             return False
 
@@ -67,6 +79,9 @@ class Op(Generic[T]):
         return True
 
     def reverse(self, df: gp.GeoDataFrame):
+        """
+        Reverses the state change onto the dataframe. (undo)
+        """
         for key, operation in self.changed.columns:
             if operation == "before":
                 df.loc[self.changed.index, key] = self.changed[(key, "before")]
@@ -81,6 +96,9 @@ class Op(Generic[T]):
         df.loc[changedIndex, "modified"] = now
 
     def apply(self, df: gp.GeoDataFrame):
+        """
+        Applies the state change onto the dataframe. (redo)
+        """
         for key, values in self.added.iterrows():
             df.loc[key, :] = values
 
@@ -105,6 +123,9 @@ class RecordLog(Generic[T]):
         return
 
     def createState(self):
+        """
+        Creates a new state on the log so future states will not replace the last state.
+        """
         self.replaceable = False
 
     def _peakReplaceable(self) -> Union[Op[T], None]:

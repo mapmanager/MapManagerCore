@@ -15,8 +15,6 @@ import sys
 
 from logging.handlers import RotatingFileHandler
 
-from platformdirs import user_data_dir  # to get log path
-
 def setLogLevel(newLogLevel : str = 'INFO'):
     """Set the global logging level.
     
@@ -50,7 +48,13 @@ def getLoggerFilePath():
      - MapManagerQt
     """
     appName = 'MapManager'
-    appDir = user_data_dir(appName)
+    try:
+        from platformdirs import user_data_dir  # to get log path
+        appDir = user_data_dir(appName)
+    except ImportError:
+        appDir = os.path.join(os.path.expanduser('~'), '.mapmanager')
+        os.makedirs(appDir, exist_ok=True)
+
     logFilePath = os.path.join(appDir, 'mapmanager.log')
     return logFilePath
 

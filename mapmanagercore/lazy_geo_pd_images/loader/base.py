@@ -2,28 +2,52 @@ from functools import lru_cache
 from typing import Iterator, List, Self, Tuple, Union
 import numpy as np
 import pandas as pd
-from ..config import Metadata
-from ..utils import shapeIndexes
 import geopandas as gp
 import zarr
+from shapely.geometry import GeometryCollection, LineString, MultiPolygon, Polygon
+import shapely
+import skimage.draw
+from mapmanagercore.lazy_geo_pd_images.metadata import Metadata
 
-from mapmanagercore.analysis_params import AnalysisParams
 
-from mapmanagercore.logger import logger
+def shapeIndexes(d: Union[Polygon, LineString]) -> Tuple[np.ndarray, np.ndarray]:
+    """ Get the x and y indexes of the pixels in a shape."""
+
+    d = shapely.force_2d(d)
+
+    # TODO: fully support multi-polygon
+    if isinstance(d, MultiPolygon):
+        d = d.geoms[0]
+    if isinstance(d, GeometryCollection):
+        d = next(s for s in d.geoms if isinstance(s, Polygon))
+
+    if isinstance(d, Polygon):
+        x, y = zip(*d.exterior.coords)
+        return skimage.draw.polygon(x, y)
+
+    x, y = zip(*d.coords)
+    return skimage.draw.line(int(x[0]), int(y[0]), int(x[1]), int(y[1]))
+
 
 class ImageLoader:
     """
     Base class for image loaders.
     """
 
+    def __init__(self):
+        self._metadata = {}
+        
+    def __str__(self):
+        return f"ImageLoader: time points: {self.timePoints()}"
+
+    def metadata(self, t: int) -> Metadata:
+        return self._metadata[t] if t in self._metadata else Metadata()
+
     def timePoints(self) -> Iterator[int]:
         ("implemented by subclass")
 
     def _images(self, t: int) -> np.ndarray:
         ("implemented by subclass", t)
-
-    def metadata(self, t: int) -> Metadata:
-        ("implemented by subclass")
 
     def loadSlice(self, time: int, channel: int, slice: int) -> np.ndarray:
         """
@@ -46,7 +70,7 @@ class ImageLoader:
         Returns:
           np.dtype: The data type of the image data.
         """
-        np.dtype(str.lower(self.metadata(t)["dtype"]))
+        return np.dtype(str.lower(self.metadata(t)["dtype"]))
 
     def shape(self, t: int) -> Tuple[int, int, int, int]:
         """
@@ -89,7 +113,7 @@ class ImageLoader:
         for t in self.timePoints():
             image = self._images(t)
             group.create_dataset(f"img-{t}", data=image, dtype=image.dtype)
-            group.attrs[f"metadata-{t}"] = self.metadata(t)
+            group.attrs[f"metadata-{t}"] = self.metadata(t).to_json()
 
         group.attrs["timePoints"] = list(self.timePoints())
 
@@ -105,7 +129,7 @@ class ImageLoader:
         Returns:
           np.ndarray: The fetched slices.
         """
-        
+
         # abb fetchSlices() is getting called multiple times when editing one spine?
         # logger.info(f'=== time:{time} channel:{channel} sliceRange:{sliceRange}')
 
@@ -170,6 +194,8 @@ class ImageLoader:
             shape (gp.GeoDataFrame): GeoDataFrame containing the shape under the column polygon, along with `z` and time `t`.
             zSpread (int, optional): Number of slices to expand in the z-direction. Defaults to 0.
             channel (int, optional): Channel index. Defaults to 0.
+            time (int, optional): Time index. Defaults to None. If provided, the time index will be used instead of the `t` column in the shape.
+            z (int, optional): Z index. Defaults to None. If provided, the z index will be used instead of the `z` column in the shape.
 
         Returns:
             pd.Series: Series containing the image slices corresponding to the shape.
@@ -244,39 +270,5 @@ class ImageLoader:
         self.close()
 
 
-class Loader:
-    def __init__(self,
-                 lineSegments: Union[str, pd.DataFrame] = pd.DataFrame(),
-                 points: Union[str, pd.DataFrame] = pd.DataFrame(),
-                 metadata: Union[str, Metadata] = Metadata(),
-                 analysisParams: AnalysisParams = AnalysisParams()):
-        
-        if not isinstance(lineSegments, gp.GeoDataFrame):
-            if not isinstance(lineSegments, pd.DataFrame):
-                lineSegments = pd.read_csv(lineSegments, index_col=False)
-
-        if not isinstance(points, gp.GeoDataFrame):
-            if not isinstance(points, pd.DataFrame):
-                points = pd.read_csv(points, index_col=False)
-
-        self._lineSegments = lineSegments
-        self._points = points
-
-        # abb analysisparams
-        self._analysisParams : AnalysisParams = analysisParams
-
-    def points(self) -> gp.GeoDataFrame:
-        return self._points
-
-    def segments(self) -> gp.GeoDataFrame:
-        return self._lineSegments
-
-    def images(self) -> ImageLoader:
-        "abstract method"
-
-    # abb analysisparams
-    def analysisParams(self) -> AnalysisParams:
-        return self._analysisParams
-    
 def bounds(x: np.array):
     return (x.min(), int(x.max()) + 1)

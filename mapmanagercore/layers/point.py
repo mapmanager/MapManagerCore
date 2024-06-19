@@ -2,7 +2,6 @@ from typing import Callable, Self, Tuple, Union
 import numpy as np
 import geopandas as gp
 from shapely.geometry import LineString
-
 from mapmanagercore.benchmark import timer
 from mapmanagercore.utils import force_2d
 from .layer import Layer
@@ -16,7 +15,7 @@ class PointLayer(Layer):
         self.series = self.series[inRange(self.series.z, range=range)]
         self.series = force_2d(self.series)
         return self
-    
+
     def splitZ(self, range: Tuple[int, int]) -> Tuple[Self, Self]:
         mask = inRange(self.series.z, range=range)
         self.series = force_2d(self.series)
