@@ -50,33 +50,47 @@ class Layer:
             return self
         return wrapped
 
-    def onDrag(self, func: Callable[[str, int, int, DragState, bool], bool]) -> Self:
+    def onDrag(self, func: Callable[[str, int, int, int, DragState], bool]) -> Self:
         self.properties["drag"] = func
+        return self
+
+    def onClick(self, func: Callable[[str, int, int, int], bool]) -> Self:
+        self.properties["click"] = func
+        return self
+
+    def onHover(self, func: Callable[[str, int, int, int], bool]) -> Self:
+        self.properties["hover"] = func
+        return self
+
+    def onHoverOut(self, func: Callable[[], bool]) -> Self:
+        self.properties["hoverOut"] = func
         return self
 
     def fixed(self, fixed: bool = True) -> Self:
         self.properties["fixed"] = fixed
         return self
 
+    @timer
     def filter(self, mask: pd.Series) -> Self:
         self.series = self.series[mask]
         return self
 
+    @timer
     def splitGhost(self, visibleMask: pd.Series, opacity=int) -> List[Self]:
         return [self.copy(id="ghost").filter(~visibleMask).opacity(opacity), self.filter(visibleMask)]
 
     @setProperty
-    def stroke(self, color: Union[Color, Callable[[str], Color]]) -> Self:
+    def stroke(self, color: Union[Color, Callable[[int], Color]]) -> Self:
         ("implemented by decorator", color)
         return self
 
     @setProperty
-    def strokeWidth(self, width: Union[int, Callable[[str], int]]) -> Self:
+    def strokeWidth(self, width: Union[int, Callable[[int], int]]) -> Self:
         ("implemented by decorator", width)
         return self
 
     @setProperty
-    def fill(self, color: Union[Color, Callable[[str], Color]]) -> Self:
+    def fill(self, color: Union[Color, Callable[[int], Color]]) -> Self:
         ("implemented by decorator", color)
         return self
 
@@ -91,26 +105,28 @@ class Layer:
     def _encodeBin(self):
         "abstract"
 
+    @timer
     def encodeBin(self):
         if len(self.series) == 0:
             return {}
 
         if "id" not in self.properties:
             warnings.warn("missing id")
-
         return {
             **self._encodeBin(),
             "properties": self.properties
         }
-        
+
+    @timer
     def normalize(self) -> Self:
         self.series = gp.GeoSeries(self.series)
         return self
-    
+
+    @timer
     def coordinates(self) -> Tuple[pd.DataFrame, dict]:
         normalize = self.normalize()
         return [normalize.series.get_coordinates(), normalize.properties]
-    
+
     @timer
     def translate(self, translate: gp.GeoSeries = None) -> Self:
         self.series = self.series.combine(
@@ -120,9 +136,10 @@ class Layer:
     def setSeries(self, series: gp.GeoSeries) -> Self:
         self.series = series
         return self
-    
-    def copy(self, series: gp.GeoSeries = None, id="") -> Self:
-        cls = self.__class__
+
+    @timer
+    def copy(self, series: gp.GeoSeries = None, id="", cls=None) -> Self:
+        cls = cls if cls is not None else self.__class__
         result = cls.__new__(cls)
         result.properties = self.properties.copy()
         if len(id) != 0:
