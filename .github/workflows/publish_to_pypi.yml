@@ -5,6 +5,8 @@
 
 name: Publish core to PyPi (cudmore)
 
+on: push
+
 # my code
 # on:
 #   workflow_run:
