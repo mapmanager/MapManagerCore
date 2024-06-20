@@ -3,17 +3,10 @@
 # in mapmanager org
 #          TWINE_PASSWORD: ${{ secrets.TWINE_API_KEY }}
 
-name: Publish core to PyPi (cudmore)
+name: Publish mapmanagercore to PyPi (cudmore)
 
 on: push
 
-# my code
-# on:
-#   workflow_run:
-#     workflows: ["Release (cudmore)"]
-#     types: [completed]
-
-# see: https://packaging.python.org/en/latest/guides/publishing-package-distribution-releases-using-github-actions-ci-cd-workflows/
 jobs:
     build:
         name: Build distribution 📦
