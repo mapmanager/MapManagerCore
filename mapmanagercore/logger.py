@@ -46,6 +46,12 @@ def getLoggerFilePath():
     """All MapManager code will log to the same place including:
      - MapManagerCore
      - MapManagerQt
+
+    Notes
+    -----
+    Mac: /Users/cudmore/Library/Application Support/MapManager
+    Linux: /share/MapManager
+    Windows: 
     """
     appName = 'MapManager'
     try:
