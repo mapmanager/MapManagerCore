@@ -6,10 +6,10 @@
 name: Publish core to PyPi (cudmore)
 
 # my code
-on:
-  workflow_run:
-    workflows: ["Release (cudmore)"]
-    types: [completed]
+# on:
+#   workflow_run:
+#     workflows: ["Release (cudmore)"]
+#     types: [completed]
 
 # see: https://packaging.python.org/en/latest/guides/publishing-package-distribution-releases-using-github-actions-ci-cd-workflows/
 jobs:
