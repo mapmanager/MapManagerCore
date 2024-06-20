@@ -45,9 +45,11 @@ class ImageLoader:
 
     def timePoints(self) -> Iterator[int]:
         ("implemented by subclass")
+        return []
 
     def _images(self, t: int) -> np.ndarray:
         ("implemented by subclass", t)
+        return np.array([])
 
     def loadSlice(self, time: int, channel: int, slice: int) -> np.ndarray:
         """
@@ -90,6 +92,9 @@ class ImageLoader:
         """
 
         if t is None:
+            if len(self.timePoints()) == 0:
+                return 0
+
             return min(self.shape(t)[0] for t in self.timePoints())
 
         return self.shape(t)[0]
