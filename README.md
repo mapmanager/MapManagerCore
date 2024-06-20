@@ -1,6 +1,6 @@
 [![Python](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/release/python-3111/)
 [![tests](https://github.com/mapmanager/MapManagerCore/workflows/Test/badge.svg)](https://github.com/mapmanager/MapManagerCore/actions)
-[![codecov](https://codecov.io/gh/MapManagerCore/branch/master/graph/badge.svg?token=L7L3FB04IP)](https://codecov.io/gh/cudmore/SanPy)
+[![codecov](https://codecov.io/gh/MapManagerCore/branch/master/graph/badge.svg?token=L7L3FB04IP)](https://codecov.io/gh/mapmanager/MapManagerCore)
 [![OS](https://img.shields.io/badge/OS-Linux|Windows|macOS-blue.svg)]()
 [![License](https://img.shields.io/badge/license-GPLv3-blue)](https://github.com/mapmanager/MapManagerCore/blob/master/LICENSE)
 
