@@ -469,11 +469,15 @@ class LazyGeoFrame(Generic[T]):
         # Some computed keys might be missing when the root frame is empty
         # Temporary add empty series as placeholders for those computed columns
         df = self._df
+
         columns = self.columns
         if not isinstance(keys, list):
             if keys in df.columns or not keys in columns:
                 return self._df[keys]
             return pd.Series()
+
+        if df.empty:
+            return pd.DataFrame({key: pd.Series() for key in keys})
 
         keyGroups = [], []
         for key in keys:
