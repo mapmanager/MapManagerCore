@@ -17,6 +17,7 @@ jobs:
       run: >-
         python3 -m
         pip install
+        pip install .  # abb
         build
         --user
     - name: Build a binary wheel and a source tarball
