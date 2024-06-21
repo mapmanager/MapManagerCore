@@ -3,7 +3,7 @@
 [![codecov](https://codecov.io/gh/mapmanager/MapManagerCore/graph/badge.svg?token=M9SO38DYPY)](https://codecov.io/gh/mapmanager/MapManagerCore)
 [![OS](https://img.shields.io/badge/OS-Linux|Windows|macOS-blue.svg)]()
 [![License](https://img.shields.io/badge/license-GPLv3-blue)](https://github.com/mapmanager/MapManagerCore/blob/master/LICENSE)
-[![image](http://img.shields.io/pypi/v/exampy.svg)](https://pypi.python.org/project/mapmanagercore)
+[![image](http://img.shields.io/pypi/v/mapmanagercore.svg)](https://pypi.python.org/project/mapmanagercore)
 
 # MapManagerCore
 
