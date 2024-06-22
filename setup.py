@@ -7,24 +7,21 @@ with open(os.path.abspath(_thisPath+"/README.md")) as f:
     long_description = f.read()
 
 install_requires = [
-    'async-lru',
-    'asyncio',
-    'tifffile',
-    'imagecodecs',  # required for compression
-    # 'plotly',  # required for compression
     'numpy',
     'pandas',
     'shapely',
-    # 'geopandas==1.0.0a1',  # removed 20240608
     'geopandas',
     'scikit-image',
     'zarr',
+    'async-lru',
+    'asyncio',
+    'imagecodecs',  # required for compression
     'platformdirs',  # to get platform specific App paths
-    'plotly',
+    'plotly',  # needed for colors
     "dataclasses-json",
     'brightest-path-lib',
-    #'bioimage',
-    #
+    'pooch',  # to load data from MapManagerCore-Data repo
+    # 'bioio',  # TODO: use to load metadata and lazy load images
 ]
 
 testRequirements = [
@@ -32,7 +29,7 @@ testRequirements = [
     'pytest',
     'pytest-cov',
     'flake8',
-    'nbformat'
+    'nbformat'  # used in tests
 ]
 
 devRequirements = [

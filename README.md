@@ -9,7 +9,7 @@
 
 MapManagerCore is a Python library that provides the core functionality for MapManager.
 
-An example notebook is located under `examples/example.ipynb`.
+An example notebook is located under [examples/example.ipynb](examples/example.ipynb)
 
 ## Install
 
@@ -24,7 +24,7 @@ Clone the repo, create a conda environment, install with pip, and run the tests.
     conda activate mmc-env
 
     # install
-    pip install -e '.[dev]'
+    pip install -e '.[tests]'
 
     # run test
     pytest tests
