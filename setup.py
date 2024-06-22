@@ -29,7 +29,8 @@ testRequirements = [
     'pytest',
     'pytest-cov',
     'flake8',
-    'nbformat'  # used in tests
+    'nbformat',
+    'matplotlib',
 ]
 
 devRequirements = [
