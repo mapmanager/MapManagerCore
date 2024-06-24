@@ -24,6 +24,8 @@ class TestExamplesNotebook(unittest.TestCase):
             
             
             # Create the annotation map
+            lineSegments=getLinesFile()
+            print('lineSegments:', lineSegments)
             map = MapAnnotations(loader.build(),
                                 #  lineSegments="../data/rr30a_s0u/line_segments.csv",
                                 #  points="../data/rr30a_s0u/points.csv")

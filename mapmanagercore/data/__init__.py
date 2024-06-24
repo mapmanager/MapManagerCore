@@ -10,7 +10,7 @@ The next fetch will reload from the local file (no download)?
 
 import pooch
 
-def getPointsFile():
+def getPointsFile() -> str:
     """Download and get path to points csv.
     """
     urlPoints = 'https://raw.githubusercontent.com/mapmanager/MapManagerCore-Data/main/data/rr30a_s0u/points.csv'
@@ -21,7 +21,7 @@ def getPointsFile():
     )
     return pointsPath
 
-def getLinesFile():
+def getLinesFile() -> str:
     urlLines = 'https://raw.githubusercontent.com/mapmanager/MapManagerCore-Data/main/data/rr30a_s0u/line_segments.csv'
     # urlLines = 'https://github.com/mapmanager/MapManagerCore-Data/raw/main/data/rr30a_s0u/line_segments.csv'
     linePath = pooch.retrieve(
@@ -30,7 +30,7 @@ def getLinesFile():
     )
     return linePath
 
-def getTiffChannel_1():
+def getTiffChannel_1() -> str:
     urlCh1 = 'https://github.com/mapmanager/MapManagerCore-Data/raw/main/data/rr30a_s0u/t0/rr30a_s0_ch1.tif'
     ch1Path = pooch.retrieve(
         url=urlCh1,
@@ -38,7 +38,7 @@ def getTiffChannel_1():
     )
     return ch1Path
 
-def getTiffChannel_2():
+def getTiffChannel_2() -> str:
     urlCh2 = 'https://github.com/mapmanager/MapManagerCore-Data/raw/main/data/rr30a_s0u/t0/rr30a_s0_ch2.tif'
     ch2Path = pooch.retrieve(
         url=urlCh2,
@@ -46,7 +46,7 @@ def getTiffChannel_2():
     )
     return ch2Path
 
-def getSingleTimepointMap():
+def getSingleTimepointMap() -> str:
     urlMap = 'https://github.com/mapmanager/MapManagerCore-Data/raw/main/data/rr30a_s0u.mmap'
     mapPath = pooch.retrieve(
         url=urlMap,
