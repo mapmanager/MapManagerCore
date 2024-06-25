@@ -27,10 +27,11 @@ class TestExamplesNotebook(unittest.TestCase):
             lineSegments=getLinesFile()
             print('lineSegments:', lineSegments)
             map = MapAnnotations(loader.build(),
-                                #  lineSegments="../data/rr30a_s0u/line_segments.csv",
-                                #  points="../data/rr30a_s0u/points.csv")
-                                 lineSegments=getLinesFile(),
-                                 points=getPointsFile())
+                                # lineSegments="../data/rr30a_s0u/line_segments.csv",
+                                # points="../data/rr30a_s0u/points.csv",
+                                lineSegments=getLinesFile(),
+                                points=getPointsFile()
+                                )
             map.points[:]
             map.segments[:]
             
@@ -71,8 +72,8 @@ class TestExamplesNotebook(unittest.TestCase):
             id
             
             # abb
-            timePoint.points["roi"].get_coordinates()
-            timePoint.points["roiBase"].get_coordinates()['x'].tolist()
+            # timePoint.points["roi"].get_coordinates()
+            # timePoint.points["roiBase"].get_coordinates()['x'].tolist()
             
             from mapmanagercore.schemas.spine import Spine
             

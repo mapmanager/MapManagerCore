@@ -6,6 +6,9 @@ See: https://github.com/mapmanager/MapManagerCore-Data
 The first fetch will download the file and will take a few seconds.
 
 The next fetch will reload from the local file (no download)?
+
+As a github workflow:
+    /home/runner/.cache/pooch
 """
 
 import pooch
@@ -13,8 +16,7 @@ import pooch
 def getPointsFile() -> str:
     """Download and get path to points csv.
     """
-    urlPoints = 'https://raw.githubusercontent.com/mapmanager/MapManagerCore-Data/main/data/rr30a_s0u/points.csv'
-    # urlPoints = 'https://github.com/mapmanager/MapManagerCore-Data/raw/main/data/rr30a_s0u/points.csv'
+    urlPoints = 'https://github.com/mapmanager/MapManagerCore-Data/raw/main/data/rr30a_s0u/points.csv'
     pointsPath = pooch.retrieve(
         url=urlPoints,
         known_hash=None
@@ -22,8 +24,7 @@ def getPointsFile() -> str:
     return pointsPath
 
 def getLinesFile() -> str:
-    urlLines = 'https://raw.githubusercontent.com/mapmanager/MapManagerCore-Data/main/data/rr30a_s0u/line_segments.csv'
-    # urlLines = 'https://github.com/mapmanager/MapManagerCore-Data/raw/main/data/rr30a_s0u/line_segments.csv'
+    urlLines = 'https://github.com/mapmanager/MapManagerCore-Data/raw/main/data/rr30a_s0u/line_segments.csv'
     linePath = pooch.retrieve(
         url=urlLines,
         known_hash=None
