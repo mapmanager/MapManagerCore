@@ -6,10 +6,13 @@ def test_load():
     linesFile = mapmanagercore.data.getLinesFile()
     
     dfLines = pd.read_csv(linesFile)
-    print('=== test_load')
+    print('=== test_load dfLines')
     print(dfLines)
 
     pointsFile = mapmanagercore.data.getPointsFile()
+    dfPoints = pd.read_csv(pointsFile)
+    print('=== test_load dfPoints')
+    print(dfPoints)
 
     ch1 = mapmanagercore.data.getTiffChannel_1()
 
