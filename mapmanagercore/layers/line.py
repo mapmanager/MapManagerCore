@@ -138,7 +138,7 @@ def getSpineSide(line: LineString, spine: Point):
 
 # abj
 @ timer
-def getSpineAngle(segmentLine: LineString, spineLine: LineString):
+def getSpineAngle(spineLine: LineString):
     """ Return the angle between the two Lines
     Line 1: The line formed between the spine head and the anchor point
     Line 2: The line formed by two points on the segment tracing. 
@@ -156,17 +156,12 @@ def getSpineAngle(segmentLine: LineString, spineLine: LineString):
     sl1x = spineLineCoord1.x
     sl1y = spineLineCoord1.y
 
-    segmentLineCoord0 = Point(segmentLine.coords[0])
-    segmentLineCoord1 = Point(segmentLine.coords[-1])
-    sgl0x = segmentLineCoord0.x
-    sgl0y = segmentLineCoord0.y
-    sgl1x = segmentLineCoord1.x
-    sgl1y = segmentLineCoord1.y
-    
-    m1 = (sl1y-sl0y)/(sl1x-sl0x)
-    m2 = (sgl1y-sgl0y)/(sgl1x-sgl0x)
+    # abj: 6/24
+    dx = sl1x - sl0x
+    dy =  sl1y - sl0y
 
-    angle_rad = math.atan(m1) - math.atan(m2)
+    # Angle between p1 and p2 in radians
+    angle_rad = math.atan2(dy, dx)
     angle_deg = angle_rad*180/PI
 
     # Range: 0 - 360
@@ -175,7 +170,7 @@ def getSpineAngle(segmentLine: LineString, spineLine: LineString):
         angle_deg = angle_deg + 360 
 
     # print("m1", m1, "m2", m2, "degree:", angle_deg)
-
+    print("degree:", angle_deg)
     return angle_deg
 
 @timer
