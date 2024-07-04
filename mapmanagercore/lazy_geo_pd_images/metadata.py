@@ -17,6 +17,10 @@ class VoxelMetadata:
     y: float = 1
     z: float = 1
 
+    def __str__(self):
+        ret = f'x:{self.x} y:{self.y} z:{self.z}'
+        return ret
+    
 @dataclass_json
 @dataclass
 class MetadataPhysicalSize:
@@ -32,10 +36,16 @@ class MetadataPhysicalSize:
     y: float = 1
     unit: Literal["µm"] = "µm"
 
+    def __str__(self):
+        ret = f'x:{self.x} y:{self.y} unit:{self.unit}'
+        return ret
+    
 @dataclass_json
 @dataclass
 class Metadata:
     voxel: VoxelMetadata = field(default_factory=lambda: VoxelMetadata())
     physicalSize: MetadataPhysicalSize = field(default_factory=lambda: MetadataPhysicalSize())
     
-    
+    def __str__(self):
+        str = f'VoxelMetadata {self.voxel} MetadataPhysicalSize {self.physicalSize}'
+        return str     

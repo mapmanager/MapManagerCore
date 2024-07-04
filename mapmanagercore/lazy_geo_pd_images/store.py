@@ -136,7 +136,14 @@ class LazyImagesGeoPandas(LazyGeoPandas):
 
     def _channels(self):
         return self._images.channels()
-
+    
+    def getAutoContrast_qt(self, time: int, channel: int) -> Tuple[int, int]:
+        """Get the auto contrast from the entire image volume.
+        
+        Used in PyQt interface.
+        """
+        return self._images.getAutoContrast_qt(time, channel)
+    
     def getPixels(self, time: int, channel: int, zRange: Tuple[int, int] = None, z: int = None, zSpread: int = 0) -> ImageSlice:
         """
         Loads the image data for a slice.
