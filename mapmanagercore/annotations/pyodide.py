@@ -28,9 +28,11 @@ class PyodideSingleTimePoint(SingleTimePointAnnotations):
 
     def getSpinePosition(self, spineID: SpineId):
         """Returns the position of a spine in the current time point."""
-        if (spineID, self._t) not in self._annotations.points.index:
+        if spineID not in self.points.index:
             return None
-        return to_js(list(self._annotations.points[(spineID, self._t), "point"].coords)[0])
+        
+        points = self.points[spineID, ["point", "z"]]
+        return to_js([*list(*points["point"].coords), int(points["z"])])
 
     def getSegmentsAndSpines(self, options: AnnotationsOptions):
         options = options.to_py()
