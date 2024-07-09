@@ -170,7 +170,7 @@ def getSpineAngle(spineLine: LineString):
         angle_deg = angle_deg + 360 
 
     # print("m1", m1, "m2", m2, "degree:", angle_deg)
-    print("degree:", angle_deg)
+    # print("degree:", angle_deg)
     return angle_deg
 
 @timer
