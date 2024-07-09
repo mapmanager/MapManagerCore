@@ -24,8 +24,8 @@ class TestExamplesNotebook(unittest.TestCase):
             
             
             # Create the annotation map
-            lineSegments=getLinesFile()
-            print('lineSegments:', lineSegments)
+            # lineSegments=getLinesFile()
+            # print('lineSegments:', lineSegments)
             map = MapAnnotations(loader.build(),
                                 # lineSegments="../data/rr30a_s0u/line_segments.csv",
                                 # points="../data/rr30a_s0u/points.csv",
@@ -36,9 +36,14 @@ class TestExamplesNotebook(unittest.TestCase):
             map.segments[:]
             
             # save the annotation map
-            map.save("../data/rr30a_s0u.mmap")
+            map.save("../data/rr30a_s0u_v2.mmap")
             map.close()
+            # MapAnnotations.checkFile("../data/rr30a_s0u.mmap", verbose=False)
+            MapAnnotations.checkFile("../data/rr30a_s0u_v2.mmap", verbose=False)
+            
+            
             map = MapAnnotations.load("../data/rr30a_s0u.mmap")
+            print(map)
             fig, ax = plt.subplots(figsize=(5, 5))
             
             map.points["anchorLine"].plot(color='black', ax=ax)

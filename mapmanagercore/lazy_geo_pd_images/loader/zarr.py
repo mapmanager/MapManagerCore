@@ -1,3 +1,4 @@
+import os
 from mapmanagercore.lazy_geo_pd_images.metadata import Metadata
 from .base import ImageLoader
 from typing import Iterator
@@ -19,7 +20,11 @@ class ZarrLoader(ImageLoader):
         """
         super().__init__()
 
-        self.store = zarr.ZipStore(path, mode="r")
+        if os.path.isdir(path):
+            self.store = zarr.DirectoryStore(path)
+        else:
+            self.store = zarr.ZipStore(path, mode="r")
+
         self.group = zarr.group(store=self.store)
         self._imagesSrcs = {}
         self._metadata = {}
