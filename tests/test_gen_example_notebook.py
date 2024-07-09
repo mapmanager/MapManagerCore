@@ -36,9 +36,10 @@ class TestExamplesNotebook(unittest.TestCase):
             map.segments[:]
             
             # save the annotation map
-            map.save("../data/rr30a_s0u.mmap")
+            map.save("../data/rr30a_s0u_v2.mmap")
             map.close()
-            MapAnnotations.checkFile("../data/rr30a_s0u.mmap", verbose=True)
+            # MapAnnotations.checkFile("../data/rr30a_s0u.mmap", verbose=False)
+            MapAnnotations.checkFile("../data/rr30a_s0u_v2.mmap", verbose=False)
             
             
             map = MapAnnotations.load("../data/rr30a_s0u.mmap")

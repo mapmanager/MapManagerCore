@@ -129,7 +129,7 @@ class ImageLoader:
         Used in PyQt interface.
         """
     
-        logger.info(f'{self._images(time)[channel].shape} {np.min(self._images(time)[channel]), np.max(self._images(time)[channel])}')
+        # logger.info(f'{self._images(time)[channel].shape} {np.min(self._images(time)[channel]), np.max(self._images(time)[channel])}')
 
         _percent_low = 30.0 #0.5  # .30
         _percent_high = 99.95  #100 - 0.5
