@@ -65,12 +65,17 @@ class SingleTimePointFrame(LazyGeoFrame):
             return SingleTimePointFrame(result, self._t)
 
         # extract single values if index is precisely one row
-        if result.shape[0] <= 1 and (len(result.shape) == 1 or result.shape[1] <= 1):
-            row, _key = self._parseKeyRow(items)
-            if self._root._schema.isIndexType(row):
+        if result.shape[0] <= 1:
+            if (len(result.shape) == 1 or result.shape[1] <= 1):
+                row, _key = self._parseKeyRow(items)
+                if self._root._schema.isIndexType(row):
+                    if result.empty:
+                        return None
+                    return result.values[0]
+            else:
                 if result.empty:
                     return None
-                return result.values[0]
+                return result.iloc[0]
 
         return result
 

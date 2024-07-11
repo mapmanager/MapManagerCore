@@ -145,9 +145,9 @@ class AnnotationsLayers(AnnotationsInteractions):
         points = points[["point", "anchorLine", "anchor", "z", "anchorZ"]]
 
         visiblePoints = points["z"].between(
-            zRange[0], zRange[1], inclusive="left")
+            zRange[0], zRange[1], inclusive="right")
         visibleAnchors = points["anchorZ"].between(
-            zRange[0], zRange[1], inclusive="left")
+            zRange[0], zRange[1], inclusive="right")
 
         if not editing:
             points = points[visiblePoints | visibleAnchors]
