@@ -56,7 +56,7 @@ def main():
         df["xBackgroundOffset"][index] = newDF["xBackgroundOffset"][index]
         df["yBackgroundOffset"][index] = newDF["yBackgroundOffset"][index]
 
-    df.to_csv('newPoints.csv', index=False)
+    df.to_csv('points.csv', index=False)
 
 
 if __name__ == '__main__':

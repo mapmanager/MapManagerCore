@@ -16,7 +16,7 @@ import pooch
 def getPointsFile() -> str:
     """Download and get path to points csv.
     """
-    urlPoints = 'https://raw.githubusercontent.com/mapmanager/MapManagerCore-Data/j-dev/data/rr30a_s0u/newPoints.csv'
+    urlPoints = 'https://raw.githubusercontent.com/mapmanager/MapManagerCore-Data/main/data/rr30a_s0u/points.csv'
     pointsPath = pooch.retrieve(
         url=urlPoints,
         known_hash=None

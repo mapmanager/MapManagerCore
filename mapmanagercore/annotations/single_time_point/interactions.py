@@ -98,7 +98,7 @@ class AnnotationsInteractions(AnnotationsSegments):
         z = self.points[spineId, "z"]
 
         # create a grid of points to search for the best offset
-        grid = shapeGrid(roi, points=5, overlap=0.1)
+        grid = shapeGrid(roi, points=5, overlap=0.1) # abj
         # grid = shapeGrid(roi, points=3, overlap=0.1)
 
         # translate the roi by the grid points
