@@ -269,11 +269,15 @@ class AnnotationsBase(LazyImagesGeoPandas):
             fs = zarr.DirectoryStore(path)
             with fs as store:
                 group = zarr.group(store=store)
-                self._images.saveTo(group)
+                fileExists = os.path.isdir(path)
+                if not fileExists:
+                    self._images.saveTo(group)
+          
+                # TODO: Check if dirty
                 group.create_dataset(
-                    "points", data=self.points.toBytes(), dtype=np.uint8)
+                    "points", overwrite = True, data=self.points.toBytes(), dtype=np.uint8)
                 group.create_dataset(
-                    "lineSegments", data=self.segments.toBytes(), dtype=np.uint8)
+                    "lineSegments", overwrite = True, data=self.segments.toBytes(), dtype=np.uint8)
                 group.attrs["version"] = 1
 
                 # abb analysisparams
