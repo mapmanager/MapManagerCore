@@ -265,11 +265,11 @@ class AnnotationsBase(LazyImagesGeoPandas):
             warnings.simplefilter("ignore")
 
             logger.info(f'saving to {path}')
+            fileExists = os.path.isdir(path)
             # fs = zarr.ZipStore(path, mode="w", compression=compression)
             fs = zarr.DirectoryStore(path)
             with fs as store:
                 group = zarr.group(store=store)
-                fileExists = os.path.isdir(path)
                 if not fileExists:
                     self._images.saveTo(group)
           
