@@ -261,6 +261,10 @@ class AnnotationsBase(LazyImagesGeoPandas):
         if not path.endswith(".mmap"):
             path += ".mmap"
 
+        #abj - dont save if path is empty
+        if path ==".mmap":
+            return
+        
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
 
