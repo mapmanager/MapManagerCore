@@ -21,6 +21,10 @@ class AnalysisParams():
     def getDict(self):
         return self._dict
 
+    def printDict(self):
+        for k,v in self.getDict().items():
+            print(f'{k} {v}')
+
     def getJson(self):
         return json.dumps(self._dict)
 
@@ -38,7 +42,7 @@ class AnalysisParams():
             },
 
             'channel': {
-                'defaultValue': 1,
+                'defaultValue': 1,  # 0 based
                 'currentValue': 1,
                 'description': 'image color channel to find brightest connection of spine.'
             },
@@ -71,8 +75,8 @@ class AnalysisParams():
             
             # The distance 
             'segmentTracingMaxDistance': {
-                'defaultValue': 30,
-                'currentValue': 30,
+                'defaultValue': 90,  # abb was 20
+                'currentValue': 90,
                 'description': 'Max distance to trace a brightest path with relatively low performance cost.'
             },
 

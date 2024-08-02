@@ -158,13 +158,15 @@ class Spine:
             segmentFrame[["segment"]], on=["segmentID", "t"])
         return shapely.line_locate_point(df["segment"], df["anchor"])
 
+    # abb working on this ???
     # abj
-    @compute(title="Spine Side", dependencies={
-        "Spine": ["segmentID", "point"],
-        "Segment": ["segment"]
-    }, description="Side of spine w.r.t. segment in ('left', 'right')", plot=False)
+    @compute(title="Spine Side", dependencies=
+             {
+                # "Spine": ["segmentID", "point"],
+                "Spine": ["point"],
+                "Segment": ["segment"]
+            }, description="Side of spine w.r.t. segment in ('left', 'right')", plot=False)
     def spineSide(frame: LazyGeoFrame):
-
         # do this for all spines
         segmentFrame = frame.getFrame("Segment")
         df = frame[["segmentID", "point"]].join(

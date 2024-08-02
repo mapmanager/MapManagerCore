@@ -38,6 +38,7 @@ class MultiImageLoader(ImageLoader):
         self._images[time].append([channel, imgData])
         self.paths.append([time, channel, path])
 
+    # abb TODO: this is never called?
     def readMetadata(self, metadata: Union[Metadata, str], time: int = 0):
         """
         Set the metadata for the given time index.

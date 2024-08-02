@@ -9,6 +9,7 @@ from shapely.geometry.base import BaseGeometry
 from .benchmark import timer
 import itertools
 
+from mapmanagercore.logger import logger
 
 @timer
 def filterMask(d: pd.Index, index_filter: list):
@@ -40,10 +41,16 @@ def generateGrid(stepX: int, stepY: int, points: int):
     """
     distanceX = stepX * points
     distanceY = stepY * points
-    x = np.arange(0, distanceX, stepX) - (stepX * ((distanceX * 0.5) // stepX))
-    y = np.arange(0, distanceY, stepY) - (stepY * ((distanceY * 0.5) // stepY))
-    return pd.DataFrame(itertools.product(x, y), columns=["x", "y"])
 
+    try:
+        x = np.arange(0, distanceX, stepX) - (stepX * ((distanceX * 0.5) // stepX))
+        y = np.arange(0, distanceY, stepY) - (stepY * ((distanceY * 0.5) // stepY))
+        return pd.DataFrame(itertools.product(x, y), columns=["x", "y"])
+    except (ValueError) as e:
+        logger.error(f'points:{points}')
+        logger.error(f'distanceX:{distanceX} stepX:{stepX}')
+        logger.error(f'distanceY:{distanceX} stepX:{stepY}')
+        raise
 
 def shapeGrid(shape: BaseGeometry, points: int, overlap=0):
     """Generate a grid of offsets using a shape as distance.
@@ -60,7 +67,15 @@ def shapeGrid(shape: BaseGeometry, points: int, overlap=0):
     width = maxx - minx
     height = maxy - miny
     overlap = 1 - overlap
-    return generateGrid(width * overlap, height * overlap, points)
+    try:
+        _grid = generateGrid(width * overlap, height * overlap, points)
+    except (ValueError) as e:
+        logger.error(f'shape:{shape}')
+        logger.error(f'shape.bounds:{shape.bounds}')
+        logger.error(f'minx:{minx} miny:{miny} maxx:{maxx} maxy:{maxy}')
+        raise
+    
+    return _grid
 
 def set_precision(series: gpd.GeoSeries, *args, **kwargs):
     """Set the precision of a GeoSeries."""

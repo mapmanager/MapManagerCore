@@ -40,8 +40,9 @@ from ..lazy_geo_pandas import schema
 class Segment:
     """A schema representing a segment"""
     
-    t: int
+    # abb swapped order
     segmentID: int
+    t: int
 
     segment: LineString
     roughTracing: Union[LineString, Point]

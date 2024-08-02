@@ -142,7 +142,18 @@ class LazyGeoPandas:
     def _update(self, key: str, ids: Union[Hashable, Sequence[Hashable], pd.Index], value: Schema, replaceLog=False, skipLog=False):
         """
         Applies an update to a frame while adding a undo/redo log entry.
+        
+        Parameters
+        ----------
+        key : str
+            From ['Segments', 'Spines']
+        ids : slice
         """
+        
+        # logger.info(f'key:{key} {type(key)}')
+        # logger.info(f'ids:{ids} {type(ids)}')
+        # logger.info(f'value:{value}')
+        
         store = self._frames[key]
 
         if not isinstance(value, store._schema):
@@ -438,6 +449,8 @@ class LazyGeoFrame(Generic[T]):
         """Modeled after the __getitem__ method of a pandas DataFrame."""
         row, key = self._parseKeyRow(items)
 
+        # logger.info(f'row:{row} key:{key}')
+
         filtered = self
         if row is not None:
             filtered = self._filter(row)
@@ -451,13 +464,27 @@ class LazyGeoFrame(Generic[T]):
                 key = filtered.columns
             filtered._insureComputed(key)
 
+        # logger.warning('=== !!!')
+        # print('   key:', key)
+        # print('   filtered._getFiltered(key):', filtered._getFiltered(key))
+
         df: pd.DataFrame = filtered._getFiltered(key)
 
         if len(df) <= 1 and (len(df.shape) == 1 or df.shape[1] < 1):
             if (isinstance(row, tuple) and df.index.nlevels == len(row)) or df.index.nlevels == 1 and self._schema.isIndexType(row):
                 if df.empty:
+                    logger.warning(f'returning none with items:{items}')
                     return None
+                # logger.warning('!!!=== returning df.values[0]')
+                # print(df.values[0])
+                # print('from df.values')
+                # print(df.values)
+
                 return df.values[0]
+            
+        # logger.warning(f'========= returning df with type {type(df)}')
+        # print(df)
+        
         return df
 
     @timer

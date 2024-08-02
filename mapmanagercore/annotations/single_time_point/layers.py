@@ -15,6 +15,7 @@ from typing import List
 import geopandas as gpd
 from typing import TypedDict, Tuple
 
+from mapmanagercore.logger import logger
 
 class AnnotationsSelection(TypedDict):
     """
@@ -142,8 +143,18 @@ class AnnotationsLayers(AnnotationsInteractions):
         else:
             points = self.points
 
-        points = points[["point", "anchorLine", "anchor", "z", "anchorZ"]]
+        # abb KeyError
+        try:
+            points = points[["point", "anchorLine", "anchor", "z", "anchorZ"]]
+        except (KeyError) as e:
+            logger.error(e)
+            logger.error(f'points.index is:{points.index}')
+            # logger.error(f'available columns are:{points.columns}')
 
+        # logger.warning(f'zRange:{zRange} {type(zRange[0])} {type(zRange[1])}')
+        # logger.warning(f'points:{points}')
+        # logger.warning(f'points["z"]:{points["z"]}')
+                       
         visiblePoints = points["z"].between(
             zRange[0], zRange[1], inclusive="right")
         visibleAnchors = points["anchorZ"].between(

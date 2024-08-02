@@ -52,16 +52,25 @@ class AnnotationsBase(LazyImagesGeoPandas):
         self.loader = loader
 
     # abb
+    def getNumTimepoints(self):
+        return len(self._images.timePoints())
+    
+    # abb
     def __str__(self):
         """Print info about the map.
         
         See: _SingleTimePointAnnotationsBase()
         """
-        numTimepoints = len(self._images.timePoints())
-        numPnts = len(self.points._rootDf)
-        numSegments = len(self.segments._rootDf)
-
-        return f't:{numTimepoints}, points:{numPnts} segments:{numSegments} loader:{self.loader}'
+        timePoints = self._images.timePoints()
+        numTimepoints = len(timePoints)
+        numPnts = len(self.points)
+        numSegments = len(self.segments)
+        
+        theRet =  f'mmmap t:[{numTimepoints}], points:{numPnts} segments:{numSegments}\n'
+        for tpIdx in timePoints:
+            tp = self.getTimePoint(time=tpIdx)
+            theRet += f'      {tp}\n'
+        return theRet
     
     @property
     def segments(self) -> LazyGeoFrame:
@@ -125,6 +134,7 @@ class AnnotationsBase(LazyImagesGeoPandas):
 
     # Serialization
 
+    # abb
     @classmethod
     def checkFile(cls, path: str, lazy=True, verbose=False) -> bool:
         """Check if a zarr file is valid to load.

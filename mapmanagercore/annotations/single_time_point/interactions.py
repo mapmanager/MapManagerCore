@@ -47,10 +47,13 @@ class AnnotationsInteractions(AnnotationsSegments):
         # find the closest point on the segment to the `point`
         minProjection = segment.project(point)
         
+        # abb
         if np.isnan(minProjection):
-            logger.warning(f'minProjection:{minProjection}')
-            logger.warning(f'segment:{segment}')
-            logger.warning(f'point:{point}')
+            logger.error(f'=== UNEXPECTED minProjection:{minProjection}')
+            logger.error(f'   segmentID:{segmentID}')
+            logger.error(f'   self.segments[:]:{self.segments[:]}')
+            logger.error(f'   segment:{segment}')
+            logger.error(f'   point:{point}')
             
         if not findBrightest:
             # Default to the closest point (not brightest)
@@ -98,7 +101,13 @@ class AnnotationsInteractions(AnnotationsSegments):
         z = self.points[spineId, "z"]
 
         # create a grid of points to search for the best offset
-        grid = shapeGrid(roi, points=3, overlap=0.1)
+        try:
+            grid = shapeGrid(roi, points=3, overlap=0.1)
+        except (ValueError) as e:
+            logger.error(f'   {e}')
+            logger.error(f'   roi:{roi}')
+            print('   self.points[:]')
+            print(self.points[:])
 
         # translate the roi by the grid points
         candidates = gp.GeoSeries(grid.apply(
@@ -128,12 +137,21 @@ class AnnotationsInteractions(AnnotationsSegments):
         """
         point = Point(x, y, z)
 
-        logger.error(f'1 FutureWarning: The `drop` keyword ...')
+        # logger.error(f'1 FutureWarning: The `drop` keyword ...')
         anchor = self.nearestAnchor(segmentId, point, findBrightest=True)
+
+        # if segmentId == 5:
+        #     logger.warning(f'anchor:{anchor}')
 
         spineId = self.newUnassignedSpineId()
 
-        self.updateSpine(spineId, Spine.withDefaults(
+        # abb
+        spineId = int(spineId)
+
+        # if self._t in [1, 2]:
+        #     logger.info(f'spineId:{spineId} {type(spineId)} segmentId:{segmentId} anchor:{anchor}')
+
+        _spine = Spine.withDefaults(
             segmentID=segmentId,
             point=Point(point.x, point.y),
             z=int(z),
@@ -141,10 +159,19 @@ class AnnotationsInteractions(AnnotationsSegments):
             anchorZ=int(anchor.z),
             xBackgroundOffset=0.0,
             yBackgroundOffset=0.0,
-        ))
+        )
+        self.updateSpine(spineId, _spine)
 
-        logger.error(f'4 FutureWarning: The `drop` keyword ...')
-        self.snapBackgroundOffset(spineId)
+        # if self._t in [1, 2]:
+        #     logger.info('after updateSpine')
+        #     logger.info(self)
+        #     print('self.points.index is:')
+        #     print(self.points.index)
+
+        # logger.error(f'4 FutureWarning: The `drop` keyword ...')
+        # abb 20240730 was causing exceptions
+        # moving into PyMapManager so we can refresh with getTimePoint()
+        # self.snapBackgroundOffset(spineId)
 
         return spineId
 
@@ -200,7 +227,7 @@ class AnnotationsInteractions(AnnotationsSegments):
         # when moving, do not find brightest
         anchor = self.nearestAnchor(segmentId, Point(x, y, z))
 
-        logger.info(f'segmentId:{segmentId} anchor:{anchor}')
+        # logger.info(f'segmentId:{segmentId} anchor:{anchor}')
 
         self.updateSpine(spineId, Spine(
             anchorZ=int(anchor.z),
@@ -328,10 +355,17 @@ class AnnotationsInteractions(AnnotationsSegments):
         """        
         segmentId = self.newUnassignedSegmentId()
         
-        self.updateSegment(segmentId, Segment.withDefaults(
+        # abb
+        segmentId = int(segmentId)
+
+        _segment = Segment.withDefaults(
             segment=LineString([]),
             roughTracing=LineString([])
-        ))
+        )
+
+        # logger.info(f'segmentId:{segmentId} _segment:{_segment}')
+
+        self.updateSegment(segmentId, _segment)
 
         return segmentId
 
@@ -374,8 +408,22 @@ class AnnotationsInteractions(AnnotationsSegments):
             LineString: The updated rough tracing.
         """
 
+        # abb
+        # logger.info(f'segmentId:{segmentId} {type(segmentId)}')
+        # print('   self.segments:')
+        # # self.segments is mapmanagercore.annotations.single_time_point.base.SingleTimePointFrame
+        # print(self.segments)
+        
         roughTracing: Union[LineString,
                             Point] = self.segments[segmentId, "roughTracing"]
+        
+        # abb
+        # roughTracing is LINESTRING Z
+        if roughTracing is None:
+            logger.error(f'   segmentId:{segmentId} roughTracing IS NONE -->> ERROR')
+            logger.error('self.segments.index:')
+            print(self.segments.index)
+
         point = Point(x, y, z)
         first = len(roughTracing.coords) < 2 or point.distance(
             Point(roughTracing.coords[0])) < point.distance(Point(roughTracing.coords[-1]))
@@ -386,6 +434,7 @@ class AnnotationsInteractions(AnnotationsSegments):
             "segmentTracingMaxDistance")
 
         if maxTracingDistance is not None and point.distance(snappedPoint) > maxTracingDistance:
+            logger.warning(f'abb return None for maxTracingDistance:{maxTracingDistance}')
             return None
 
         if first:
@@ -411,9 +460,14 @@ class AnnotationsInteractions(AnnotationsSegments):
             roughTracing = [*roughTracing.coords, point.coords[0]]
             idx = len(roughTracing) - 1
 
+        # logger.info(f'idx:{idx} roughTracing:{roughTracing}')
+        
         self.updateSegmentWithLiveTracing(
             segmentId, roughTracing, idx)
-        return 0 if first else len(roughTracing) - 1
+        
+        theRet = 0 if first else len(roughTracing) - 1
+        # logger.info(f'theRet:{theRet}')
+        return theRet
 
     def moveSegmentPoint(self, segmentId: SegmentId, x: int, y: int, z: int, index: int, state: DragState = DragState.MANUAL) -> bool:
         """

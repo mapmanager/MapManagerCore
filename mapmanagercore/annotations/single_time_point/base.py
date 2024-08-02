@@ -32,6 +32,12 @@ class SingleTimePointFrame(LazyGeoFrame):
         else:
             self._root = copy(frame)
 
+        # abb
+        # if isinstance(frame, SingleTimePointFrame):
+        #     self._root = frame._root
+        # else:
+        #     self._root = frame
+
         self._currentVersion = -1
         self._t = t
         self._refreshIndex()
@@ -51,7 +57,7 @@ class SingleTimePointFrame(LazyGeoFrame):
             self._t, level=1, drop_level=False).index)
 
     @timer
-    def __getitem__(self, items: Any) -> Any:
+    def __getitem__v0(self, items: Any) -> Any:
         self._refreshIndex()
 
         result = self._root[items]
@@ -79,6 +85,81 @@ class SingleTimePointFrame(LazyGeoFrame):
 
         return result
 
+    #abj johnson version
+    @timer
+    def __getitem__(self, items: Any) -> Any:
+        """
+        Notes
+        -----
+        When called with [:], items = slice(None, None, None)
+        """
+
+        # print('')
+        # logger.info(f'=== SingleTimePointFrame items: {items}')
+        
+        self._refreshIndex()
+
+        result = self._root[items]
+
+        # logger.info(f'  at start result._root[items] is type {type(result)}')
+        # print(result)
+        
+        if isinstance(result, pd.DataFrame) or isinstance(result, gp.GeoDataFrame) or isinstance(result, pd.Series) or isinstance(result, gp.GeoSeries):
+            if result.index is not None and result.index.nlevels > 1:
+                #abj: only check Dataframes since Series/ gp.Series cause AttributeError: 'GeoSeries' object has no attribute 'set_index'
+                if result.empty and (isinstance(result, pd.DataFrame) or isinstance(result, gp.GeoDataFrame)):
+                # if result.empty:
+                    # this can only be called by a dataframe
+                    # logger.info(f'  (1) return result.set_index')
+                    return result.set_index(result.index.droplevel(1), inplace=False, drop=True)
+
+                #abj: fix for key error: 0
+                if not result.empty:
+                    # logger.info('  1.5) result = result.xs(self._t, level=1, drop_level=True)')
+                    result = result.xs(self._t, level=1, drop_level=True)
+
+        if isinstance(result, LazyGeoFrame):
+            # logger.info('  (2) return SingleTimePointFrame')
+            return SingleTimePointFrame(result, self._t)
+
+        # extract single values if index is precisely one row
+        if result.shape[0] <= 1 and (len(result.shape) == 1 or result.shape[1] <= 1):
+            # [logger.info](http://logger.info)(f"check 2 is instance type: {type(result)}")
+            row, _key = self._parseKeyRow(items)
+            if self._root._schema.isIndexType(row):
+                if result.empty:
+                    # logger.info('  (3) return NONE -->> ERROR')
+                    # logger.info(f'  row:{row}')
+                    # logger.info(f'  result: {type(result)}')
+                    # print(result)
+                    # logger.info(f'result.values: {type(result.values)}')
+                    # print(result.values)
+                    
+                    from shapely.geometry import LineString
+                    return LineString([])
+                    
+                    # abb was this
+                    # return None
+                
+                # logger.info('  (4) return result.values[0]')
+                # print(result.values[0])
+                
+                return result.values[0]
+
+        #abj
+        # error: empty spineLines returns series instead of geoseries
+        # force pd.series into geoseries
+        if isinstance(result, pd.Series) and len(result) == 0:
+            # logger.error('  (5) result = gp.GeoSeries(result)')
+            # logger.error(f'result:{result} {type(result)}')
+            result = gp.GeoSeries(result)
+
+        # abb never seems to get here???
+        # logger.info(f'  (6) final return result: {type(result)}')
+        # print(result)
+        
+        return result
+    
     @property
     def index(self):
         self._refreshIndex()
@@ -145,7 +226,16 @@ class _SingleTimePointAnnotationsBase:
     _t: int
 
     def __init__(self, annotations: Annotations, t: int):
+        # abb dug
+        # this is where we run into problems on add/update spine and segment
+        # when we add, we update self._annotations
+        # but then self.points and self.segments are not updated?
+        # they are another copy from SingleTimePointFrame
+
+        # was this
         self._annotations = copy(annotations)
+        # abb
+        # self._annotations = annotations
 
         self._segments = SingleTimePointFrame(
             self._annotations._segments, t)
@@ -153,34 +243,23 @@ class _SingleTimePointAnnotationsBase:
             self._annotations._points, t)
 
         self._t = t
-
-    def __str__(self):
-        logger.info('')
-        
-        # get the number of time points
-        numTimepoints = 'abb ???'
-        try:
-            numTimepoints = len(self._images._imagesSrcs.keys())
-        except (AttributeError) as e:
-            logger.error(e)
-
-        numPnts = len(self._annotations._points._rootDf)
-        numSegments = len(self._annotations._segments._rootDf)
-        return f't:{numTimepoints}, points:{numPnts} segments:{numSegments}'
     
     @property
     def points(self) -> LazyGeoFrame:
+        logger.warning('')
         return self._points
 
     @property
     def segments(self) -> LazyGeoFrame:
+        logger.warning('')
         return self._segments
 
-    # abb analysisparams
+    # abb
     @property
     def analysisParams(self) -> AnalysisParams:
         return self._annotations._analysisParams
 
+    # abb not used
     @property
     def timeSeries(self) -> Annotations:
         return self._annotations
@@ -191,6 +270,15 @@ Keys = Union[Key, list[Key]]
 
 
 class SingleTimePointAnnotationsBase(_SingleTimePointAnnotationsBase):
+
+    # abb
+    def __str__(self):        
+        numTimepoints = f'single timepoint ({self._t})'
+        numPnts = len(self.points)
+        numSegments = len(self.segments)
+                
+        return f't:{numTimepoints}, points:{numPnts} segments:{numSegments} images:{self.shape}'
+        
     def getPixels(self, channel: int, zRange: Tuple[int, int] = None, z: int = None, zSpread: int = 0) -> ImageSlice:
         """
         Loads the image data for a slice.
@@ -206,6 +294,7 @@ class SingleTimePointAnnotationsBase(_SingleTimePointAnnotationsBase):
         """
         return self._annotations.getPixels(self._t, channel, zRange, z, zSpread)
 
+    # abb
     def getAutoContrast_qt(self, channel: int) -> Tuple[int, int]:
         """Get the auto contrast from the entire image volume.
         
@@ -219,26 +308,48 @@ class SingleTimePointAnnotationsBase(_SingleTimePointAnnotationsBase):
     def shape(self):
         return self._annotations._images.shape(self._t)
 
+    # abb
+    @property
+    def numChannels(self) -> int:
+        """Get the number of image channels.
+        """
+        return self._annotations._images.shape(self._t)[0]
+
     def getShapePixels(self, shapes: gp.GeoDataFrame, channel: Union[int, List[int]] = 0, zSpread: int = 0, z: int = None) -> pd.Series:
         return self._annotations.getShapePixels(shapes, channel, zSpread, self._t, z=z)
 
     def _mapKeys(self, keys: Keys) -> Keys:
         if isinstance(keys, list):
-            return [(id, self._t) for id in keys]
+            _ret = [(id, self._t) for id in keys]
         else:
-            return (keys, self._t)
-
+            _ret = (keys, self._t)
+        # logger.warning(f'keys:{keys} is returning _ret:{_ret}')
+        return _ret
+    
     def deleteSpine(self, spineId: Keys, skipLog=False):
         return self._annotations.deleteSpine(self._mapKeys(spineId), skipLog)
+
+    def getNumSpines(self, segmentId: Keys):
+        return self._annotations.getNumSpines(self._mapKeys(segmentId))
 
     def deleteSegment(self, segmentId: Keys, skipLog=False):
         return self._annotations.deleteSegment(self._mapKeys(segmentId), skipLog)
 
     def updateSegment(self, segmentId: Keys, value: Segment, replaceLog=False, skipLog=False):
+        # logger.warning(f'segmentId:{segmentId} self._mapKeys(segmentId):{self._mapKeys(segmentId)}')
         return self._annotations.updateSegment(self._mapKeys(segmentId), value, replaceLog, skipLog)
 
     def updateSpine(self, spineId: Keys, value: Spine, replaceLog=False, skipLog=False):
-        return self._annotations.updateSpine(self._mapKeys(spineId), value, replaceLog, skipLog)
+        
+        _keys = self._mapKeys(spineId)
+
+        # if self._t in [1,2]:
+        #     logger.info(f'{self}')
+        #     logger.info(f'self._t:{self._t}')
+        #     logger.info(f'_keys:{_keys}')
+        #     logger.info(f'value:{value}')
+            
+        return self._annotations.updateSpine(_keys, value, replaceLog, skipLog)
 
     def connect(self, spineKey: SpineId, toSpineKey: Tuple[SpineId, int]):
         return self._annotations.connect((spineKey, self._t), toSpineKey)

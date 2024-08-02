@@ -16,6 +16,19 @@ class AnnotationsBaseMut(AnnotationsBase):
         """
         self._drop("Spine", spineId, skipLog=skipLog)
 
+    # abb
+    def getNumSpines(self, segmentId : Keys) -> int:
+        """Get number of spines on a segment.
+        
+        TODO: Too complicated
+        """
+        try:
+            _spines = self.points[["segmentID"]].reset_index().set_index(["segmentID", "t"]).loc[segmentId]
+            _numSpines = len(_spines)
+        except (KeyError) as e:
+            _numSpines = 0
+        return _numSpines
+    
     def deleteSegment(self, segmentId: Keys, skipLog=False):
         """
         Delete the segment with the given ID.
@@ -23,7 +36,7 @@ class AnnotationsBaseMut(AnnotationsBase):
         try:
             if not self.points[["segmentID"]].reset_index().set_index(["segmentID", "t"]).loc[segmentId].empty:
                 # abb
-                logger.info(f'Cannot delete segment(s) {segmentId} as it has an attached spine(s)')
+                logger.warning(f'Cannot delete segment(s) {segmentId} as it has an attached spine(s)')
                 return False
                 # raise ValueError(
                 #     f"Cannot delete segment(s) {segmentId} as it has an attached spine(s)")
@@ -99,12 +112,25 @@ class AnnotationsBaseMut(AnnotationsBase):
         # check if the key already exists in the time point
         existingKey = (toSegmentKey[0], segmentKey[1])
         if existingKey in self.segments.index:
+            logger.info(f'   calling disconnectSegment() for existingKey:{existingKey}')
             self.disconnectSegment(existingKey)
 
         # Propagate the segment ID to all future time points
-        self.updateSegment(slice(segmentKey, segmentKey[0]), Segment(
-            segmentID=toSegmentKey[0],
-        ))
+        # was this
+        _slice = slice(segmentKey, segmentKey[0])
+        # logger.info(f'   _slice:{(segmentKey, segmentKey[0])}')
+        # abb, this works for transient (1 tp) segments, does not get any other downstream
+        _slice = toSegmentKey  # ('bar',)
+
+        _segment = Segment(
+            # was this
+            # segmentID=toSegmentKey[0],
+            # abb
+            segmentID=segmentKey[0],
+        )
+        # logger.info(f'   _segment:{_segment}')
+
+        self.updateSegment(_slice, _segment)
 
     def disconnectSegment(self, segmentKey: Tuple[SegmentId, int]):
         newID = self.newUnassignedSegmentId()
