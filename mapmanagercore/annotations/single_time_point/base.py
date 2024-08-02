@@ -63,9 +63,15 @@ class SingleTimePointFrame(LazyGeoFrame):
         result = self._root[items]
         if isinstance(result, pd.DataFrame) or isinstance(result, gp.GeoDataFrame) or isinstance(result, pd.Series) or isinstance(result, gp.GeoSeries):
             if result.index is not None and result.index.nlevels > 1:
-                if result.empty:
+                #abj: only check Dataframes since Series/ gp.Series due to AttributeError: 'GeoSeries' object has no attribute 'set_index'
+                if result.empty and (isinstance(result, pd.DataFrame) or isinstance(result, gp.GeoDataFrame)):        
+                # if result.empty:
+                    # this can only be called by a dataframe
                     return result.set_index(result.index.droplevel(1), inplace=False, drop=True)
-                result = result.xs(self._t, level=1, drop_level=True)
+
+                #abj
+                if not result.empty:
+                    result = result.xs(self._t, level=1, drop_level=True)
 
         if isinstance(result, LazyGeoFrame):
             return SingleTimePointFrame(result, self._t)
@@ -124,7 +130,7 @@ class SingleTimePointFrame(LazyGeoFrame):
 
         # extract single values if index is precisely one row
         if result.shape[0] <= 1 and (len(result.shape) == 1 or result.shape[1] <= 1):
-            # [logger.info](http://logger.info)(f"check 2 is instance type: {type(result)}")
+            # logger.info(f"check 2 is instance type: {type(result)}")
             row, _key = self._parseKeyRow(items)
             if self._root._schema.isIndexType(row):
                 if result.empty:

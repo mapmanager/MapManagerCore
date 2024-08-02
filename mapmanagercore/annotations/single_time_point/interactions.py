@@ -44,6 +44,7 @@ class AnnotationsInteractions(AnnotationsSegments):
             Point: The nearest anchor point.
         """            
         segment: LineString = self.segments[segmentID, "segment"]
+
         # find the closest point on the segment to the `point`
         minProjection = segment.project(point)
         
@@ -86,6 +87,30 @@ class AnnotationsInteractions(AnnotationsSegments):
         brightest = (pixels.apply(np.median) / targets.length).idxmax()
 
         return Point(targets[brightest].coords[1])
+    
+    #abj
+    def autoConnectBrightestIndex(self, spineId: SpineId,
+                      segmentID: SegmentId,
+                      point: Point,
+                      findBrightest : bool = True,
+                      ):
+        """ Calculates nearest (brightest) anchor and sets it
+
+        Args:
+            segmentID (SegmentId): The ID of the line segment.
+            point (Point): The point to find the nearest anchor to.
+
+
+        """  
+        anchor = self.nearestAnchor(segmentID, point, findBrightest)
+
+        self.updateSpine(spineId, Spine(
+            #TODO: update spine Line?
+            anchorZ=int(anchor.z),
+            anchor=Point(anchor.x, anchor.y),
+        ), replaceLog=True)
+
+        return True
 
     def snapBackgroundOffset(self, spineId: SpineId,
                              channel: int = None,
@@ -126,7 +151,7 @@ class AnnotationsInteractions(AnnotationsSegments):
             yBackgroundOffset=offset["y"],
         ), replaceLog=True)
 
-    def addSpine(self, segmentId: SpineId, x: int, y: int, z: int) -> Union[SpineId, None]:
+    def addSpine(self, segmentId: SegmentId, x: int, y: int, z: int) -> Union[SpineId, None]:
         """
         Adds a spine.
 
@@ -275,8 +300,9 @@ class AnnotationsInteractions(AnnotationsSegments):
             x, y]
 
         return True
-
-    def moveRoiExtend(self, spineId: SpineId, x: int, y: int, z: int = 0, state: DragState = DragState.MANUAL) -> bool:
+    
+    def moveRoiExtend(self, spineId: SpineId, x: int, y: int, z: int = 0, 
+                      state: DragState = DragState.MANUAL, roiExtend: int = None) -> bool:
         """
         Move the ROI extend for a given spine ID.
 
@@ -285,6 +311,8 @@ class AnnotationsInteractions(AnnotationsSegments):
             x (int): The x-coordinate of the cursor.
             y (int): The y-coordinate of the cursor.
             state (DragState): The state of the translation.
+            roiExtend (int): updates roiExtend for Spine if given a value (#abj)
+                - used to standardize the roiExtend of a point across multiple time points
 
         returns:
             bool: True if the ROI extend was successfully translated, False otherwise.
@@ -292,9 +320,14 @@ class AnnotationsInteractions(AnnotationsSegments):
 
         point = self.points[spineId, "point"]
 
-        self.updateSpine(spineId, Spine(
-            roiExtend=float(point.distance(Point(x, y)))
-        ), state != DragState.START and state != DragState.MANUAL)
+        if roiExtend is None:
+            self.updateSpine(spineId, Spine(
+                roiExtend=float(point.distance(Point(x, y)))
+            ), state != DragState.START and state != DragState.MANUAL)
+        else: #abj
+            self.updateSpine(spineId, Spine(
+                roiExtend=float(roiExtend)
+            ), state != DragState.START and state != DragState.MANUAL)
 
         return True
 
