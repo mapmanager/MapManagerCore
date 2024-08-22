@@ -19,8 +19,6 @@ from plotly.express.colors import sample_colorscale
 import geopandas as gp
 
 from mapmanagercore.analysis_params import AnalysisParams
-
-from mapmanagercore.analysis_params import AnalysisParams
 from mapmanagercore.logger import logger
 
 class AnnotationsBase(LazyImagesGeoPandas):
@@ -298,7 +296,8 @@ class AnnotationsBase(LazyImagesGeoPandas):
 
         # abb analysisparams
         _analysisParams_json = loader.group.attrs['analysisParams']  # json str
-        analysisParams = AnalysisParams(loadJson=_analysisParams_json)
+        # abj added path argument
+        analysisParams = AnalysisParams(loadJson=_analysisParams_json, path = path)
 
         return cls(loader, lineSegments, points, analysisParams)
 
@@ -307,7 +306,7 @@ class AnnotationsBase(LazyImagesGeoPandas):
             path += ".mmap"
 
         #abj - dont save if path is empty
-        if path ==".mmap":
+        if path == ".mmap":
             return
         
         with warnings.catch_warnings():

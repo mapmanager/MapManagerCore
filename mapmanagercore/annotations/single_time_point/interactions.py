@@ -105,7 +105,6 @@ class AnnotationsInteractions(AnnotationsSegments):
         anchor = self.nearestAnchor(segmentID, point, findBrightest)
 
         self.updateSpine(spineId, Spine(
-            #TODO: update spine Line?
             anchorZ=int(anchor.z),
             anchor=Point(anchor.x, anchor.y),
         ), replaceLog=True)
@@ -126,8 +125,12 @@ class AnnotationsInteractions(AnnotationsSegments):
         z = self.points[spineId, "z"]
 
         # create a grid of points to search for the best offset
+        points = self.analysisParams.getValue('backgroundROIGridPoint')
+        overlap = self.analysisParams.getValue('backgroundROIGridOverlap')
+
         try:
-            grid = shapeGrid(roi, points=3, overlap=0.1)
+            grid = shapeGrid(roi, points=points, overlap=overlap) # abj
+            # grid = shapeGrid(roi, points=3, overlap=0.1)
         except (ValueError) as e:
             logger.error(f'   {e}')
             logger.error(f'   spineId:{spineId}')
@@ -186,6 +189,8 @@ class AnnotationsInteractions(AnnotationsSegments):
             anchorZ=int(anchor.z),
             xBackgroundOffset=0.0,
             yBackgroundOffset=0.0,
+            roiExtend = self.analysisParams.getValue("roiExtend"),
+            roiRadius = self.analysisParams.getValue("roiRadius")
         )
         self.updateSpine(spineId, _spine)
 
@@ -397,13 +402,8 @@ class AnnotationsInteractions(AnnotationsSegments):
         _segment = Segment.withDefaults(
             segment=LineString([]),
             roughTracing=LineString([]),
-            leftRadiusLine=LineString([]),
-            rightRadiusLine=LineString([])
-        )
-
-        # logger.info(f'segmentId:{segmentId} _segment:{_segment}')
-
-        self.updateSegment(segmentId, _segment)
+            radius = self.analysisParams.getValue("segmentRadius")
+        ))
 
         return segmentId
 
