@@ -1,4 +1,6 @@
 from typing import Tuple, Union
+from shapely.geometry import Point
+
 from ..schemas import Spine, Segment
 from ..config import SegmentId, SpineId
 from .base import AnnotationsBase
@@ -10,6 +12,7 @@ Keys = Union[Key, list[Key]]
 
 
 class AnnotationsBaseMut(AnnotationsBase):
+    
     def deleteSpine(self, spineId: Keys, skipLog=False):
         """
         Delete the spine with the given ID.
@@ -81,21 +84,45 @@ class AnnotationsBaseMut(AnnotationsBase):
         
         # ValueError: Can only compare identically-labeled Series objects
         # if self.points[toSpineKey, "segmentID"] != self.points[spineKey, "segmentID"]:
-        _segmentID = self.points[spineKey, "segmentID"].values[0]
-        _toSegmentID = self.points[toSpineKey, "segmentID"].values[0]
+        
+        _segmentID = self.points[spineKey, "segmentID"]
+        # abb was this
+        # _segmentID = self.points[spineKey, "segmentID"].values[0]
+        
+        _toSegmentID = self.points[toSpineKey, "segmentID"]
+        # abb was this
+        # _toSegmentID = self.points[toSpineKey, "segmentID"].values[0]
+        
+        # logger.info(f'_segmentID:{_segmentID} _toSegmentID:{_toSegmentID}')
+
         if _toSegmentID != _segmentID:
-            raise ValueError("Cannot connect spines from different segments.")
+            # raise ValueError("Cannot connect spines from different segments.")
+            logger.warning(f'Cannot connect spines from different segments. Got segments {_segmentID} and {_toSegmentID}')
+            return False
         
         # check if the key already exists in the time point
-        existingKey = (toSpineKey[0], spineKey[1])
+        existingKey = (spineKey[0], toSpineKey[1])
+        #existingKey = (toSpineKey[0], spineKey[1])
         if existingKey in self.points.index:
+            logger.info(f'disconnecting existingKey:{existingKey}')
             self.disconnect(existingKey)
 
         # Propagate the spine ID to all future time points
-        self.updateSpine(slice(spineKey, spineKey[0]), Spine(
-            spineID=toSpineKey[0],
-        ))
+        # _slice = slice(spineKey, spineKey[0])
+        _slice = toSpineKey  # this will not get toSpineKEy[0] at future timepoints
 
+        _spine = Spine(
+            # spineID=toSpineKey[0],
+            spineID=spineKey[0],
+        )
+        
+        # logger.info(f'   _slice:{_slice}')
+        # logger.info(f'   _spine:{_spine}')
+        
+        self.updateSpine(_slice, _spine)
+
+        return True
+    
     def disconnect(self, spineKey: Tuple[SpineId, int]):
         newID = self.newUnassignedSpineId()
 
@@ -117,7 +144,7 @@ class AnnotationsBaseMut(AnnotationsBase):
 
         # Propagate the segment ID to all future time points
         # was this
-        _slice = slice(segmentKey, segmentKey[0])
+        # _slice = slice(segmentKey, segmentKey[0])
         # logger.info(f'   _slice:{(segmentKey, segmentKey[0])}')
         # abb, this works for transient (1 tp) segments, does not get any other downstream
         _slice = toSegmentKey  # ('bar',)
@@ -131,6 +158,19 @@ class AnnotationsBaseMut(AnnotationsBase):
         # logger.info(f'   _segment:{_segment}')
 
         self.updateSegment(_slice, _segment)
+
+        spineRows = self.points[ self.points['segmentID'] == toSegmentKey[0]].index
+        _spine = Spine(
+            segmentID=segmentKey[0],
+        )
+
+        # logger.warning(f'todo: update all SPINES with segmentID:{toSegmentKey} to {segmentKey}')
+        # print('spineRows:')
+        # print(spineRows)
+        # print('_spine')
+        # print(_spine)
+
+        self.updateSpine(spineRows, _spine)
 
     def disconnectSegment(self, segmentKey: Tuple[SegmentId, int]):
         newID = self.newUnassignedSegmentId()

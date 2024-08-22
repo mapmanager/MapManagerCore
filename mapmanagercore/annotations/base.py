@@ -1,7 +1,7 @@
 import os
 from copy import copy
 from io import BytesIO
-from typing import Any, Tuple, Union
+from typing import Any, Tuple, Union, Optional
 import zipfile
 import numpy as np
 import pandas as pd
@@ -47,6 +47,12 @@ class AnnotationsBase(LazyImagesGeoPandas):
 
         self._segments = LazyGeoFrame(
             Segment, data=lineSegments, store=self)
+        
+        # logger.warning(f'base.py AnnotationsBase is making points from: {type(points)}')
+        # print(points.columns)
+        # print('points is:')
+        # print(points)
+
         self._points = LazyGeoFrame(Spine, data=points, store=self)
 
         self.loader = loader
@@ -54,6 +60,21 @@ class AnnotationsBase(LazyImagesGeoPandas):
     # abb
     def getNumTimepoints(self):
         return len(self._images.timePoints())
+
+    # abb
+    def getPointDataFrame(self, t : Optional[int] = None) -> pd.DataFrame:
+        """Get the full points dataframe.
+        """
+        pointsDf = self.points[:]
+        
+        if t is not None:
+
+            # move (,t) index into a column
+            pointsDf = pointsDf.reset_index(level=1)
+            # reduce my t==t
+            pointsDf = pointsDf[ pointsDf['t']==t ]
+        
+        return pointsDf
     
     # abb
     def __str__(self):
@@ -88,6 +109,8 @@ class AnnotationsBase(LazyImagesGeoPandas):
         """
         Filters the points.
         """
+        logger.error(f'filter:{filter} {type(filter)}')
+        
         c = copy(self)
         c._points = c._points[filter]
         return c
@@ -253,10 +276,22 @@ class AnnotationsBase(LazyImagesGeoPandas):
         return _errors == 0
     
     @classmethod
-    def load(cls, path: str, lazy=False):
+    def load(cls, path: str, lazy=False, version:int=0):
+        """
+        Parameters
+        ----------
+        version : int
+            Verion to load, 0 (default) is original
+        """
+        logger.info(f'lazy:{lazy} path:{path}')
+
         loader = ZarrLoader(path, lazy=lazy)
+        
+        # logger.info(f'abb tweaking load/save version:{version}')
+    
         points = pd.read_pickle(BytesIO(loader.group["points"][:].tobytes()))
         points = gp.GeoDataFrame(points, geometry="point")
+        
         lineSegments = pd.read_pickle(
             BytesIO(loader.group["lineSegments"][:].tobytes()))
         lineSegments = gp.GeoDataFrame(lineSegments, geometry="segment")
@@ -267,7 +302,7 @@ class AnnotationsBase(LazyImagesGeoPandas):
 
         return cls(loader, lineSegments, points, analysisParams)
 
-    def save(self, path: str, compression=zipfile.ZIP_STORED):
+    def save(self, path: str, compression=zipfile.ZIP_STORED, version:int=0):
         if not path.endswith(".mmap"):
             path += ".mmap"
 
@@ -279,6 +314,7 @@ class AnnotationsBase(LazyImagesGeoPandas):
             warnings.simplefilter("ignore")
 
             logger.info(f'saving to {path}')
+            
             fileExists = os.path.isdir(path)
             # fs = zarr.ZipStore(path, mode="w", compression=compression)
             fs = zarr.DirectoryStore(path)
@@ -286,12 +322,15 @@ class AnnotationsBase(LazyImagesGeoPandas):
                 group = zarr.group(store=store)
                 if not fileExists:
                     self._images.saveTo(group)
-          
-                # TODO: Check if dirty
-                group.create_dataset(
-                    "points", overwrite = True, data=self.points.toBytes(), dtype=np.uint8)
-                group.create_dataset(
+        
+                # self.points : LazyGeoFrame
+                _dPoints = group.create_dataset(
+                        "points", overwrite = True, data=self.points.toBytes(), dtype=np.uint8)
+                
+                # self.segments : LazyGeoFrame
+                _dSegment = group.create_dataset(
                     "lineSegments", overwrite = True, data=self.segments.toBytes(), dtype=np.uint8)
+
                 group.attrs["version"] = 1
 
                 # abb analysisparams

@@ -8,6 +8,8 @@ import geopandas as gp
 from shapely.geometry import LineString, MultiPolygon, Polygon, Point
 from ..lazy_geo_pd_images import aggregateROI
 
+from mapmanagercore.logger import logger
+
 @schema(
     index=["spineID", "t"],
     relationships={
@@ -158,12 +160,10 @@ class Spine:
             segmentFrame[["segment"]], on=["segmentID", "t"])
         return shapely.line_locate_point(df["segment"], df["anchor"])
 
-    # abb working on this ???
     # abj
     @compute(title="Spine Side", dependencies=
              {
-                # "Spine": ["segmentID", "point"],
-                "Spine": ["point"],
+                "Spine": ["segmentID", "point"],
                 "Segment": ["segment"]
             }, description="Side of spine w.r.t. segment in ('left', 'right')", plot=False)
     def spineSide(frame: LazyGeoFrame):
@@ -171,7 +171,21 @@ class Spine:
         segmentFrame = frame.getFrame("Segment")
         df = frame[["segmentID", "point"]].join(
             segmentFrame[["segment"]], on=["segmentID", "t"])
-        return df.apply(lambda d: getSpineSide(d["segment"], d["point"]), axis=1)
+        # abb
+        # logger.error('df.apply on df as:')
+        # print(df)
+
+        try:
+            _ret = df.apply(lambda d: getSpineSide(d["segment"], d["point"]), axis=1)
+        except(AttributeError) as e:
+            # fixed in getSpineSide when line segment is None
+            logger.error(e)
+            print('   segmentFrame is:')
+            print(segmentFrame)
+            print('   df is:')
+            print(df)
+
+        return _ret
 
     @compute(title="Anchor", dependencies=["anchor", "point"], plot=False)
     @timer

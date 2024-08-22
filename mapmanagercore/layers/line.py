@@ -11,6 +11,8 @@ from ..benchmark import timer
 import math
 from math import pi as PI
 
+from mapmanagercore.logger import logger
+
 class MultiLineLayer(Layer):
     @Layer.setProperty
     def offset(self, offset: Union[int, Callable[[int], int]]) -> Self:
@@ -131,6 +133,16 @@ def getSpineSide(line: LineString, spine: Point):
         Line: segment in the for of a LineString
         Spine: point
     """
+
+    # logger.warning(f'line')
+    # print(line)
+    # logger.warning(f'spine')
+    # print(spine)
+
+    if line is None:
+        # logger.error(f'got None line for spine: {spine}')
+        return
+        
     first = Point(line.coords[0])
     last = Point(line.coords[-1])
     val = getSide(first, last, spine)
@@ -195,7 +207,7 @@ def pushLine(segment, lines):
     lines.append(segment)
 
 
-def clipLines(series: gp.GeoSeries, zRange: Tuple[int, int]):
+def clipLines(series: gp.GeoSeries, zRange: Tuple[int, int]) -> gp.GeoSeries:
     # TODO: vectorized
     return series.apply(clipLine, zRange=zRange)
 

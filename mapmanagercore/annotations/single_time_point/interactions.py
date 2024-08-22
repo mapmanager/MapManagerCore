@@ -130,10 +130,12 @@ class AnnotationsInteractions(AnnotationsSegments):
             grid = shapeGrid(roi, points=3, overlap=0.1)
         except (ValueError) as e:
             logger.error(f'   {e}')
+            logger.error(f'   spineId:{spineId}')
             logger.error(f'   roi:{roi}')
             print('   self.points[:]')
             print(self.points[:])
-
+            return
+        
         # translate the roi by the grid points
         candidates = gp.GeoSeries(grid.apply(
             lambda x: shapely.affinity.translate(roi, x["x"], x["y"]), axis=1))
@@ -195,6 +197,7 @@ class AnnotationsInteractions(AnnotationsSegments):
 
         # logger.error(f'4 FutureWarning: The `drop` keyword ...')
         # abb 20240730 was causing exceptions
+        
         # moving into PyMapManager so we can refresh with getTimePoint()
         # self.snapBackgroundOffset(spineId)
 
@@ -393,7 +396,9 @@ class AnnotationsInteractions(AnnotationsSegments):
 
         _segment = Segment.withDefaults(
             segment=LineString([]),
-            roughTracing=LineString([])
+            roughTracing=LineString([]),
+            leftRadiusLine=LineString([]),
+            rightRadiusLine=LineString([])
         )
 
         # logger.info(f'segmentId:{segmentId} _segment:{_segment}')

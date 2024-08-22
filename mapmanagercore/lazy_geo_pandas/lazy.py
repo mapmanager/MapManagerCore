@@ -300,6 +300,10 @@ class LazyGeoFrame(Generic[T]):
         self._rootDf = schema.setColumnTypes(data)
         store.addSchema(self)
 
+    def __str__(self):
+        _ret = str(self._rootDf)
+        return _ret
+    
     def _updateColumns(self):
         """Updates the columns by collecting all the non-index columns from the scheme."""
         self._columns = []
@@ -589,7 +593,7 @@ class LazyGeoFrame(Generic[T]):
                     storeClone._setFilterIndex(store._df.loc[ids].index)
                     storeClone._insureComputed(deps)
                 logger.debug(
-                    f"Computing column {column} for {len(invalidClone)}")
+                    f"Computing column {column} for num invalid: {len(invalidClone)}")
                 results = attribute["_func"](invalidClone)
 
                 missingIndex = invalidClone._df.index
@@ -636,9 +640,17 @@ class LazyGeoFrame(Generic[T]):
 
         return invalidate
 
-    def toBytes(self):
-        return toBytes(self._rootDf)
+    def toBytes(self, version:int=0):
 
+        #retBytes = toBytes(self._rootDf)
+
+        """Converts a GeoPandas DataFrame to bytes."""
+        buffer = io.BytesIO()
+        self._rootDf.to_pickle(buffer)
+        retBytes = np.frombuffer(buffer.getvalue(), dtype=np.uint8)
+
+        # return toBytes(self._rootDf)
+        return retBytes
 
 class LazyGeoSeries(LazyGeoFrame[T]):
     def __init__(self, schema: Schema, data: gp.GeoSeries = None, store: T = SOURCE):

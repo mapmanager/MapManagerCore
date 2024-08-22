@@ -26,9 +26,21 @@ from ..lazy_geo_pandas import schema
             "description": "Rough tracing of the spine",
             "plot": False
         },
+        # abb adding left/right radius line to backend
+        "leftRadiusLine": {
+            "title": "Left Radius",
+            "description": "Left radius line",
+            "plot": False
+        },
+        "rightRadiusLine": {
+            "title": "Right Radius",
+            "description": "Right radius line",
+            "plot": False
+        },
+
         "radius": {
             "title": "Radius",
-            "description": "Radius of the segment"
+            "description": "Radius of the segment (points)"
         },
         "modified": {
             "title": "Modified",
@@ -46,5 +58,10 @@ class Segment:
 
     segment: LineString
     roughTracing: Union[LineString, Point]
+
+    # abb
+    leftRadiusLine: LineString
+    rightRadiusLine: LineString
+
     radius: float = 4
     modified: np.datetime64

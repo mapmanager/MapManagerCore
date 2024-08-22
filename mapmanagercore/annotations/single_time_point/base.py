@@ -27,9 +27,23 @@ from mapmanagercore.logger import logger
 
 class SingleTimePointFrame(LazyGeoFrame):
     def __init__(self, frame: LazyGeoFrame, t: int):
+        
+        # frame does not have any computed values (columns)
+        # 
+        # logger.warning(f'SingleTimePointFrame constructor from frame: {type(frame)}')
+        # # abb no __str__ rep for LazyGeoFrame
+        # logger.warning(f'frame is: {frame}')
+        # print('frame._rootDf is:')
+        # print(frame._rootDf.columns)
+
         if isinstance(frame, SingleTimePointFrame):
+            logger.warning('CONSTRUCTING FROM SingleTimePointFrame')
             self._root = copy(frame._root)
         else:
+            # why is this getting called so much???
+            # logger.warning('NOT CONSTRUCTING FROM SingleTimePointFrame')
+            # print('   frame:', type(frame))
+            # frame: mapmanagercore.lazy_geo_pandas.lazy.LazyGeoFrame
             self._root = copy(frame)
 
         # abb
@@ -74,6 +88,7 @@ class SingleTimePointFrame(LazyGeoFrame):
                     result = result.xs(self._t, level=1, drop_level=True)
 
         if isinstance(result, LazyGeoFrame):
+            # logger.info('  (2) return SingleTimePointFrame')
             return SingleTimePointFrame(result, self._t)
 
         # extract single values if index is precisely one row
@@ -101,7 +116,7 @@ class SingleTimePointFrame(LazyGeoFrame):
         """
 
         # print('')
-        # logger.info(f'=== SingleTimePointFrame items: {items}')
+        # logger.info(f'=== abj version SingleTimePointFrame base.py items: {items}')
         
         self._refreshIndex()
 
@@ -125,7 +140,10 @@ class SingleTimePointFrame(LazyGeoFrame):
                     result = result.xs(self._t, level=1, drop_level=True)
 
         if isinstance(result, LazyGeoFrame):
-            # logger.info('  (2) return SingleTimePointFrame')
+            logger.info('  (2) return SingleTimePointFrame')
+            print('self._t:', self._t, type(self._t))
+            print('result:', result)
+
             return SingleTimePointFrame(result, self._t)
 
         # extract single values if index is precisely one row
@@ -252,12 +270,12 @@ class _SingleTimePointAnnotationsBase:
     
     @property
     def points(self) -> LazyGeoFrame:
-        logger.warning('')
+        # logger.warning('')
         return self._points
 
     @property
     def segments(self) -> LazyGeoFrame:
-        logger.warning('')
+        # logger.warning('')
         return self._segments
 
     # abb
@@ -347,7 +365,7 @@ class SingleTimePointAnnotationsBase(_SingleTimePointAnnotationsBase):
 
     def updateSpine(self, spineId: Keys, value: Spine, replaceLog=False, skipLog=False):
         
-        _keys = self._mapKeys(spineId)
+        _keys = self._mapKeys(spineId)  # yields (spineID, self._t)
 
         # if self._t in [1,2]:
         #     logger.info(f'{self}')
