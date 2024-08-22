@@ -1,4 +1,7 @@
 import numpy as np
+# from mapmanagercore.analysis_params import AnalysisParams
+# from mapmanagercore.annotations.base import getAnalysisParams
+from mapmanagercore.logger import logger
 from mapmanagercore.benchmark import timer
 from mapmanagercore.utils import union
 from ..layers.line import calcSubLine, extend, getSpineSide, getSpineAngle
@@ -112,14 +115,15 @@ class Spine:
     anchorZ: int
     modified: np.datetime64
 
-    roiExtend: float = 4.0
-    roiRadius: float = 4.0
+    roiExtend: float 
+    roiRadius: float
+
     note: str = ""
     userType: int = 0
     accept: bool = True
 
     # Computed columns
-
+    
     @compute(title="X", dependencies=["point"], group="Coordinate")
     @timer
     def x(frame: LazyGeoFrame):
@@ -185,7 +189,7 @@ class Spine:
         df = frame[["segmentID", "point", "anchorLine"]].join(
             segmentFrame[["segment"]], on=["segmentID", "t"])
 
-        # # Create a dataframe of
+        # Create a dataframe of
         return df.apply(lambda d: getSpineAngle(d["anchorLine"]), axis=1)
 
     @compute(tile="ROI Base", dependencies={
@@ -214,7 +218,7 @@ class Spine:
     def roiHead(frame: LazyGeoFrame) -> gp.GeoSeries:
         def computeRoiHead(x):
             head = extend(LineString([x["anchor"], x["point"]]), origin=x["anchor"],
-                          distance=x["roiExtend"]).buffer(x["roiRadius"], cap_style=2)
+                        distance=x["roiExtend"]).buffer(x["roiRadius"], cap_style=2)
             head = head.difference(x["roiBase"])
             if isinstance(head, MultiPolygon):
                 for poly in head.geoms:

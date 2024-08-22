@@ -1,7 +1,12 @@
 from typing import Union
 from shapely.geometry import LineString, Point
 import numpy as np
-from ..lazy_geo_pandas import schema
+import geopandas as gpd
+from mapmanagercore.logger import logger
+from mapmanagercore.layers.line import calculateSegmentOffset
+
+from ..lazy_geo_pandas import schema, compute, LazyGeoFrame
+# from ..lazy_geo_pandas import schema
 
 
 @schema(
@@ -45,5 +50,33 @@ class Segment:
 
     segment: LineString
     roughTracing: Union[LineString, Point]
-    radius: float = 4
+
+    radius: float
     modified: np.datetime64
+
+    # abj
+    @compute(title="Left Radius", dependencies=["segment", "radius"])
+    def leftRadius(frame: LazyGeoFrame):
+        df = frame[["segment", "radius"]]
+        df["z"] = (df['segment'].apply(lambda geom: [coord[2] for coord in geom.coords]))  
+        offsettedSegment = df.apply(lambda d: calculateSegmentOffset(d["segment"], d["radius"], isPositive=False), axis=1)
+        df["x"] = (offsettedSegment.apply(lambda geom: [coord[0] for coord in geom.coords]))
+        df["y"] = (offsettedSegment.apply(lambda geom: [coord[1] for coord in geom.coords]))
+        newDF = gpd.GeoSeries(df[["x", "y", "z"]].apply(lambda ldf: LineString(Point(ldf["x"][i], ldf["y"][i], ldf["z"][i]) 
+                                                                               for i, val in enumerate(ldf["x"])), axis=1))
+
+        logger.info(f"newDF {newDF}")
+        return newDF
+    
+    @compute(title="Right Radius", dependencies=["segment", "radius"])
+    def rightRadius(frame: LazyGeoFrame):
+        df = frame[["segment", "radius"]]
+        df["z"] = (df['segment'].apply(lambda geom: [coord[2] for coord in geom.coords]))
+        offsettedSegment = df.apply(lambda d: calculateSegmentOffset(d["segment"], d["radius"], isPositive=True), axis=1)
+        df["x"] = (offsettedSegment.apply(lambda geom: [coord[0] for coord in geom.coords]))
+        df["y"] = (offsettedSegment.apply(lambda geom: [coord[1] for coord in geom.coords]))
+        newRightRadiusDF = gpd.GeoSeries(df[["x", "y", "z"]].apply(lambda ldf: LineString(Point(ldf["x"][i], ldf["y"][i], ldf["z"][i]) 
+                                                                               for i, val in enumerate(ldf["x"])), axis=1))
+        return newRightRadiusDF
+
+

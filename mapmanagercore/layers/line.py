@@ -1,6 +1,7 @@
 from typing import Callable, Self, Tuple, Union
 import numpy as np
 from mapmanagercore.utils import count_coordinates
+from mapmanagercore.logger import logger
 from ..layers.point import PointLayer
 from .layer import Layer
 from shapely.geometry import LineString, MultiLineString, Point, Polygon
@@ -173,13 +174,25 @@ def getSpineAngle(spineLine: LineString):
     # print("degree:", angle_deg)
     return angle_deg
 
+# abj
+@timer
+def calculateSegmentOffset(segmentLine: LineString, radiusOffset : int, isPositive: bool):
+    # radiusOffset = segmentRadius
+    if isPositive:
+        offsetSign = 1
+    else: 
+        offsetSign = -1
+    offsettedSegment = shapely.offset_curve(segmentLine, distance = radiusOffset * offsetSign, 
+                                            join_style = "mitre", mitre_limit = 10)
+          
+    return offsettedSegment
+
 @timer
 def calcSubLine(line: LineLayer, origin: Point, distance: int):
     root = line.project(origin)
     sub = substring(line, start_dist=max(
         root - distance, 0), end_dist=root + distance)
     return sub
-
 
 @timer
 def extend(x: LineString, origin: Point, distance: float) -> Polygon:

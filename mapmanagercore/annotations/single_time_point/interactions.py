@@ -102,7 +102,6 @@ class AnnotationsInteractions(AnnotationsSegments):
         anchor = self.nearestAnchor(segmentID, point, findBrightest)
 
         self.updateSpine(spineId, Spine(
-            #TODO: update spine Line?
             anchorZ=int(anchor.z),
             anchor=Point(anchor.x, anchor.y),
         ), replaceLog=True)
@@ -123,7 +122,9 @@ class AnnotationsInteractions(AnnotationsSegments):
         z = self.points[spineId, "z"]
 
         # create a grid of points to search for the best offset
-        grid = shapeGrid(roi, points=5, overlap=0.1) # abj
+        points = self.analysisParams.getValue('backgroundROIGridPoint')
+        overlap = self.analysisParams.getValue('backgroundROIGridOverlap')
+        grid = shapeGrid(roi, points=points, overlap=overlap) # abj
         # grid = shapeGrid(roi, points=3, overlap=0.1)
 
         # translate the roi by the grid points
@@ -167,10 +168,12 @@ class AnnotationsInteractions(AnnotationsSegments):
             anchorZ=int(anchor.z),
             xBackgroundOffset=0.0,
             yBackgroundOffset=0.0,
+            roiExtend = self.analysisParams.getValue("roiExtend"),
+            roiRadius = self.analysisParams.getValue("roiRadius")
         ))
 
         logger.error(f'4 FutureWarning: The `drop` keyword ...')
-        self.snapBackgroundOffset(spineId)
+        # self.snapBackgroundOffset(spineId)
 
         return spineId
 
@@ -364,7 +367,8 @@ class AnnotationsInteractions(AnnotationsSegments):
         
         self.updateSegment(segmentId, Segment.withDefaults(
             segment=LineString([]),
-            roughTracing=LineString([])
+            roughTracing=LineString([]),
+            radius = self.analysisParams.getValue("segmentRadius")
         ))
 
         return segmentId

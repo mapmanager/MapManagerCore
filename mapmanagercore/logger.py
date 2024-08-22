@@ -51,7 +51,7 @@ def getLoggerFilePath():
     -----
     Mac: /Users/cudmore/Library/Application Support/MapManager
     Linux: /share/MapManager
-    Windows: 
+    Windows: /Users/johns/AppData/Local/MapManager
     """
     appName = 'MapManager'
     try:
