@@ -16,6 +16,7 @@ class AnalysisParams():
         self.__version__ = 0.3  # segmentTracingMaxDistance
         self.__version__ = 0.4 # abj: added saving and loading
         self.__version__ = 0.5 # abj: adding types and background calculations: Points, Overlap
+        # self.__version__ = 0.6 # 20240823 adding type???
 
         if loadJson is not None:
             self._dict = json.loads(loadJson)
@@ -103,7 +104,8 @@ class AnalysisParams():
             'segmentTracingMaxDistance': {
                 'defaultValue': 90,  # abb was 20
                 'currentValue': 90,
-                'description': 'Max distance to trace a brightest path with relatively low performance cost.'
+                'description': 'Max distance to trace a brightest path with relatively low performance cost.',
+                'type' : "int"
             },
 
             'backgroundRoiGridPoints': {

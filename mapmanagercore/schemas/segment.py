@@ -32,16 +32,16 @@ from ..lazy_geo_pandas import schema, compute, LazyGeoFrame
             "plot": False
         },
         # abb adding left/right radius line to backend
-        "leftRadiusLine": {
-            "title": "Left Radius",
-            "description": "Left radius line",
-            "plot": False
-        },
-        "rightRadiusLine": {
-            "title": "Right Radius",
-            "description": "Right radius line",
-            "plot": False
-        },
+        # "leftRadiusLine": {
+        #     "title": "Left Radius",
+        #     "description": "Left radius line",
+        #     "plot": False
+        # },
+        # "rightRadiusLine": {
+        #     "title": "Right Radius",
+        #     "description": "Right radius line",
+        #     "plot": False
+        # },
 
         "radius": {
             "title": "Radius",

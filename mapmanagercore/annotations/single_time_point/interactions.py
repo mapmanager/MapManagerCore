@@ -403,7 +403,7 @@ class AnnotationsInteractions(AnnotationsSegments):
             segment=LineString([]),
             roughTracing=LineString([]),
             radius = self.analysisParams.getValue("segmentRadius")
-        ))
+        )
 
         return segmentId
 
