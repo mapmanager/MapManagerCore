@@ -78,7 +78,7 @@ class Segment:
         newDF = gpd.GeoSeries(df[["x", "y", "z"]].apply(lambda ldf: LineString(Point(ldf["x"][i], ldf["y"][i], ldf["z"][i]) 
                                                                                for i, val in enumerate(ldf["x"])), axis=1))
 
-        logger.info(f"newDF {newDF}")
+        # logger.info(f"newDF {newDF}")
         return newDF
     
     @compute(title="Right Radius", dependencies=["segment", "radius"])

@@ -13,6 +13,7 @@ As a github workflow:
 
 import pooch
 
+# abb: DO NOT USE THIS !!!!
 def getPointsFile() -> str:
     """Download and get path to points csv.
     """
@@ -23,6 +24,7 @@ def getPointsFile() -> str:
     )
     return pointsPath
 
+# abb: DO NOT USE THIS !!!!
 def getLinesFile() -> str:
     urlLines = 'https://github.com/mapmanager/MapManagerCore-Data/raw/main/data/rr30a_s0u/line_segments.csv'
     linePath = pooch.retrieve(

@@ -407,6 +407,7 @@ class LazyGeoFrame(Generic[T]):
     @timer
     def _filter(self, index: pd.Index):
         """Creates a filtered copy of the frame."""
+        # logger.error(f'abb copy memory #5 self:{type(self)}')
         filtered = copy(self)
         if isinstance(index, pd.Series):
             index = index[index].index
@@ -552,6 +553,7 @@ class LazyGeoFrame(Generic[T]):
         if self._df.shape[0] == invalid.shape[0]:
             return self
 
+        # logger.error(f'abb copy memory #6 self:{type(self)}')
         filtered = copy(self)
         filtered._setFilterIndex(invalid.index)
         return filtered
@@ -589,11 +591,12 @@ class LazyGeoFrame(Generic[T]):
 
                     store = self._store._frames[depStore]
                     ids = invalidClone._schema._mapIds(depStore, store._df)
+                    # logger.error(f'abb copy memory #7 store:{type(store)}')
                     storeClone = copy(store)
                     storeClone._setFilterIndex(store._df.loc[ids].index)
                     storeClone._insureComputed(deps)
                 logger.debug(
-                    f"Computing column {column} for num invalid: {len(invalidClone)}")
+                    f'Computing column "{column}" for num invalid: {len(invalidClone)}')
                 results = attribute["_func"](invalidClone)
 
                 missingIndex = invalidClone._df.index
@@ -634,6 +637,7 @@ class LazyGeoFrame(Generic[T]):
             depsStore = dependents[column]
             for dependencyKey, invalidColumns in depsStore.items():
                 if not dependencyKey in invalidate:
+                    # logger.error(f'abb copy memory #8 store:{type(invalidColumns)}')
                     invalidate[dependencyKey] = copy(invalidColumns)
                 else:
                     invalidate[dependencyKey].update(invalidColumns)

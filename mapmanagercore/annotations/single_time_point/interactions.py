@@ -405,6 +405,8 @@ class AnnotationsInteractions(AnnotationsSegments):
             radius = self.analysisParams.getValue("segmentRadius")
         )
 
+        self.updateSegment(segmentId, _segment)
+
         return segmentId
 
     def newUnassignedSegmentId(self) -> SegmentId:
@@ -472,7 +474,7 @@ class AnnotationsInteractions(AnnotationsSegments):
             "segmentTracingMaxDistance")
 
         if maxTracingDistance is not None and point.distance(snappedPoint) > maxTracingDistance:
-            logger.warning(f'abb return None for maxTracingDistance:{maxTracingDistance}')
+            # logger.warning(f'abb return None for maxTracingDistance:{maxTracingDistance}')
             return None
 
         if first:
