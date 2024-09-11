@@ -127,39 +127,42 @@ def getSide(a: Point, b: Point, c: Point):
 
 # abj
 @ timer
-def getSpineSide(line: LineString, spine: Point):
+def getSpineSide(line: LineString, spine: Point, anchor:Point):
     """ Return a string representing the side at which the spine point is relative to its segment
 
     Args:
-        Line: segment in the for of a LineString
+        Line: segment in the form of a LineString
         Spine: point
     """
-
-    # logger.warning(f'line')
-    # print(line)
-    # logger.warning(f'spine')
-    # print(spine)
-
+    # logger.info("Calculating spine side in mmc")
     if line is None:
         # logger.error(f'got None line for spine: {spine}')
         return
-        
+    
+    # old method getting first and last coordinate of segment
+    # first = Point(line.coords[0])
+    # last = Point(line.coords[-1])
+
     first = Point(line.coords[0])
-    last = Point(line.coords[-1])
+    last = anchor
+
     val = getSide(first, last, spine)
     return val
 
 # abj
 @ timer
 def getSpineAngle(spineLine: LineString):
-    """ Return the angle between the two Lines
-    Line 1: The line formed between the spine head and the anchor point
-    Line 2: The line formed by two points on the segment tracing. 
-    Grab two points, one “up” and the other “down” the segment from the spine anchor point. 
-    I think the anchor point on the segment tracing is our new “position”.
+    """ Return the angle of the spine Line by using the anchor point and the spine point
+    
+    Old Idea:
+        Return the angle between the two Lines
+        Line 1: The line formed between the spine head and the anchor point
+        Line 2: The line formed by two points on the segment tracing. 
+        Grab two points, one “up” and the other “down” the segment from the spine anchor point. 
+        I think the anchor point on the segment tracing is our new “position”.
 
     Args:
-        segmentLine: segment in the for of a LineString
+        deprecated - segmentLine: segment in the for of a LineString
         spineLine: Linestring of spine head to anchor point
     """
     spineLineCoord0 = Point(spineLine.coords[0])
@@ -177,14 +180,14 @@ def getSpineAngle(spineLine: LineString):
     angle_rad = math.atan2(dy, dx)
     angle_deg = angle_rad*180/PI
 
-    # Range: 0 - 360
-    # Check for Negative angle and add 360 degrees to determine counter clockwise value
+    # # Range: 0 - 360
+    # # Check for Negative angle and add 360 degrees to determine counter clockwise value
     if angle_deg < 0:
         angle_deg = angle_deg + 360 
 
     # print("m1", m1, "m2", m2, "degree:", angle_deg)
-    # print("degree:", angle_deg)
     return angle_deg
+    # return angle_rad
 
 # abj
 @timer
@@ -194,8 +197,10 @@ def calculateSegmentOffset(segmentLine: LineString, radiusOffset : int, isPositi
         offsetSign = 1
     else: 
         offsetSign = -1
+    # offsettedSegment = shapely.offset_curve(segmentLine, distance = radiusOffset * offsetSign, 
+    #                                         join_style = "mitre", mitre_limit = 10)
     offsettedSegment = shapely.offset_curve(segmentLine, distance = radiusOffset * offsetSign, 
-                                            join_style = "mitre", mitre_limit = 10)
+                                        join_style = "mitre")
           
     return offsettedSegment
 
