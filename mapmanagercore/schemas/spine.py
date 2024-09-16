@@ -117,7 +117,7 @@ class Spine:
     anchorZ: int
     modified: np.datetime64
 
-    roiExtend: float 
+    roiExtend: float
     roiRadius: float
 
     note: str = ""
@@ -167,20 +167,21 @@ class Spine:
     # abj
     @compute(title="Spine Side", dependencies=
              {
-                "Spine": ["segmentID", "point"],
-                "Segment": ["segment"]
+                "Spine": ["segmentID", "point", "anchor"],
+                "Segment": ["segment"],
             }, description="Side of spine w.r.t. segment in ('left', 'right')", plot=False)
     def spineSide(frame: LazyGeoFrame):
         # do this for all spines
+        logger.info("Spine Side calculating ")
         segmentFrame = frame.getFrame("Segment")
-        df = frame[["segmentID", "point"]].join(
+        df = frame[["segmentID", "point", "anchor"]].join(
             segmentFrame[["segment"]], on=["segmentID", "t"])
         # abb
         # logger.error('df.apply on df as:')
         # print(df)
 
         try:
-            _ret = df.apply(lambda d: getSpineSide(d["segment"], d["point"]), axis=1)
+            _ret = df.apply(lambda d: getSpineSide(d["segment"], d["point"], d["anchor"]), axis=1)
         except(AttributeError) as e:
             # fixed in getSpineSide when line segment is None
             logger.error(e)
@@ -196,7 +197,6 @@ class Spine:
     def anchorLine(frame: LazyGeoFrame):
         return frame[["anchor", "point"]].apply(lambda x: LineString([x["anchor"], x["point"]]), axis=1)
 
-    # abj
     @compute(title="Spine Angle", dependencies=["point"])
     def spineAngle(frame: LazyGeoFrame):
         
@@ -206,7 +206,8 @@ class Spine:
             segmentFrame[["segment"]], on=["segmentID", "t"])
 
         # Create a dataframe of
-        return df.apply(lambda d: getSpineAngle(d["anchorLine"]), axis=1)
+        return df.apply(lambda d: getSpineAngle(d["segment"], d["anchorLine"]), axis=1)
+
 
     @compute(tile="ROI Base", dependencies={
         "Spine": ["anchor"],

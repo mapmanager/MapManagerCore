@@ -133,6 +133,7 @@ def getSpineSide(line: LineString, spine: Point, anchor:Point):
     Args:
         Line: segment in the form of a LineString
         Spine: point
+        anchor: point on segment line that spine point connects to
     """
     # logger.info("Calculating spine side in mmc")
     if line is None:
@@ -151,7 +152,7 @@ def getSpineSide(line: LineString, spine: Point, anchor:Point):
 
 # abj
 @ timer
-def getSpineAngle(spineLine: LineString):
+def old_getSpineAngle(spineLine: LineString):
     """ Return the angle of the spine Line by using the anchor point and the spine point
     
     Old Idea:
@@ -186,8 +187,59 @@ def getSpineAngle(spineLine: LineString):
         angle_deg = angle_deg + 360 
 
     # print("m1", m1, "m2", m2, "degree:", angle_deg)
-    return angle_deg
-    # return angle_rad
+    # return angle_deg
+    return angle_rad
+
+def get_angle(line1, line2):
+
+    #segment
+    line1Coord0 = Point(line1.coords[0]) # beginning of segment
+    line1Coord1 = Point(line1.coords[-1]) # end of segment
+    l1x0 = line1Coord0.x
+    l1y0 = line1Coord0.y
+    l1x1 = line1Coord1.x
+    l1y1 = line1Coord1.y
+
+    #spineline
+    line2Coord0 = Point(line2.coords[0]) # anchor
+    line2Coord1 = Point(line2.coords[-1]) # spine point
+    l2x0 = line2Coord0.x
+    l2y0 = line2Coord0.y
+    l2x1 = line2Coord1.x
+    l2y1 = line2Coord1.y
+
+    # Get directional vectors
+    d1 = (l1x1 - l1x0, l1y1 - l1y0)
+    d2 = (l2x1 - l2x0, l2y1 - l2y0)
+    # Compute dot product
+    p = d1[0] * d2[0] + d1[1] * d2[1]
+    # Compute norms
+    n1 = math.sqrt(d1[0] * d1[0] + d1[1] * d1[1])
+    n2 = math.sqrt(d2[0] * d2[0] + d2[1] * d2[1])
+    # Compute angle
+    ang = math.acos(p / (n1 * n2))
+    # Convert to degrees if you want
+    ang = math.degrees(ang)
+    return ang
+
+@ timer
+def getSpineAngle(segmentLine: LineString, spineLine: LineString):
+    """ 
+        Return the angle between the two Lines
+        Line 1: The line formed between the spine head and the anchor point
+        Line 2: The line formed by two points on the segment tracing. 
+    
+    Previous Idea:
+        Return the angle of the spine Line by using the anchor point and the spine point
+
+    Args:
+        segmentLine: segment in the for of a LineString
+        spineLine: Linestring of spine head to anchor point
+    """
+    angle = get_angle(segmentLine, spineLine)
+    # print("angle", angle)
+
+    return angle
 
 # abj
 @timer
