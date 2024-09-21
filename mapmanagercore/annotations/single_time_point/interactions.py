@@ -29,9 +29,12 @@ class AnnotationsInteractions(AnnotationsSegments):
         return minProjection
     
     # abb added findBrightest=False, do not find brightest by default
+    # abj added returnIndex=False, return Anchor point by default, return its index if True
     def nearestAnchor(self, segmentID: SegmentId,
                       point: Point,
-                      findBrightest : bool = False):
+                      findBrightest : bool = False,
+                      returnIndex : bool = False
+                      ):
         """Finds the nearest anchor point on a given line segment to a given point.
 
         Args:
@@ -58,8 +61,34 @@ class AnnotationsInteractions(AnnotationsSegments):
             
         if not findBrightest:
             # Default to the closest point (not brightest)
+            # problem: closest point on line but not actually a point stored within segments
+            logger.info("defaulting to closest point")
             anchor = segment.interpolate(minProjection)
             anchor = roundPoint(anchor, 1)
+            logger.info(f"anchor {anchor}")
+
+            if returnIndex:
+                logger.info(f"entering return index")
+                distanceStart = None
+                # find index of point in segment that is closest to minProjection
+                x, y = segment.xy
+                for i, val in enumerate(x):
+                    currentPoint = Point(x[i], y[i])
+                    logger.info(f"currentPoint {currentPoint}")
+                    # check the distance 
+                    distanceCheck = Point(anchor.x, anchor.y).distance(currentPoint)
+                    if distanceStart is None:
+                        distanceStart = distanceCheck
+
+                    if abs(distanceCheck) < abs(distanceStart): # check for closer point, where distance is less
+                        logger.info(f"distanceCheck {abs(distanceCheck)} < distanceStart {abs(distanceStart)}")
+                        pivotIndex = i
+                        distanceStart = distanceCheck
+                        logger.info(f"pivotIndex {pivotIndex}")
+               
+                return pivotIndex
+
+            # otherwise return anchor
             return anchor
 
         brightestPathDistance = self.analysisParams.getValue('brightestPathDistance')
@@ -506,6 +535,48 @@ class AnnotationsInteractions(AnnotationsSegments):
         theRet = 0 if first else len(roughTracing) - 1
         # logger.info(f'theRet:{theRet}')
         return theRet
+    
+    def old_setPivotPoint(self, segmentId: SegmentId, clickedPoint: Point, speculate: bool = False) -> Point:
+        """ Sets pivotPoint of segment. 
+
+        Calculates pivot point by find closest brightest index point to the clicked Point
+        """
+        # pass
+
+        # auto set pivot point closest to click on line
+
+        closestPivotPoint = self.nearestAnchor(segmentID=segmentId, point=clickedPoint, findBrightest=False)
+        logger.info(f"closestPivotPoint {closestPivotPoint}")
+        # set pivot point in backend
+        self.updateSegment(segmentId, Segment(
+            pivotPoint=closestPivotPoint
+        ))
+
+        # used for verification
+        return closestPivotPoint
+    
+    def setPivotDistance(self, segmentId: SegmentId, clickedPoint: Point, speculate: bool = False) -> Point:
+        """ Sets pivotPoint of segment. 
+
+        Calculates pivot point by find closest brightest index point to the clicked Point
+        """
+        # use closest pivot point to find similar ID in the segments
+        closestPivotID = self.nearestAnchor(segmentID=segmentId, point=clickedPoint, findBrightest=False, returnIndex=True)
+        logger.info(f"closestPivotID {closestPivotID}")
+
+        # # get the value of 'distance' at closestPivotID within the segment
+        distanceList = self.segments[segmentId, "distance"]
+        closestPivotDistance = distanceList[closestPivotID]
+
+        logger.info(f"closestPivotDistance {closestPivotDistance}")
+
+        # set pivot point in backend
+        self.updateSegment(segmentId, Segment(
+            pivotDistance = closestPivotDistance
+        ))
+
+        # used for verification
+        return closestPivotDistance
 
     def moveSegmentPoint(self, segmentId: SegmentId, x: int, y: int, z: int, index: int, state: DragState = DragState.MANUAL) -> bool:
         """

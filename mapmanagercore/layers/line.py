@@ -249,12 +249,42 @@ def calculateSegmentOffset(segmentLine: LineString, radiusOffset : int, isPositi
         offsetSign = 1
     else: 
         offsetSign = -1
-    # offsettedSegment = shapely.offset_curve(segmentLine, distance = radiusOffset * offsetSign, 
-    #                                         join_style = "mitre", mitre_limit = 10)
     offsettedSegment = shapely.offset_curve(segmentLine, distance = radiusOffset * offsetSign, 
-                                        join_style = "mitre")
+                                            # quad_segs = 16,
+                                            join_style = "mitre"
+                                            , mitre_limit = 15
+                                            )
           
     return offsettedSegment
+
+# abj
+def getRunningDistance(segmentLine: LineString):
+    """
+
+    Return:
+        List (same length as inputted segmentLine), that has the running sum distance at each point in the Line.
+    """
+    # logger.info(f"segmentLine {segmentLine}")
+    # segmentLine = list(segmentLine)
+    # logger.info(f"segmentLine {segmentLine}")
+    x, y = segmentLine.xy
+    runningDistanceList = []
+    # print(x)
+    currentSum = 0
+    prevPoint = Point(x[0], y[0]) # First point
+    # nextPoint = Point()
+    for i, val in enumerate(x):
+        # logger.info(f"i {i} val {val}")
+        currentPoint = Point(x[i], y[i])
+
+        currentLineString = LineString([prevPoint, currentPoint])
+        currentSum = currentSum + currentLineString.length
+        runningDistanceList.append(currentSum)
+
+        prevPoint = currentPoint # keep track of previous point
+    # print("runningDistanceList", runningDistanceList)
+    return runningDistanceList
+
 
 @timer
 def calcSubLine(line: LineLayer, origin: Point, distance: int):
