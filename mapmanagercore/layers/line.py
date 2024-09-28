@@ -152,7 +152,7 @@ def getSpineSide(line: LineString, spine: Point, anchor:Point):
 
 # abj
 @ timer
-def old_getSpineAngle(spineLine: LineString):
+def getSpineAngle(spineLine: LineString):
     """ Return the angle of the spine Line by using the anchor point and the spine point
     
     Old Idea:
@@ -187,10 +187,9 @@ def old_getSpineAngle(spineLine: LineString):
         angle_deg = angle_deg + 360 
 
     # print("m1", m1, "m2", m2, "degree:", angle_deg)
-    # return angle_deg
-    return angle_rad
+    return angle_deg
 
-def get_angle(line1, line2):
+def old_get_angle(line1, line2):
 
     #segment
     line1Coord0 = Point(line1.coords[0]) # beginning of segment
@@ -223,7 +222,7 @@ def get_angle(line1, line2):
     return ang
 
 @ timer
-def getSpineAngle(segmentLine: LineString, spineLine: LineString):
+def old_getSpineAngle(segmentLine: LineString, spineLine: LineString):
     """ 
         Return the angle between the two Lines
         Line 1: The line formed between the spine head and the anchor point
@@ -236,7 +235,7 @@ def getSpineAngle(segmentLine: LineString, spineLine: LineString):
         segmentLine: segment in the for of a LineString
         spineLine: Linestring of spine head to anchor point
     """
-    angle = get_angle(segmentLine, spineLine)
+    angle = old_get_angle(segmentLine, spineLine)
     # print("angle", angle)
 
     return angle
@@ -252,7 +251,7 @@ def calculateSegmentOffset(segmentLine: LineString, radiusOffset : int, isPositi
     offsettedSegment = shapely.offset_curve(segmentLine, distance = radiusOffset * offsetSign, 
                                             # quad_segs = 16,
                                             join_style = "mitre"
-                                            , mitre_limit = 15
+                                            # , mitre_limit = 15
                                             )
           
     return offsettedSegment
@@ -264,27 +263,18 @@ def getRunningDistance(segmentLine: LineString):
     Return:
         List (same length as inputted segmentLine), that has the running sum distance at each point in the Line.
     """
-    # logger.info(f"segmentLine {segmentLine}")
-    # segmentLine = list(segmentLine)
-    # logger.info(f"segmentLine {segmentLine}")
     x, y = segmentLine.xy
     runningDistanceList = []
-    # print(x)
     currentSum = 0
     prevPoint = Point(x[0], y[0]) # First point
-    # nextPoint = Point()
     for i, val in enumerate(x):
-        # logger.info(f"i {i} val {val}")
         currentPoint = Point(x[i], y[i])
-
         currentLineString = LineString([prevPoint, currentPoint])
         currentSum = currentSum + currentLineString.length
         runningDistanceList.append(currentSum)
-
         prevPoint = currentPoint # keep track of previous point
-    # print("runningDistanceList", runningDistanceList)
-    return runningDistanceList
 
+    return runningDistanceList
 
 @timer
 def calcSubLine(line: LineLayer, origin: Point, distance: int):
