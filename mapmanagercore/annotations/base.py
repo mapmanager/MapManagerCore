@@ -1,3 +1,4 @@
+import os
 from copy import copy
 from io import BytesIO
 from typing import Any, Tuple, Union
@@ -60,7 +61,7 @@ class AnnotationsBase(LazyImagesGeoPandas):
         numPnts = len(self.points._rootDf)
         numSegments = len(self.segments._rootDf)
 
-        return f't:{numTimepoints}, points:{numPnts} segments:{numSegments} loader:{self.laoder}'
+        return f't:{numTimepoints}, points:{numPnts} segments:{numSegments} loader:{self.loader}'
     
     @property
     def segments(self) -> LazyGeoFrame:
@@ -96,7 +97,7 @@ class AnnotationsBase(LazyImagesGeoPandas):
         """
         from .single_time_point import SingleTimePointAnnotations
         return SingleTimePointAnnotations(self, time)
-
+    
     def getPixels(self, time: int, channel: int, zRange: Tuple[int, int] = None, z: int = None, zSpread: int = 0) -> ImageSlice:
         """
         Loads the image data for a slice.
@@ -125,6 +126,123 @@ class AnnotationsBase(LazyImagesGeoPandas):
     # Serialization
 
     @classmethod
+    def checkFile(cls, path: str, lazy=True, verbose=False) -> bool:
+        """Check if a zarr file is valid to load.
+
+        This is a complex function, Python has never been good at this?
+        Is there a better way to write it?
+        """
+        from json import JSONDecodeError
+        from pickle import UnpicklingError
+        from mapmanagercore.lazy_geo_pd_images.metadata import Metadata
+
+        _errors = 0
+
+        if verbose:
+            logger.info(f'inspecting zarr file: {path}')
+
+        # (1) taken from ZarrLoader (it loads images)
+        # loader = ZarrLoader(path, lazy=lazy)
+        # error when trying to load a zipstore
+        # zarr.errors.FSPathExistNotDir: path exists but is not a directory: %r
+        if os.path.isdir(path):
+            store = zarr.DirectoryStore(path)
+        else:
+            store = zarr.ZipStore(path, mode="r")
+        
+        group = zarr.group(store=store)
+
+        if verbose:
+            logger.info('file has the following groups')
+            for _key, _value in group.items():
+                logger.info(f'  {_key}: {_value}')
+
+            logger.info('file has the following attrs keys')
+            for _key, _value in group.attrs.items():
+                logger.info(f'  {_key}: {_value}')
+
+        _imagesSrcs = {}
+        _metadata = {}
+        for t in group.attrs["timePoints"]:
+            try:
+                images = group[f"img-{t}"]
+            except (KeyError) as e:
+                logger.error(f'did not find group "img-{t}"')
+                logger.error(f'   {e}')
+                _errors += 1
+            finally:
+                _imagesSrcs[t] = images if lazy else images[:]
+                if verbose:
+                    logger.info(f'img-{t}: {_imagesSrcs[t].shape}')
+
+            try:
+                group.attrs[f"metadata-{t}"]
+            except (KeyError) as e:
+                logger.error(f'did not find group "metadata-{t}"')
+                logger.error(f'   {e}')
+                _errors += 1
+            finally:
+                _metadata[t] = Metadata.from_json(group.attrs[f"metadata-{t}"])
+                if verbose:
+                    logger.info(f'metadata-{t}: {_metadata[t]}')
+
+        # (2) points
+        try:
+            _points = group["points"]  # zarr.core.Array '/points' (255865,) uint8
+        except (KeyError) as e:
+            logger.error('did not find group "points"')
+            logger.error(f'   {e}')
+            _errors += 1
+        finally:
+            try:
+                _points = pd.read_pickle(BytesIO(_points[:].tobytes()))
+                if verbose:
+                    logger.info(f'points: {len(_points)}')
+                    # print(_points.head())
+            except (UnpicklingError) as e:
+                logger.error('error reading pickel from points')
+                logger.error(f'   {e}')
+                _errors += 1
+
+        # (3) lineSegments
+        try:
+            _lineSegments = group["lineSegments"]
+        except (KeyError) as e:
+            logger.error('did not find group "lineSegments"')
+            logger.error(f'   {e}')
+            _errors += 1
+        finally:
+            try:
+                _lineSegments = pd.read_pickle(BytesIO(_lineSegments[:].tobytes()))
+                if verbose:
+                    logger.info(f'lineSegments: {len(_lineSegments)}')
+                    # print(_lineSegments.head())
+            except (UnpicklingError) as e:
+                logger.error('error reading pickel from lineSegments')
+                logger.error(f'   {e}')
+                _errors += 1
+
+        # (4) analysisParams
+        try:
+            _analysisParams_json = group.attrs['analysisParams']
+        except (KeyError) as e:
+            logger.error('did not find "analysisParams"')
+            logger.error(f'   {e}')
+            _errors += 1
+        finally:
+            try:
+                analysisParams = AnalysisParams(loadJson=_analysisParams_json)
+            except (JSONDecodeError) as e:
+                logger.error('did not parse json into AnalysisParams()')
+                logger.error(f'   {e}')
+                _errors += 1
+
+        if verbose:
+            logger.info(f'encountered {_errors} errors while inspecting {path}')
+
+        return _errors == 0
+    
+    @classmethod
     def load(cls, path: str, lazy=False):
         loader = ZarrLoader(path, lazy=lazy)
         points = pd.read_pickle(BytesIO(loader.group["points"][:].tobytes()))
@@ -147,7 +265,8 @@ class AnnotationsBase(LazyImagesGeoPandas):
             warnings.simplefilter("ignore")
 
             logger.info(f'saving to {path}')
-            fs = zarr.ZipStore(path, mode="w", compression=compression)
+            # fs = zarr.ZipStore(path, mode="w", compression=compression)
+            fs = zarr.DirectoryStore(path)
             with fs as store:
                 group = zarr.group(store=store)
                 self._images.saveTo(group)

@@ -206,6 +206,15 @@ class SingleTimePointAnnotationsBase(_SingleTimePointAnnotationsBase):
         """
         return self._annotations.getPixels(self._t, channel, zRange, z, zSpread)
 
+    def getAutoContrast_qt(self, channel: int) -> Tuple[int, int]:
+        """Get the auto contrast from the entire image volume.
+        
+        Used in PyQt interface.
+        """
+        theMin, theMax = self._annotations.getAutoContrast_qt(time=self._t, channel=channel)
+
+        return theMin, theMax
+    
     @property
     def shape(self):
         return self._annotations._images.shape(self._t)

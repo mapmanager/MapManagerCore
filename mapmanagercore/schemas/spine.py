@@ -177,19 +177,16 @@ class Spine:
         return frame[["anchor", "point"]].apply(lambda x: LineString([x["anchor"], x["point"]]), axis=1)
 
     # abj
-    @compute(title="Spine Angle", dependencies={
-        "Spine": ["segmentID""point", "anchorLine"],
-        "Segment": ["segment"]
-    })
-    def angle(frame: LazyGeoFrame):
-
+    @compute(title="Spine Angle", dependencies=["point"])
+    def spineAngle(frame: LazyGeoFrame):
+        
         # do this for all spines
         segmentFrame = frame.getFrame("Segment")
         df = frame[["segmentID", "point", "anchorLine"]].join(
             segmentFrame[["segment"]], on=["segmentID", "t"])
 
         # # Create a dataframe of
-        return df.apply(lambda d: getSpineAngle(d["segment"], d["anchorLine"]), axis=1)
+        return df.apply(lambda d: getSpineAngle(d["anchorLine"]), axis=1)
 
     @compute(tile="ROI Base", dependencies={
         "Spine": ["anchor"],

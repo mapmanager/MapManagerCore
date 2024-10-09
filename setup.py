@@ -7,24 +7,21 @@ with open(os.path.abspath(_thisPath+"/README.md")) as f:
     long_description = f.read()
 
 install_requires = [
-    'async-lru',
-    'asyncio',
-    'tifffile',
-    'imagecodecs',  # required for compression
-    # 'plotly',  # required for compression
     'numpy',
     'pandas',
     'shapely',
-    # 'geopandas==1.0.0a1',  # removed 20240608
     'geopandas',
     'scikit-image',
     'zarr',
+    'async-lru',
+    'asyncio',
+    'imagecodecs',  # required for compression
     'platformdirs',  # to get platform specific App paths
-    'plotly',
+    'plotly',  # needed for colors
     "dataclasses-json",
     'brightest-path-lib',
-    #'bioimage',
-    #
+    'pooch',  # to load data from MapManagerCore-Data repo
+    # 'bioio',  # TODO: use to load metadata and lazy load images
 ]
 
 testRequirements = [
@@ -32,6 +29,8 @@ testRequirements = [
     'pytest',
     'pytest-cov',
     'flake8',
+    'nbformat',
+    'matplotlib',
 ]
 
 devRequirements = [
@@ -59,7 +58,7 @@ setup(
         'Programming Language :: Python :: 3',
         'Natural Language :: English',
         'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
-        'Operating System :: Linux',
+        'Operating System :: POSIX :: Linux',
         'Operating System :: MacOS',
         'Operating System :: Microsoft :: Windows',
         'Intended Audience :: Developers',
@@ -67,7 +66,6 @@ setup(
         'Intended Audience :: End Users/Desktop',
         'Topic :: Scientific/Engineering :: Bio-Informatics',
         'Topic :: Scientific/Engineering :: Information Analysis',
-        'Topic :: Scientific/Engineering :: Research Science Apps.',
         'Topic :: Scientific/Engineering :: Visualization',
         'Topic :: Software Development :: Libraries :: Python Modules',
         'Topic :: Software Development :: Libraries :: Application Frameworks',

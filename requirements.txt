@@ -1,10 +1,14 @@
 numpy
 pandas
-scikit-image
-geopandas==1.0.0a1
 shapely
-imagecodecs
-plotly
+geopandas
+scikit-image  # is this needed?
 zarr
-Blosc
+async-lru
+asyncio
+imagecodecs  # required for compression
+platformdirs  # to get platform specific App paths
+plotly  # needed for colors
 dataclasses-json
+brightest-path-lib
+bioimage

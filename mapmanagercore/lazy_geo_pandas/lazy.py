@@ -571,7 +571,16 @@ class LazyGeoFrame(Generic[T]):
                     depKey = [c + ".valid" for c in results.columns]
                     df.loc[results.index, results.columns] = results.values
                 else:
-                    df.loc[missingIndex, column] = results
+                    # abb, df is GeoDataFrame
+                    try:
+                        df.loc[missingIndex, column] = results
+                    except (TypeError) as e:
+                        logger.error(f'missingIndex:{missingIndex}')
+                        logger.error(f'column:{column}')
+                        logger.error(f'results:{results}')
+                        logger.error(f'type results:{type(results)}')
+                        print(df.dtypes)
+                        logger.error(e)
 
                 if len(attribute["_dependencies"]) != 0:
                     df.loc[missingIndex, depKey] = True

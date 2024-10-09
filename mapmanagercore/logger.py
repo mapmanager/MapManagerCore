@@ -46,11 +46,19 @@ def getLoggerFilePath():
     """All MapManager code will log to the same place including:
      - MapManagerCore
      - MapManagerQt
+
+    Notes
+    -----
+    Mac: /Users/cudmore/Library/Application Support/MapManager
+    Linux: /share/MapManager
+    Windows: 
     """
     appName = 'MapManager'
     try:
         from platformdirs import user_data_dir  # to get log path
         appDir = user_data_dir(appName)
+        if not os.path.isdir(appDir):
+            os.makedirs(appDir, exist_ok=True)
     except ImportError:
         appDir = os.path.join(os.path.expanduser('~'), '.mapmanager')
         os.makedirs(appDir, exist_ok=True)

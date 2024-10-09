@@ -10,29 +10,40 @@ class TestExamplesNotebook(unittest.TestCase):
         matplotlib.use('Agg')
         try:
             from mapmanagercore import MapAnnotations, MultiImageLoader
+            from mapmanagercore.data import getLinesFile, getPointsFile, getTiffChannel_1, getTiffChannel_2
             import matplotlib.pyplot as plt
             # Create an image loader
             loader = MultiImageLoader()
             
             # add image channels to the loader
-            loader.read("../data/rr30a_s0u/t0/rr30a_s0_ch1.tif", channel=0)
-            loader.read("../data/rr30a_s0u/t0/rr30a_s0_ch2.tif", channel=1)
+            loader.read(getTiffChannel_1(), channel=0)
+            loader.read(getTiffChannel_2(), channel=1)
             
             # loader.read("../data/rr30a_s0u/t0/rr30a_s0_ch1.tif", channel=0, time=1)
             # loader.read("../data/rr30a_s0u/t0/rr30a_s0_ch2.tif", channel=1, time=1)
             
             
             # Create the annotation map
+            # lineSegments=getLinesFile()
+            # print('lineSegments:', lineSegments)
             map = MapAnnotations(loader.build(),
-                                 lineSegments="../data/rr30a_s0u/line_segments.csv",
-                                 points="../data/rr30a_s0u/points.csv")
+                                # lineSegments="../data/rr30a_s0u/line_segments.csv",
+                                # points="../data/rr30a_s0u/points.csv",
+                                lineSegments=getLinesFile(),
+                                points=getPointsFile()
+                                )
             map.points[:]
             map.segments[:]
             
             # save the annotation map
-            map.save("../data/rr30a_s0u.mmap")
+            map.save("../data/rr30a_s0u_v2.mmap")
             map.close()
+            # MapAnnotations.checkFile("../data/rr30a_s0u.mmap", verbose=False)
+            MapAnnotations.checkFile("../data/rr30a_s0u_v2.mmap", verbose=False)
+            
+            
             map = MapAnnotations.load("../data/rr30a_s0u.mmap")
+            print(map)
             fig, ax = plt.subplots(figsize=(5, 5))
             
             map.points["anchorLine"].plot(color='black', ax=ax)
@@ -66,8 +77,8 @@ class TestExamplesNotebook(unittest.TestCase):
             id
             
             # abb
-            timePoint.points["roi"].get_coordinates()
-            timePoint.points["roiBase"].get_coordinates()['x'].tolist()
+            # timePoint.points["roi"].get_coordinates()
+            # timePoint.points["roiBase"].get_coordinates()['x'].tolist()
             
             from mapmanagercore.schemas.spine import Spine
             
