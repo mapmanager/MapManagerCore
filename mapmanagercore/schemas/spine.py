@@ -206,8 +206,8 @@ class Spine:
             segmentFrame[["segment"]], on=["segmentID", "t"])
 
         # Create a dataframe of
-        return df.apply(lambda d: getSpineAngle(d["segment"], d["anchorLine"]), axis=1)
-
+        # return df.apply(lambda d: getSpineAngle(d["segment"], d["anchorLine"]), axis=1)
+        return df.apply(lambda d: getSpineAngle(d["anchorLine"]), axis=1)
 
     @compute(tile="ROI Base", dependencies={
         "Spine": ["anchor"],
