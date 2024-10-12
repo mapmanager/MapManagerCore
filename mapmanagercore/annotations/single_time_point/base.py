@@ -264,7 +264,7 @@ class _SingleTimePointAnnotationsBase:
 
         # was this
         # self._annotations = copy(annotations)
-        logger.warning('abb turned OFF copy of Annotations')
+        logger.warning('abb turned OFF copy of Annotations in _SingleTimePointAnnotationsBase()')
         self._annotations = annotations
 
         self._segments = SingleTimePointFrame(

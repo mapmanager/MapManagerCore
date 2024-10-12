@@ -4,6 +4,8 @@ from .base import ImageLoader
 from typing import Iterator, Union
 import numpy as np
 
+from mapmanagercore.logger import logger
+
 class MultiImageLoader(ImageLoader):
     """
     Class for building an MultiImageLoader.
