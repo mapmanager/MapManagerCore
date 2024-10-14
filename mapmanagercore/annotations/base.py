@@ -30,7 +30,8 @@ class AnnotationsBase(LazyImagesGeoPandas):
                  loader: ImageLoader,
                  lineSegments: Union[str, pd.DataFrame] = pd.DataFrame(),
                  points: Union[str, pd.DataFrame] = pd.DataFrame(),
-                 analysisParams: AnalysisParams = AnalysisParams()):
+                 analysisParams: AnalysisParams = AnalysisParams(),
+                 path: str = None):
 
         super().__init__(loader)
 
@@ -50,6 +51,7 @@ class AnnotationsBase(LazyImagesGeoPandas):
         self._points = LazyGeoFrame(Spine, data=points, store=self)
 
         self.loader = loader
+        self.path = path
 
     # abb
     def __str__(self):
@@ -255,9 +257,12 @@ class AnnotationsBase(LazyImagesGeoPandas):
         _analysisParams_json = loader.group.attrs['analysisParams']  # json str
         analysisParams = AnalysisParams(loadJson=_analysisParams_json)
 
-        return cls(loader, lineSegments, points, analysisParams)
+        return cls(loader, lineSegments, points, analysisParams, path)
 
-    def save(self, path: str, compression=zipfile.ZIP_STORED):
+    def save(self, path: str=None, compression=zipfile.ZIP_STORED):
+        if path is None:
+            path = self.path
+
         if not path.endswith(".mmap"):
             path += ".mmap"
 
@@ -265,8 +270,11 @@ class AnnotationsBase(LazyImagesGeoPandas):
             warnings.simplefilter("ignore")
 
             logger.info(f'saving to {path}')
-            # fs = zarr.ZipStore(path, mode="w", compression=compression)
-            fs = zarr.DirectoryStore(path)
+            if os.path.isdir(path):
+                fs = zarr.DirectoryStore(path)
+            else:
+                fs = zarr.ZipStore(path, mode="w", compression=compression)
+
             with fs as store:
                 group = zarr.group(store=store)
                 self._images.saveTo(group)

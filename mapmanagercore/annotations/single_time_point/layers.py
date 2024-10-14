@@ -328,12 +328,13 @@ class AnnotationsLayers(AnnotationsInteractions):
             .onHoverOut(onHoverOutHitTarget)
         )
 
-        segment = (LineLayer(segments["segment"])
+        editingSegmentSeries = gpd.GeoSeries(segments["segment"])
+        segment = (LineLayer(editingSegmentSeries)
                    .id("segment")
                    .clipZ(zRange)
                    .stroke(Colors.segment))
 
-        segmentGhost = (LineLayer(force_2d(segments["segment"]))
+        segmentGhost = (LineLayer(force_2d(editingSegmentSeries))
                         .id("segment-ghost")
                         .stroke(Colors.segment)
                         .opacity(Config.ghostOpacity))
