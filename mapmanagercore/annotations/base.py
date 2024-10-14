@@ -107,7 +107,7 @@ class AnnotationsBase(LazyImagesGeoPandas):
         """
         Filters the points.
         """
-        logger.error(f'filter:{filter} {type(filter)}')
+        # logger.error(f'abb copy memory #1 filter:{filter} {type(filter)}')
         
         c = copy(self)
         c._points = c._points[filter]
@@ -117,6 +117,7 @@ class AnnotationsBase(LazyImagesGeoPandas):
         """
         Filters the segments.
         """
+        # logger.error(f'abb copy memory #2 filter:{filter} {type(filter)}')
         c = copy(self)
         c._segments = c._segments[filter]
         return c

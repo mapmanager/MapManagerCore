@@ -37,14 +37,20 @@ class SingleTimePointFrame(LazyGeoFrame):
         # print(frame._rootDf.columns)
 
         if isinstance(frame, SingleTimePointFrame):
-            logger.warning('CONSTRUCTING FROM SingleTimePointFrame')
+            # logger.warning('CONSTRUCTING FROM SingleTimePointFrame')
+            # logger.error(f'abb copy memory #3 frame:{type(frame)}')
             self._root = copy(frame._root)
+            # logger.warning('abb SingleTimePointFrame removed copy v1')
+            # self._root = frame._root
         else:
             # why is this getting called so much???
             # logger.warning('NOT CONSTRUCTING FROM SingleTimePointFrame')
+            # logger.error(f'abb copy memory #4 frame:{type(frame)}')
             # print('   frame:', type(frame))
             # frame: mapmanagercore.lazy_geo_pandas.lazy.LazyGeoFrame
             self._root = copy(frame)
+            # logger.warning('abb SingleTimePointFrame removed copy v2')
+            # self._root = frame
 
         # abb
         # if isinstance(frame, SingleTimePointFrame):
@@ -250,16 +256,16 @@ class _SingleTimePointAnnotationsBase:
     _t: int
 
     def __init__(self, annotations: Annotations, t: int):
-        # abb dug
+        # abb dubug
         # this is where we run into problems on add/update spine and segment
         # when we add, we update self._annotations
         # but then self.points and self.segments are not updated?
         # they are another copy from SingleTimePointFrame
 
         # was this
-        self._annotations = copy(annotations)
-        # abb
-        # self._annotations = annotations
+        # self._annotations = copy(annotations)
+        logger.warning('abb turned OFF copy of Annotations in _SingleTimePointAnnotationsBase()')
+        self._annotations = annotations
 
         self._segments = SingleTimePointFrame(
             self._annotations._segments, t)
@@ -270,12 +276,14 @@ class _SingleTimePointAnnotationsBase:
     
     @property
     def points(self) -> LazyGeoFrame:
-        # logger.warning('')
+        # logger.warning('SINGLE TIMEPOINT')
         return self._points
 
     @property
     def segments(self) -> LazyGeoFrame:
-        # logger.warning('')
+        # logger.warning('SINGLE TIMEPOINT')
+        # print(self._annotations._segments)
+
         return self._segments
 
     # abb
