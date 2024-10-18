@@ -2,6 +2,7 @@ import os
 from copy import copy
 from io import BytesIO
 from typing import Any, Tuple, Union
+import weakref
 import zipfile
 import numpy as np
 import pandas as pd
@@ -47,8 +48,8 @@ class AnnotationsBase(LazyImagesGeoPandas):
         self._analysisParams: AnalysisParams = analysisParams
 
         self._segments = LazyGeoFrame(
-            Segment, data=lineSegments, store=self)
-        self._points = LazyGeoFrame(Spine, data=points, store=self)
+            Segment, data=lineSegments, store=weakref.ref(self))
+        self._points = LazyGeoFrame(Spine, data=points, store=weakref.ref(self))
 
         self.loader = loader
         self.path = path
@@ -245,7 +246,7 @@ class AnnotationsBase(LazyImagesGeoPandas):
         return _errors == 0
     
     @classmethod
-    def load(cls, path: str, lazy=False):
+    def load(cls, path: Union[str, None], lazy=False):
         loader = ZarrLoader(path, lazy=lazy)
         points = pd.read_pickle(BytesIO(loader.group["points"][:].tobytes()))
         points = gp.GeoDataFrame(points, geometry="point")
@@ -256,6 +257,7 @@ class AnnotationsBase(LazyImagesGeoPandas):
         # abb analysisparams
         _analysisParams_json = loader.group.attrs['analysisParams']  # json str
         analysisParams = AnalysisParams(loadJson=_analysisParams_json)
+
 
         return cls(loader, lineSegments, points, analysisParams, path)
 

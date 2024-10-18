@@ -74,7 +74,7 @@ class SingleTimePointFrame(LazyGeoFrame):
                     return result.values[0]
             else:
                 if result.empty:
-                    return None
+                    return result
                 return result.iloc[0]
 
         return result

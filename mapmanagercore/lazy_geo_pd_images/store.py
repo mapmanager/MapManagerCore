@@ -1,6 +1,7 @@
 # Adds image slices to lazy geo pandas
 
 from typing import Callable, List, Self, Tuple, Union, Unpack
+import weakref
 import numpy as np
 from mapmanagercore.lazy_geo_pd_images.image_slices import ImageSlice
 from mapmanagercore.lazy_geo_pandas.attributes import ColumnAttributes
@@ -74,6 +75,8 @@ class LazyImagesGeoPandas(LazyGeoPandas):
         tColumn = attributes["t"] if "t" in attributes else "t"
         timeIndexLevel = frame._schema._index.index(
             tColumn) if tColumn in frame._schema._index else None
+        
+        weakSelf = weakref.ref(self)
 
         def wrappedFunc(frame: LazyGeoFrame[Self]):
             (channels, aggregates) = parseColumns(
@@ -91,7 +94,7 @@ class LazyImagesGeoPandas(LazyGeoPandas):
                 channels) > 1 else next(channels)
 
             # Compute the aggregates over the pixels
-            pixels = self.getShapePixels(
+            pixels = weakSelf().getShapePixels(
                 shapes, channel=channels, zSpread=zSpread)
 
             if isinstance(pixels, pd.Series):
@@ -102,6 +105,7 @@ class LazyImagesGeoPandas(LazyGeoPandas):
             return pd.DataFrame({
                 f"{name}_ch{channel + 1}_{agg}": pixels[channel].apply(lambda x: getattr(np, agg)(x)) for agg in aggregates for channel in channels
             }, index=pixels.index)
+
         return wrappedFunc
 
     def addSchema(self, frame: LazyGeoFrame[Self]):

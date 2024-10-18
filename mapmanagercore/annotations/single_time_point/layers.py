@@ -402,7 +402,7 @@ class AnnotationsLayers(AnnotationsInteractions):
     def _getSegments(self, zRange: Tuple[int, int], editSegId: SegmentId, selectedSegId: SegmentId, showLineSegmentsRadius: bool) -> List[Layer]:
         layers = []
         segments = self.segments[["segment", "radius"]]
-
+                
         def getStrokeColor(id: SegmentId):
             return Colors.segmentEditing if id == editSegId else (Colors.segmentSelected if id == selectedSegId else Colors.segment)
 

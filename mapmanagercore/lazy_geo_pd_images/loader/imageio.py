@@ -69,7 +69,6 @@ class MultiImageLoader(ImageLoader):
 
         return _MultiImageLoader(images, self._metadata)
 
-
 class _MultiImageLoader(ImageLoader):
     """
     A loader class for loading from imageio supported formats.

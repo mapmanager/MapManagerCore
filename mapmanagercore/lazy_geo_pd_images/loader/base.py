@@ -1,5 +1,6 @@
 from functools import lru_cache
 from typing import Iterator, List, Self, Tuple, Union
+from mapmanagercore.analysis_params import AnalysisParams
 import numpy as np
 import pandas as pd
 import geopandas as gp
@@ -10,6 +11,7 @@ import skimage.draw
 
 from mapmanagercore.lazy_geo_pd_images.metadata import Metadata
 from mapmanagercore.logger import logger
+
 
 def shapeIndexes(d: Union[Polygon, LineString]) -> Tuple[np.ndarray, np.ndarray]:
     """ Get the x and y indexes of the pixels in a shape."""
@@ -37,7 +39,7 @@ class ImageLoader:
 
     def __init__(self):
         self._metadata = {}
-        
+
     def __str__(self):
         return f"ImageLoader: time points: {self.timePoints()}"
 
@@ -125,15 +127,15 @@ class ImageLoader:
 
     def getAutoContrast_qt(self, time: int, channel: int) -> Tuple[int, int]:
         """Get the auto contrast from the entire image volume.
-        
+
         Used in PyQt interface.
         """
-    
+
         # logger.info(f'{self._images(time)[channel].shape} {np.min(self._images(time)[channel]), np.max(self._images(time)[channel])}')
 
-        _percent_low = 30.0 #0.5  # .30
-        _percent_high = 99.95  #100 - 0.5
-        
+        _percent_low = 30.0  # 0.5  # .30
+        _percent_high = 99.95  # 100 - 0.5
+
         imgData = self._images(time)[channel]
         percentiles = np.percentile(imgData, (_percent_low, _percent_high))
 
@@ -141,7 +143,7 @@ class ImageLoader:
         theMax = int(percentiles[1])
 
         return theMin, theMax
-    
+
     def fetchSlices(self, time: int, channel: int, sliceRange: Tuple[int, int]) -> np.ndarray:
         """
         Fetches a range of slices for the given time, channel, and slice range.
