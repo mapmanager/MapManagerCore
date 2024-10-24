@@ -1,3 +1,4 @@
+from datetime import datetime
 import os
 from copy import copy
 from io import BytesIO
@@ -28,7 +29,9 @@ class AnnotationsBase(LazyImagesGeoPandas):
                  loader: ImageLoader,
                  lineSegments: Union[str, pd.DataFrame] = pd.DataFrame(),
                  points: Union[str, pd.DataFrame] = pd.DataFrame(),
-                 analysisParams: AnalysisParams = AnalysisParams()):
+                 analysisParams: AnalysisParams = AnalysisParams(),
+                 lastSaveTime: str = ""
+                 ):
 
         super().__init__(loader)
 
@@ -39,6 +42,9 @@ class AnnotationsBase(LazyImagesGeoPandas):
         if not isinstance(points, gp.GeoDataFrame):
             if not isinstance(points, pd.DataFrame):
                 points = pd.read_csv(points, index_col=False)
+
+        # abj
+        self._lastSaveTime = lastSaveTime
 
         # abb analysisparams
         self._analysisParams: AnalysisParams = analysisParams
@@ -54,6 +60,13 @@ class AnnotationsBase(LazyImagesGeoPandas):
         self._points = LazyGeoFrame(Spine, data=points, store=self)
 
         self.loader = loader
+
+    # abj
+    def getLastSaveTime(self):
+        """
+        """
+        # get last save time from attributes
+        return self._lastSaveTime 
 
     # abb
     def getNumTimepoints(self):
@@ -300,13 +313,19 @@ class AnnotationsBase(LazyImagesGeoPandas):
         # abj added path argument
         analysisParams = AnalysisParams(loadJson=_analysisParams_json, path = path)
 
-        return cls(loader, lineSegments, points, analysisParams)
+        # abj last save
+        try:
+            lastSaveTime = loader.group.attrs['lastSaveTime']
+        except:
+            lastSaveTime = ""
+
+        return cls(loader, lineSegments, points, analysisParams, lastSaveTime)
 
     def save(self, path: str, compression=zipfile.ZIP_STORED, version:int=0):
         if not path.endswith(".mmap"):
             path += ".mmap"
 
-        #abj - dont save if path is empty
+        # abj - dont save if path is empty
         if path == ".mmap":
             return
         
@@ -336,8 +355,17 @@ class AnnotationsBase(LazyImagesGeoPandas):
                 # abb analysisparams
                 group.attrs['analysisParams'] = self._analysisParams.getJson()
 
-    # Context manager
+                # abj
+                group.attrs["lastSaveTime"] = self.getCurrentTime()
 
+    def getCurrentTime(self):
+        currentTime = datetime.now()
+        # Format the current time
+        formatted_time = currentTime.strftime('%Y%m%d %H:%M')
+        logger.info(f"storeLastSaveTime {formatted_time}")
+        return formatted_time
+    
+    # Context manager
     def __enter__(self):
         self._images = self._images.__enter__()
         return self

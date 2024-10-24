@@ -112,7 +112,7 @@ class SingleTimePointFrame(LazyGeoFrame):
 
         return result
 
-    #abj johnson version
+    # abj johnson version
     @timer
     def __getitem__(self, items: Any) -> Any:
         """
