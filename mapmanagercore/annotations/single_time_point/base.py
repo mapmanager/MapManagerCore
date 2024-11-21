@@ -332,9 +332,7 @@ class SingleTimePointAnnotationsBase(_SingleTimePointAnnotationsBase):
         
         Used in PyQt interface.
         """
-        theMin, theMax = self._annotations.getAutoContrast_qt(time=self._t, channel=channel)
-
-        return theMin, theMax
+        return self._annotations.getAutoContrast_qt(time=self._t, channel=channel)
     
     @property
     def shape(self):

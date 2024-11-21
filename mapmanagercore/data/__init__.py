@@ -35,6 +35,7 @@ def getLinesFile() -> str:
 
 def getTiffChannel_1() -> str:
     urlCh1 = 'https://github.com/mapmanager/MapManagerCore-Data/raw/main/data/rr30a_s0u/t0/rr30a_s0_ch1.tif'
+    # urlCh1 = 'https://download.brainimagelibrary.org/91/2d/912d311d56fe1bce/rr30a/rr30a_s0_ch1.tif'
     ch1Path = pooch.retrieve(
         url=urlCh1,
         known_hash=None
@@ -57,3 +58,10 @@ def getSingleTimepointMap() -> str:
     )
     return mapPath
 
+def getMultiTimepointMap() -> str:
+    urlMap = 'https://github.com/mapmanager/MapManagerCore-Data/raw/main/data/multi_timepoint_map_zip.mmap'
+    mapPath = pooch.retrieve(
+        url=urlMap,
+        known_hash=None,
+    )
+    return mapPath

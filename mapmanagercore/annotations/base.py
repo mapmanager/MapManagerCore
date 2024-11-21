@@ -321,7 +321,18 @@ class AnnotationsBase(LazyImagesGeoPandas):
 
         return cls(loader, lineSegments, points, analysisParams, lastSaveTime)
 
-    def save(self, path: str, compression=zipfile.ZIP_STORED, version:int=0):
+    def saveAsZipStore(self, path: str, version:int=0):
+        self.save(path, compression=zipfile.ZIP_STORED, version=version)
+
+    def save(self, path: str,
+             compression = None,
+             version:int=0):
+        """
+        Parameters
+        ==========
+        compression :
+            If zipfile.ZIP_STORED then save as a zarr ZipStore.
+        """
         if not path.endswith(".mmap"):
             path += ".mmap"
 
@@ -334,12 +345,21 @@ class AnnotationsBase(LazyImagesGeoPandas):
 
             logger.info(f'saving to {path}')
             
-            fileExists = os.path.isdir(path)
-            # fs = zarr.ZipStore(path, mode="w", compression=compression)
-            fs = zarr.DirectoryStore(path)
+            if compression is None:
+                fs = zarr.DirectoryStore(path)
+                fileExists = os.path.isdir(path)
+            elif compression == zipfile.ZIP_STORED:
+                fs = zarr.ZipStore(path, mode="w", compression=compression)
+                # for zip we need to over-write entire file
+                fileExists = False  # os.path.isfile(path)
+            else:
+                logger.error(f'did not understand compression:{compression}')
+                return
+            
             with fs as store:
                 group = zarr.group(store=store)
                 if not fileExists:
+                    # if saving as DirectoryStore we only save images first time
                     self._images.saveTo(group)
         
                 # self.points : LazyGeoFrame
