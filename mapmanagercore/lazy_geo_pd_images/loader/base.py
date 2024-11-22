@@ -123,24 +123,33 @@ class ImageLoader:
 
         group.attrs["timePoints"] = list(self.timePoints())
 
-    def getAutoContrast_qt(self, time: int, channel: int) -> Tuple[int, int]:
+    def getAutoContrast_qt(self, time: int, channel: int) -> Tuple[int, int, int, int]:
         """Get the auto contrast from the entire image volume.
         
         Used in PyQt interface.
         """
     
         # logger.info(f'{self._images(time)[channel].shape} {np.min(self._images(time)[channel]), np.max(self._images(time)[channel])}')
-
-        _percent_low = 30.0 #0.5  # .30
-        _percent_high = 99.95  #100 - 0.5
         
         imgData = self._images(time)[channel]
-        percentiles = np.percentile(imgData, (_percent_low, _percent_high))
 
-        theMin = int(percentiles[0])
-        theMax = int(percentiles[1])
+        # _percent_low = 25.0  #20.0 #0.5  # .30
+        # _percent_high = 99.8  # 99.95  #100 - 0.5
+        # percentiles = np.percentile(imgData, (_percent_low, _percent_high))
+        # theMin = int(percentiles[0])
+        # theMax = int(percentiles[1])
 
-        return theMin, theMax
+        # not working for a stack???
+        from mapmanagercore.utils import getAutoContrast
+        _maxProject = np.max(imgData, axis=0)
+        theMin, theMax = getAutoContrast(_maxProject)
+
+        globalMin = np.min(imgData)
+        globalMax = np.max(imgData)
+
+        logger.warning(f'EXPENSIVE --> channel:{channel} shape:{imgData.shape} dtype:{imgData.dtype} globalMin:{globalMin} globalMax:{globalMax}')
+
+        return theMin, theMax, globalMin, globalMax
     
     def fetchSlices(self, time: int, channel: int, sliceRange: Tuple[int, int]) -> np.ndarray:
         """

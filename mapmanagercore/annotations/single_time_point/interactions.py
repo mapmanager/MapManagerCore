@@ -154,8 +154,8 @@ class AnnotationsInteractions(AnnotationsSegments):
         z = self.points[spineId, "z"]
 
         # create a grid of points to search for the best offset
-        points = self.analysisParams.getValue('backgroundROIGridPoint')
-        overlap = self.analysisParams.getValue('backgroundROIGridOverlap')
+        points = self.analysisParams.getValue('backgroundRoiGridPoints')
+        overlap = self.analysisParams.getValue('backgroundRoiGridOverlap')
 
         try:
             grid = shapeGrid(roi, points=points, overlap=overlap) # abj
@@ -233,7 +233,7 @@ class AnnotationsInteractions(AnnotationsSegments):
         # abb 20240730 was causing exceptions
         
         # moving into PyMapManager so we can refresh with getTimePoint()
-        # self.snapBackgroundOffset(spineId)
+        self.snapBackgroundOffset(spineId)
 
         return spineId
 

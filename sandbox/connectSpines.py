@@ -451,6 +451,7 @@ if __name__ == '__main__':
     # path = '/Users/cudmore/Sites/MapManagerCore/data/two_timepoint.mmap'
     
     # a map with connected segments and each segments have (disconnected) spines
+    # output of import_mmap.py
     path = '/Users/cudmore/Desktop/multi_timepoint_map_seg_connected.mmap'
     
     map = MapAnnotations.load(path)
@@ -473,12 +474,12 @@ if __name__ == '__main__':
 
         print(df)
 
-    if 0:
+    if 1:
         actuallyConnectSpines(map)
 
     # reload results of actuallyConnectSpines()
     savePath = '/Users/cudmore/Desktop/multi_timepoint_map_seg_spine_connected.mmap'
-    logger.info(f'loading map:{savePath}')
+    logger.info(f're-loading map:{savePath}')
     map = MapAnnotations.load(savePath)
     
     print(map)

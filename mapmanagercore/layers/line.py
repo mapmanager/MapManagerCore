@@ -266,15 +266,18 @@ def getRunningDistance(segmentLine: LineString):
     x, y = segmentLine.xy
     runningDistanceList = []
     currentSum = 0
-
-    if len(x) > 0: # error checking, ensure that segmentLine has points
-        prevPoint = Point(x[0], y[0]) # First point
-        for i, val in enumerate(x):
-            currentPoint = Point(x[i], y[i])
-            currentLineString = LineString([prevPoint, currentPoint])
-            currentSum = currentSum + currentLineString.length
-            runningDistanceList.append(currentSum)
-            prevPoint = currentPoint # keep track of previous point
+    # abb, different strategy, start with None prevPoint
+    #   this accounts for x/y len 0
+    prevPoint = None  #Point(x[0], y[0]) # First point
+    for i, val in enumerate(x):
+        currentPoint = Point(x[i], y[i])
+        if i == 0:
+            prevPoint = currentPoint
+            continue
+        currentLineString = LineString([prevPoint, currentPoint])
+        currentSum = currentSum + currentLineString.length
+        runningDistanceList.append(currentSum)
+        prevPoint = currentPoint # keep track of previous point
 
     return runningDistanceList
 

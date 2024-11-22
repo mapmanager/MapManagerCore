@@ -1,45 +1,43 @@
-import pandas as pd
+# import pandas as pd
 import pytest
 
 import mapmanagercore.data
+from mapmanagercore import MapAnnotations
 
-def test_load():
+def test_load_single_timepoint():
     """Check that we can load files from mapmanagercore.data
     
     This loads from a different repo mapmanagercore-data
     """
-    
-    linesFile = mapmanagercore.data.getLinesFile()
-    
-    dfLines = pd.read_csv(linesFile)
-    print('=== test_load dfLines')
-    print(dfLines)
-
-    pointsFile = mapmanagercore.data.getPointsFile()
-    dfPoints = pd.read_csv(pointsFile)
-    print('=== test_load dfPoints')
-    print(dfPoints)
-
-    ch1 = mapmanagercore.data.getTiffChannel_1()
-
-    ch2 = mapmanagercore.data.getTiffChannel_2()
-
-    mmap = mapmanagercore.data.getSingleTimepointMap()
-
-def test_check_file():
-    from mapmanagercore import MapAnnotations
 
     mmapPath = mapmanagercore.data.getSingleTimepointMap()
-    
+    print(f'mmapPath:{mmapPath}')
+
     # check we can load a map
     ok = MapAnnotations.checkFile(mmapPath, verbose=False)
+    print(f'ok:{ok}')
     assert ok
 
     # actually load the map
     map = MapAnnotations.load(mmapPath)
+    print(f'map:{map}')
+    assert map is not None
+
+def test_load_multi_timepoint():
+    mmapPath = mapmanagercore.data.getMultiTimepointMap()
+    print(f'mmapPath:{mmapPath}')
+
+    # check we can load a map
+    ok = MapAnnotations.checkFile(mmapPath, verbose=False)
+    print(f'ok:{ok}')
+    assert ok
+
+    # actually load the map
+    map = MapAnnotations.load(mmapPath)
+    print(f'map:{map}')
     assert map is not None
 
 if __name__ == '__main__':
-    # test_load()
-    test_check_file()
+    # test_load_single_timepoint()
+    test_load_multi_timepoint()
     
