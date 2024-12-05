@@ -3,7 +3,7 @@ from mapmanagercore.lazy_geo_pd_images.metadata import Metadata
 from .base import ImageLoader
 from typing import Iterator, Union
 import numpy as np
-
+from imageio import imread
 from mapmanagercore.logger import logger
 
 class MultiImageLoader(ImageLoader):
@@ -13,7 +13,8 @@ class MultiImageLoader(ImageLoader):
 
     def __init__(self):
         super().__init__()
-        self._images = {}
+        # self._images = {}
+        self._imagesLoaded = {} # changed name to prevent deletion of images
         self.paths = [] # for logging only
         
     def __str__(self):
@@ -29,15 +30,18 @@ class MultiImageLoader(ImageLoader):
           channel (int): The channel index.
         """
         from imageio import imread
-        if time not in self._images:
-            self._images[time] = []
+        if time not in self._imagesLoaded:
+            logger.info(f"time not in MultiImageLoader")
+            self._imagesLoaded[time] = []
 
         if isinstance(path, str):
             imgData = imread(path)
         else:
             imgData = path
 
-        self._images[time].append([channel, imgData])
+        self._imagesLoaded[time].append([channel, imgData])
+
+        # logger.info(f"compare 1 {self._imagesLoaded}") # abj
         self.paths.append([time, channel, path])
 
     # abb TODO: this is never called?
@@ -56,13 +60,25 @@ class MultiImageLoader(ImageLoader):
 
         self._metadata[time] = metadata
 
-    def build(self) -> ImageLoader:
-        images = {}
+    def build(self, currentImages = None) -> ImageLoader:
+        """
 
-        for time, values in self._images.items():
+        currentImages: Current Image that is already loaded. This is called from _MultiImagerLoader
+        """
+
+        # logger.info(f"currentImages compare {currentImages}")
+        if currentImages is not None:
+            self._imagesLoaded = currentImages
+        
+        images = {}
+        
+        # self._imagesLoaded[time].append([channel, imgData])
+        # Problem imagesLoaded is in a different format!
+
+        for time, values in self._imagesLoaded.items():
             # if not (time in self._metadata):
             #     raise ValueError(f"Metadata not found for time point {time}")
-
+            # logger.info(f"values, {values} ")
             maxChannel = max(channel for channel, _ in values) + 1
             maxSlice, maxX, maxY = values[0][1].shape
             dimensions = [maxChannel, maxSlice, maxX, maxY]
@@ -70,10 +86,16 @@ class MultiImageLoader(ImageLoader):
             for channel, image in values:
                 images[time][channel] = image
 
+        # if there are already images, return data to set within current _MultiImageLoader object
+        if currentImages is not None: 
+            return images, self._metadata
+
+        # else create new image loader object
         return _MultiImageLoader(images, self._metadata)
 
-
-class _MultiImageLoader(ImageLoader):
+# class _MultiImageLoader(ImageLoader):
+# abj - inherit from MultiImagerLoader to be able to read and build new channels
+class _MultiImageLoader(MultiImageLoader):
     """
     A loader class for loading from imageio supported formats.
     """
@@ -89,6 +111,7 @@ class _MultiImageLoader(ImageLoader):
         super().__init__()
         self._imagesSrcs = images
         self._metadata = metadata
+        self._paths = []
 
     def timePoints(self) -> Iterator[int]:
         """
@@ -101,3 +124,64 @@ class _MultiImageLoader(ImageLoader):
 
     def _images(self, t: int) -> np.ndarray:
         return self._imagesSrcs[t]
+
+    def readNewImages(self, path: Union[str, np.ndarray], time: int = 0, channel: int = 0):
+        """
+        Load an image from the given path and store it in the images array.
+
+        Args:
+          path (str): Either the path to the image file or a np array.
+          time (int): The time index.
+          channel (int): The channel index.
+        """
+
+        currentImages = {} # reformatted current images
+        if time not in currentImages:
+            logger.info(f"time not in current Images")
+            currentImages[time] = []
+
+        if isinstance(path, str):
+            imgData = imread(path)
+        else:
+            imgData = path
+
+        # self._imagesSrcs is current image
+        # append to it with new channel
+        # self._imagesSrcs[time].append([channel, imgData]
+        # Format of self._imagesSrcs: images[time][channel] = image
+
+        # print("self._imagesSrcs", self._imagesSrcs)
+
+        # Reformatting current images so that we can append new one right after
+        channelCount = -1
+        for time in self._imagesSrcs:
+            # print("time: ", time)
+            for channelImage in self._imagesSrcs[time]:
+                channelCount += 1
+                # .append([channel, imgData])
+                print("channelCount", channelCount)
+                # self._imagesLoaded[time].append([channel, imgData])
+                currentImages[time].append([channelCount, channelImage])
+
+                # TODO: create new metaData
+        
+        # TODO: need to create functionality for when user wants to switch channel numbers
+        # TODO: need to check to make sure new image channel has same size as previous  image channel
+        # append new images (channel)
+        if channel is None:
+            newChannel = channelCount + 1
+        else:
+            newChannel = channel
+         
+        currentImages[time].append([newChannel, imgData])
+
+        logger.info(f"compare 2 {currentImages}")
+        
+        # rebuild these images to correct form
+        newImages, metaData = self.build(currentImages = currentImages)
+
+        # set these images
+        self._imagesSrcs = newImages
+        self._metadata = metaData
+
+

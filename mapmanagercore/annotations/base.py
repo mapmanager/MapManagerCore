@@ -9,6 +9,7 @@ import pandas as pd
 
 from mapmanagercore.benchmark import timer
 from mapmanagercore.config import Colors, scaleColors, symbols
+from mapmanagercore.lazy_geo_pd_images.loader.imageio import MultiImageLoader
 from mapmanagercore.lazy_geo_pd_images.loader.zarr import ZarrLoader
 from ..lazy_geo_pandas import LazyGeoFrame
 from ..schemas import Segment, Spine
@@ -23,10 +24,10 @@ from mapmanagercore.analysis_params import AnalysisParams
 from mapmanagercore.logger import logger
 
 class AnnotationsBase(LazyImagesGeoPandas):
-    _images: ImageLoader
+    _images: MultiImageLoader
 
     def __init__(self,
-                 loader: ImageLoader,
+                 loader: MultiImageLoader, # OLD: loader: ImageLoader,
                  lineSegments: Union[str, pd.DataFrame] = pd.DataFrame(),
                  points: Union[str, pd.DataFrame] = pd.DataFrame(),
                  analysisParams: AnalysisParams = AnalysisParams(),
@@ -86,6 +87,12 @@ class AnnotationsBase(LazyImagesGeoPandas):
             pointsDf = pointsDf[ pointsDf['t']==t ]
         
         return pointsDf
+    
+    # abj
+    # def getChannelTotal(self, t : Optional[int] = None) -> int:
+    #     """Get total number of channel
+    #     """
+    #     return self._images.channels() 
     
     # abb
     def __str__(self):
@@ -500,3 +507,18 @@ class AnnotationsBase(LazyImagesGeoPandas):
             return lambda x: symbols_[x]
 
         return values.apply(lambda x: symbols_[x])
+    
+    # abj
+    def loadInNewChannel(self, path: Union[str, np.ndarray], time: int = 0, channel: int = 0):
+        """ Load in new channel (tif image)
+        This function is called by fullMap within pymapmanager Desktop
+
+        Args:
+            path: directory str of tif file
+            time: time in series
+            channel: new channel value
+        """
+        # functions = [func for func in dir(self._images) if callable(getattr(self._images, func))]
+        # print(functions)
+
+        self._images.readNewImages(path = path, channel = channel)
