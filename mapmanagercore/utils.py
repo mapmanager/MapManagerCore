@@ -206,7 +206,7 @@ def injectLine(line: LineString, newLine: LineString, leftPoint: Optional[Point]
     # inject the new line into the line
     return LineString([*coords[:startIdx], *newLine.coords, *coords[endIdx:]])
 
-def getAutoContrast(imgData : np.ndarray):
+def getAutoContrast(imgData : np.ndarray) -> tuple[int, int]:
     # https://forum.image.sc/t/macro-for-image-adjust-brightness-contrast-auto-button/37157/5
     # Python rewriting of ImageJ's auto-threshold option (Image > Adjust > Brightness/Contrast > 'Auto' button)
     # Based on https://github.com/imagej/ImageJ/blob/706f894269622a4be04053d1f7e1424094ecc735/ij/plugin/frame/ContrastAdjuster.java#L780

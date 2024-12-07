@@ -431,18 +431,6 @@ def plotMap(map : MapAnnotations):
 
     plt.show()
 
-def _testSaveLoad(map):
-    # Save metadata as Parquet and bytes
-    df_buffer = io.BytesIO()
-    metadata.to_parquet(df_buffer)
-    root.create_dataset("metadata_parquet", data=[df_buffer.getbuffer().tobytes()], dtype=bytes)
-
-    # Read from Parquet
-    df_buffer = io.BytesIO()
-    df_buffer.write(root["metadata_parquet"][0])
-    metadata = pd.read_parquet(df_buffer)
-    assert isinstance(metadata, pd.DataFrame)
-
 if __name__ == '__main__':
     
     # a 2 session map
@@ -459,6 +447,7 @@ if __name__ == '__main__':
     print(map)
 
     if 0:
+        # testing connect spines
         tp1 = 0  # 1
         tp2 = 1  # 2
         segment1 = 1

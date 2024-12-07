@@ -47,7 +47,8 @@ class AnalysisParams():
         for k,v in self.getDict().items():
             print(f'{k} {v}')
 
-    def getJson(self):
+    def getJson(self, indent : int = 4):
+        # return json.dumps(self._dict, indent=indent)
         return json.dumps(self._dict)
     
     def setDict(self, newDict):
@@ -196,6 +197,7 @@ class AnalysisParams():
                 # _analysisParams_json = group.attrs['analysisParams']  # json str
                 # loadedAP = json.loads(_analysisParams_json)
                 if externalDict is not None:
+                    # currentJson = json.dumps(externalDict, indent=4)
                     currentJson = json.dumps(externalDict)
                 else:
                     currentJson = self.getJson()
@@ -208,3 +210,15 @@ class AnalysisParams():
             except TypeError as e:
                 logger.error(e)
 
+    def _getDocs(self) -> str:
+        """Make self documentation from our dict.
+        
+        Notes:
+            This is not ideal, we really want each key as a row
+            and all values like (currentValue, description) as columns
+        
+            - 5/23 Fixed with transpose
+        """
+        import pandas as pd
+        df = pd.DataFrame(self._dict).transpose()
+        return df

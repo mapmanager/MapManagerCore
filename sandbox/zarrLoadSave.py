@@ -10,6 +10,7 @@ import zipfile
 import zarr
 
 from mapmanagercore import MapAnnotations, MultiImageLoader, MMapLoader
+from mapmanagercore.logger import logger
 
 def _getCreateData():
     # some fake (points, lines, images, analysisParams)
@@ -62,7 +63,7 @@ def createZarr(path, zipStore=False):
     Note:
         image meta data is not included in this example
     """
-    print('createZarr()')
+    logger.info('')
     
     _fakeData = _getCreateData()
     dfPoints = _fakeData['points']
@@ -73,7 +74,8 @@ def createZarr(path, zipStore=False):
     if zipStore:
         path += '.zip'
     
-    print('   path:', path)
+    logger.info(f'   path:{path}')
+
     if os.path.isdir(path) or os.path.isfile(path):
         print(f'   error: file exists {path}')
         return
@@ -86,13 +88,16 @@ def createZarr(path, zipStore=False):
     with cm as store:
         root = zarr.group(store=store)
 
+        # TODO alternatively, we could just export points/lines df(s) to 
+        #result = dfPoints.to_json(orient="split")
+
         root.create_dataset("points", data=_toBytes(dfPoints),
                              dtype=np.uint8)
         
         root.create_dataset("lineSegments", data=_toBytes(dfLines),
                              dtype=np.uint8)
 
-        print('   images:', _images.shape, _images.dtype, np.min(_images), np.max(_images), np.mean(_images))
+        # logger.info(f'   images:{_images.shape} {_images.dtype} {np.min(_images)} {np.max(_images)} {np.mean(_images)}')
 
         root.create_dataset("images", data=_images,
                                     dtype=_images.dtype)
@@ -152,7 +157,7 @@ def loadZarr(path, zipStore=False):
             print('   error did not find zarr folder', path)
             return
     
-    print('   path:', path)
+    # print('   path:', path)
     
     if zipStore:
         cm = zarr.ZipStore(path, mode='r')

@@ -1,8 +1,10 @@
-from dataclasses import dataclass, field
-from dataclasses_json import dataclass_json
+from dataclasses import dataclass, field, asdict
+# from dataclasses_json import dataclass_json  # allows dataclass from_json
 from typing import Literal
 
-@dataclass_json
+from mapmanagercore.logger import logger
+
+# @dataclass_json
 @dataclass
 class VoxelMetadata:
     """
@@ -17,11 +19,11 @@ class VoxelMetadata:
     y: float = 1
     z: float = 1
 
-    def __str__(self):
-        ret = f'x:{self.x} y:{self.y} z:{self.z}'
-        return ret
-    
-@dataclass_json
+    # def __str__(self):
+    #     ret = f'x:{self.x} y:{self.y} z:{self.z}'
+    #     return ret
+
+# @dataclass_json
 @dataclass
 class MetadataPhysicalSize:
     """
@@ -36,16 +38,33 @@ class MetadataPhysicalSize:
     y: float = 1
     unit: Literal["µm"] = "µm"
 
-    def __str__(self):
-        ret = f'x:{self.x} y:{self.y} unit:{self.unit}'
-        return ret
-    
-@dataclass_json
+    # def __str__(self):
+    #     ret = f'x:{self.x} y:{self.y} unit:{self.unit}'
+    #     return ret
+
+# @dataclass_json
+@dataclass
+class MetadataContrast:
+    """
+    """
+    minInt: int = 1
+    maxInt: int = 1
+    minContrast: int = 1
+    maxContrast: int = 1
+    color : str = "0x00FF00"  # map -> 'green'
+
+    # def __str__(self):
+    #     ret = f'color:{self.color} minInt:{self.minInt} minInt:{self.maxInt} minContrast:{self.minContrast} maxContrast:{self.maxContrast}'
+    #     return ret
+
+# @dataclass_json
 @dataclass
 class Metadata:
     voxel: VoxelMetadata = field(default_factory=lambda: VoxelMetadata())
     physicalSize: MetadataPhysicalSize = field(default_factory=lambda: MetadataPhysicalSize())
-    
-    def __str__(self):
-        str = f'VoxelMetadata {self.voxel} MetadataPhysicalSize {self.physicalSize}'
-        return str     
+    metadataContrast : MetadataContrast = field(default_factory=lambda: MetadataContrast())
+
+    # def __str__(self):
+    #     str = f'VoxelMetadata {self.voxel} MetadataPhysicalSize {self.physicalSize}'
+    #     str += f'metadataContrast:{self.metadataContrast}'
+    #     return str     

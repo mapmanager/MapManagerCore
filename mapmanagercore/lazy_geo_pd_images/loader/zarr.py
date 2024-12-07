@@ -1,4 +1,5 @@
 import os
+import json
 from mapmanagercore.lazy_geo_pd_images.metadata import Metadata
 from .base import ImageLoader
 from typing import Iterator
@@ -31,7 +32,11 @@ class ZarrLoader(ImageLoader):
         for t in self.group.attrs["timePoints"]:
             images = self.group[f"img-{t}"]
             self._imagesSrcs[t] = images if lazy else images[:]
-            self._metadata[t] = Metadata.from_json(self.group.attrs[f"metadata-{t}"])
+            
+            _jSonMetadata = self.group.attrs[f"metadata-{t}"]
+            _dictMetadata = json.loads(_jSonMetadata)
+            # self._metadata[t] = Metadata.from_json(self.group.attrs[f"metadata-{t}"])
+            self._metadata[t] = Metadata(_dictMetadata)
             
         self.path = path
 

@@ -1,5 +1,7 @@
 from functools import lru_cache
 from typing import Iterator, List, Self, Tuple, Union
+from dataclasses import asdict
+# import json
 import numpy as np
 import pandas as pd
 import geopandas as gp
@@ -116,10 +118,16 @@ class ImageLoader:
         Args:
           store: The store to save the data to.
         """
+        logger.info('saving images to group')
         for t in self.timePoints():
+            # images
             image = self._images(t)
             group.create_dataset(f"img-{t}", data=image, dtype=image.dtype)
-            group.attrs[f"metadata-{t}"] = self.metadata(t).to_json()
+            
+            # metadata
+            _metadata = self.metadata(t)
+            _metadataDict = asdict(_metadata)
+            group.attrs[f"metadata-{t}"] = _metadataDict
 
         group.attrs["timePoints"] = list(self.timePoints())
 

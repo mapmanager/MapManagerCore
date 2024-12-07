@@ -338,6 +338,7 @@ class AnnotationsBase(LazyImagesGeoPandas):
 
         # abj - dont save if path is empty
         if path == ".mmap":
+            logger.warning(f'did not save:{path}')
             return
         
         with warnings.catch_warnings():
@@ -358,6 +359,11 @@ class AnnotationsBase(LazyImagesGeoPandas):
             
             with fs as store:
                 group = zarr.group(store=store)
+                
+                # TODO we need finer granularity
+                # for example, we need to keep track if
+                # metadata.physical or metadata.contrast has changed during runtime
+                # as save if it has
                 if not fileExists:
                     # if saving as DirectoryStore we only save images first time
                     self._images.saveTo(group)
@@ -373,7 +379,7 @@ class AnnotationsBase(LazyImagesGeoPandas):
                 group.attrs["version"] = 1
 
                 # abb analysisparams
-                group.attrs['analysisParams'] = self._analysisParams.getJson()
+                group.attrs['analysisParams'] = self._analysisParams.getDict()
 
                 # abj
                 group.attrs["lastSaveTime"] = self.getCurrentTime()

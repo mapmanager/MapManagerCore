@@ -1,9 +1,10 @@
-import json
+# import json
+import numpy as np
+
 from mapmanagercore.lazy_geo_pd_images.metadata import Metadata
 from .base import ImageLoader
 from typing import Iterator, Union
-import numpy as np
-
+from mapmanagercore.utils import getAutoContrast
 from mapmanagercore.logger import logger
 
 class MultiImageLoader(ImageLoader):
@@ -14,11 +15,16 @@ class MultiImageLoader(ImageLoader):
     def __init__(self):
         super().__init__()
         self._images = {}
-        self.paths = [] # for logging only
+        # self.paths = [] # for logging only
         
     def __str__(self):
-        return f"Multi image Loader paths: {self.paths}"
-
+        # return f"Multi image Loader paths: {self.paths}"
+        retStr = ''
+        for _timePoint, _imgList in self._images.items():
+            for _channel, imgData in _imgList:
+                retStr += f'   tp:"{_timePoint}" ch:{_channel} {imgData.shape} {imgData.dtype}\n'
+        return retStr
+    
     def read(self, path: Union[str, np.ndarray], time: int = 0, channel: int = 0):
         """
         Load an image from the given path and store it in the images array.
@@ -28,9 +34,15 @@ class MultiImageLoader(ImageLoader):
           time (int): The time index.
           channel (int): The channel index.
         """
+        # TODO do not use imageio, use bioio
+        # note, imageio is silently installed when scikit-image is installed
+        # to update, see mapmanagercore.image_importers
         from imageio import imread
+
         if time not in self._images:
             self._images[time] = []
+            # abb
+            self._metadata[time] = Metadata()
 
         if isinstance(path, str):
             imgData = imread(path)
@@ -38,7 +50,53 @@ class MultiImageLoader(ImageLoader):
             imgData = path
 
         self._images[time].append([channel, imgData])
-        self.paths.append([time, channel, path])
+        
+        # abb
+        # logger.info(f'setting metadata time:{time} channel:{channel} imgData:{imgData.shape}')
+        _metaData = Metadata()
+        # shape of imgData
+        _metaData.voxel.x = imgData.shape[2]
+        _metaData.voxel.y = imgData.shape[1]
+        _metaData.voxel.z = imgData.shape[0]
+
+        # physicaal units (um)
+        _metaData.physicalSize.x = 0.15
+        _metaData.physicalSize.y = 0.15
+        _metaData.physicalSize.z = 1
+
+        # contrast
+        _metaData.metadataContrast.color = 'TODO: fix this'
+        _metaData.metadataContrast.minInt = int(np.min(imgData))
+        _metaData.metadataContrast.maxInt = int(np.max(imgData))
+        minContrast, maxContrast = getAutoContrast(imgData)
+        _metaData.metadataContrast.minContrast = minContrast
+        _metaData.metadataContrast.maxContrast = maxContrast
+
+        # self._metadata[time].append([channel, _metaData])
+        self._metadata[time] = _metaData
+        
+        # self.paths.append([time, channel, path])
+
+    def build(self) -> ImageLoader:
+        images = {}
+        # metadata = {}
+
+        for time, values in self._images.items():
+            # if not (time in self._metadata):
+            #     raise ValueError(f"Metadata not found for time point {time}")
+
+            maxChannel = max(channel for channel, _ in values) + 1
+            maxSlice, maxX, maxY = values[0][1].shape
+            dimensions = [maxChannel, maxSlice, maxX, maxY]
+            images[time] = np.zeros(dimensions, dtype=np.uint16)
+            for channel, image in values:
+                images[time][channel] = image
+
+                # abb
+                # metadata[time][channel] = Metadata()
+                # logger.warning('TODO set MetaData()')
+
+        return _MultiImageLoader(images, self._metadata)
 
     # abb TODO: this is never called?
     def readMetadata(self, metadata: Union[Metadata, str], time: int = 0):
@@ -55,23 +113,6 @@ class MultiImageLoader(ImageLoader):
                 metadata = Metadata.from_json(metadataFile)
 
         self._metadata[time] = metadata
-
-    def build(self) -> ImageLoader:
-        images = {}
-
-        for time, values in self._images.items():
-            # if not (time in self._metadata):
-            #     raise ValueError(f"Metadata not found for time point {time}")
-
-            maxChannel = max(channel for channel, _ in values) + 1
-            maxSlice, maxX, maxY = values[0][1].shape
-            dimensions = [maxChannel, maxSlice, maxX, maxY]
-            images[time] = np.zeros(dimensions, dtype=np.uint16)
-            for channel, image in values:
-                images[time][channel] = image
-
-        return _MultiImageLoader(images, self._metadata)
-
 
 class _MultiImageLoader(ImageLoader):
     """
