@@ -176,6 +176,8 @@ class AnnotationsInteractions(AnnotationsSegments):
         pixels = self.getShapePixels(
             candidates, channel=channel, zSpread=zSpread, z=z)
 
+        # TODO: exclude out of bounds candidates
+
         # find the candidate with the lowest sum of pixel values
         offset = grid.iloc[pixels.apply(np.sum).idxmin()]
 
@@ -194,6 +196,9 @@ class AnnotationsInteractions(AnnotationsSegments):
         y (int): The y coordinate of the spine.
         z (int): The z coordinate of the spine.
         """
+
+        # TODO: check bounds x < 0, y < 0, y or x > image size, z > number of slices or z < slices
+
         point = Point(x, y, z)
 
         # logger.error(f'1 FutureWarning: The `drop` keyword ...')
