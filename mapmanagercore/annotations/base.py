@@ -69,11 +69,11 @@ class AnnotationsBase(LazyImagesGeoPandas):
         # get last save time from attributes
         return self._lastSaveTime 
 
-    # abb
+    # abb convenience
     def getNumTimepoints(self):
         return len(self._images.timePoints())
 
-    # abb
+    # abb convenience
     def getPointDataFrame(self, t : Optional[int] = None) -> pd.DataFrame:
         """Get the full points dataframe.
         """
@@ -94,7 +94,7 @@ class AnnotationsBase(LazyImagesGeoPandas):
     #     """
     #     return self._images.channels() 
     
-    # abb
+    # abb convenience
     def __str__(self):
         """Print info about the map.
         
@@ -176,7 +176,7 @@ class AnnotationsBase(LazyImagesGeoPandas):
 
     # Serialization
 
-    # abb
+    # abb adding fn to check if mmap file is valid
     @classmethod
     def checkFile(cls, path: str, lazy=True, verbose=False) -> bool:
         """Check if a zarr file is valid to load.

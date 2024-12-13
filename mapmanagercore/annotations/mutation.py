@@ -19,7 +19,7 @@ class AnnotationsBaseMut(AnnotationsBase):
         """
         self._drop("Spine", spineId, skipLog=skipLog)
 
-    # abb
+    # abb convenience
     def getNumSpines(self, segmentId : Keys) -> int:
         """Get number of spines on a segment.
         
@@ -37,8 +37,9 @@ class AnnotationsBaseMut(AnnotationsBase):
         Delete the segment with the given ID.
         """
         try:
+            # abb TODO use getNumSpines(segmentId)
+            # abb multi timepoint error
             if not self.points[["segmentID"]].reset_index().set_index(["segmentID", "t"]).loc[segmentId].empty:
-                # abb
                 logger.warning(f'Cannot delete segment(s) {segmentId} as it has an attached spine(s)')
                 return False
                 # raise ValueError(
@@ -86,11 +87,11 @@ class AnnotationsBaseMut(AnnotationsBase):
         # if self.points[toSpineKey, "segmentID"] != self.points[spineKey, "segmentID"]:
         
         _segmentID = self.points[spineKey, "segmentID"]
-        # abb was this
+        # abb multi timepoint error was this
         # _segmentID = self.points[spineKey, "segmentID"].values[0]
         
         _toSegmentID = self.points[toSpineKey, "segmentID"]
-        # abb was this
+        # abb multi timepoint error was this
         # _toSegmentID = self.points[toSpineKey, "segmentID"].values[0]
         
         # logger.info(f'_segmentID:{_segmentID} _toSegmentID:{_toSegmentID}')
@@ -146,13 +147,13 @@ class AnnotationsBaseMut(AnnotationsBase):
         # was this
         # _slice = slice(segmentKey, segmentKey[0])
         # logger.info(f'   _slice:{(segmentKey, segmentKey[0])}')
-        # abb, this works for transient (1 tp) segments, does not get any other downstream
+        # abb multi timepoint error connectSegment works for transient (1 tp) segments, does not get any other downstream
         _slice = toSegmentKey  # ('bar',)
 
         _segment = Segment(
             # was this
             # segmentID=toSegmentKey[0],
-            # abb
+            # abb multi timepoint error was this
             segmentID=segmentKey[0],
         )
         # logger.info(f'   _segment:{_segment}')

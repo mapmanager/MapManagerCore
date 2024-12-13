@@ -151,7 +151,6 @@ class Spine:
     def spineLength(frame: LazyGeoFrame):
         return gp.GeoSeries(frame["anchor"]).distance(frame["point"])
 
-    # abb
     @compute(title="Spine Position", dependencies={
         "Spine": ["segmentID", "anchor"],
         "Segment": ["segment"]
@@ -176,9 +175,6 @@ class Spine:
         segmentFrame = frame.getFrame("Segment")
         df = frame[["segmentID", "point", "anchor"]].join(
             segmentFrame[["segment"]], on=["segmentID", "t"])
-        # abb
-        # logger.error('df.apply on df as:')
-        # print(df)
 
         try:
             _ret = df.apply(lambda d: getSpineSide(d["segment"], d["point"], d["anchor"]), axis=1)

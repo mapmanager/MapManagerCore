@@ -87,7 +87,7 @@ class LazyImagesGeoPandas(LazyGeoPandas):
 
             shapes["t"] = frame["t"] if timeIndexLevel is None else frame._df.index.get_level_values(
                 timeIndexLevel)
-            # abb >= 1
+            # abb CRITICAL added >= 1
             channels = list(channels) if len(channels) >= 1 else next(channels)
                 #channels) > 1 else next(channels)
 

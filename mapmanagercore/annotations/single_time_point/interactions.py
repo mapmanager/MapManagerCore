@@ -18,7 +18,6 @@ pendingBackgroundRoiTranslation = None
 
 class AnnotationsInteractions(AnnotationsSegments):
     
-    # abb
     def getSpineDistance(self, segmentID: SegmentId,
                          point: Point):
         """Add doc string
@@ -51,7 +50,7 @@ class AnnotationsInteractions(AnnotationsSegments):
         # find the closest point on the segment to the `point`
         minProjection = segment.project(point)
         
-        # abb
+        # abb debug
         if np.isnan(minProjection):
             logger.error(f'=== UNEXPECTED minProjection:{minProjection}')
             logger.error(f'   segmentID:{segmentID}')
@@ -209,7 +208,7 @@ class AnnotationsInteractions(AnnotationsSegments):
 
         spineId = self.newUnassignedSpineId()
 
-        # abb
+        # abb TODO we want our spine id(s) to be PYthon int, not numpy int64 ???
         spineId = int(spineId)
 
         # if self._t in [1, 2]:
@@ -228,16 +227,6 @@ class AnnotationsInteractions(AnnotationsSegments):
         )
         self.updateSpine(spineId, _spine)
 
-        # if self._t in [1, 2]:
-        #     logger.info('after updateSpine')
-        #     logger.info(self)
-        #     print('self.points.index is:')
-        #     print(self.points.index)
-
-        # logger.error(f'4 FutureWarning: The `drop` keyword ...')
-        # abb 20240730 was causing exceptions
-        
-        # moving into PyMapManager so we can refresh with getTimePoint()
         self.snapBackgroundOffset(spineId)
 
         return spineId
@@ -290,11 +279,8 @@ class AnnotationsInteractions(AnnotationsSegments):
         """
         segmentId = self.points[spineId, "segmentID"]
         
-        # abb
-        # when moving, do not find brightest
+        # abb when moving, do not find brightest
         anchor = self.nearestAnchor(segmentId, Point(x, y, z))
-
-        # logger.info(f'segmentId:{segmentId} anchor:{anchor}')
 
         self.updateSpine(spineId, Spine(
             anchorZ=int(anchor.z),
@@ -429,8 +415,6 @@ class AnnotationsInteractions(AnnotationsSegments):
             int: The ID of the new segment.
         """        
         segmentId = self.newUnassignedSegmentId()
-        
-        # abb
         segmentId = int(segmentId)
 
         _segment = Segment.withDefaults(
@@ -482,7 +466,7 @@ class AnnotationsInteractions(AnnotationsSegments):
             LineString: The updated rough tracing.
         """
 
-        # abb
+        # abb debug
         # logger.info(f'segmentId:{segmentId} {type(segmentId)}')
         # print('   self.segments:')
         # # self.segments is mapmanagercore.annotations.single_time_point.base.SingleTimePointFrame
@@ -491,12 +475,12 @@ class AnnotationsInteractions(AnnotationsSegments):
         roughTracing: Union[LineString,
                             Point] = self.segments[segmentId, "roughTracing"]
         
-        # abb
+        # abb debug
         # roughTracing is LINESTRING Z
         if roughTracing is None:
             logger.error(f'   segmentId:{segmentId} roughTracing IS NONE -->> ERROR')
             logger.error('self.segments.index:')
-            print(self.segments.index)
+            logger.error(self.segments.index)
 
         point = Point(x, y, z)
         first = len(roughTracing.coords) < 2 or point.distance(

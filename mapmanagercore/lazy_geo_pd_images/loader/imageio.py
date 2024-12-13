@@ -42,7 +42,6 @@ class MultiImageLoader(ImageLoader):
         if time not in self._imagesLoaded:
             logger.info(f"time not in MultiImageLoader")
             self._imagesLoaded[time] = []
-            # abb
             self._metadata[time] = Metadata()
 
         if isinstance(path, str):
@@ -52,8 +51,6 @@ class MultiImageLoader(ImageLoader):
 
         self._imagesLoaded[time].append([channel, imgData])
 
-        # abb
-        # logger.info(f'setting metadata time:{time} channel:{channel} imgData:{imgData.shape}')
         _metaData = Metadata()
         # shape of imgData
         _metaData.voxel.x = imgData.shape[2]
@@ -79,7 +76,7 @@ class MultiImageLoader(ImageLoader):
         # logger.info(f"compare 1 {self._imagesLoaded}") # abj
         self.paths.append([time, channel, path])
 
-    # abb TODO: this is never called?
+    # abb TODO: readMetadata, this is never called?
     def readMetadata(self, metadata: Union[Metadata, str], time: int = 0):
         """
         Set the metadata for the given time index.
@@ -176,6 +173,7 @@ class _MultiImageLoader(MultiImageLoader):
             currentImages[time] = []
 
         if isinstance(path, str):
+            from imageio import imread
             imgData = imread(path)
         else:
             imgData = path

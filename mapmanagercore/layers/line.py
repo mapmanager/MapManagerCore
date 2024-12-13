@@ -266,7 +266,7 @@ def getRunningDistance(segmentLine: LineString):
     x, y = segmentLine.xy
     runningDistanceList = []
     currentSum = 0
-    # abb, different strategy, start with None prevPoint
+    # different strategy, start with None prevPoint
     #   this accounts for x/y len 0
     prevPoint = None  #Point(x[0], y[0]) # First point
     for i, val in enumerate(x):

@@ -13,26 +13,6 @@ As a github workflow:
 
 import pooch
 
-# abb: DO NOT USE THIS !!!!
-def getPointsFile() -> str:
-    """Download and get path to points csv.
-    """
-    urlPoints = 'https://raw.githubusercontent.com/mapmanager/MapManagerCore-Data/main/data/rr30a_s0u/points.csv'
-    pointsPath = pooch.retrieve(
-        url=urlPoints,
-        known_hash=None
-    )
-    return pointsPath
-
-# abb: DO NOT USE THIS !!!!
-def getLinesFile() -> str:
-    urlLines = 'https://github.com/mapmanager/MapManagerCore-Data/raw/main/data/rr30a_s0u/line_segments.csv'
-    linePath = pooch.retrieve(
-        url=urlLines,
-        known_hash=None
-    )
-    return linePath
-
 def getTiffChannel_1() -> str:
     urlCh1 = 'https://github.com/mapmanager/MapManagerCore-Data/raw/main/data/rr30a_s0u/t0/rr30a_s0_ch1.tif'
     # urlCh1 = 'https://download.brainimagelibrary.org/91/2d/912d311d56fe1bce/rr30a/rr30a_s0_ch1.tif'
