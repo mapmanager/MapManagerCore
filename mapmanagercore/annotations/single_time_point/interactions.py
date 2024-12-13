@@ -29,9 +29,12 @@ class AnnotationsInteractions(AnnotationsSegments):
         return minProjection
 
     # abb added findBrightest=False, do not find brightest by default
+    # abj added returnIndex=False, return Anchor point by default, return its index if True
     def nearestAnchor(self, segmentID: SegmentId,
                       point: Point,
-                      findBrightest: bool = False):
+                      findBrightest : bool = False,
+                      returnIndex : bool = False
+                      ):
         """Finds the nearest anchor point on a given line segment to a given point.
 
         Args:
@@ -44,18 +47,48 @@ class AnnotationsInteractions(AnnotationsSegments):
             Point: The nearest anchor point.
         """
         segment: LineString = self.segments[segmentID, "segment"]
+
         # find the closest point on the segment to the `point`
         minProjection = segment.project(point)
-
+        
+        # abb
         if np.isnan(minProjection):
-            logger.warning(f'minProjection:{minProjection}')
-            logger.warning(f'segment:{segment}')
-            logger.warning(f'point:{point}')
-
+            logger.error(f'=== UNEXPECTED minProjection:{minProjection}')
+            logger.error(f'   segmentID:{segmentID}')
+            logger.error(f'   self.segments[:]:{self.segments[:]}')
+            logger.error(f'   segment:{segment}')
+            logger.error(f'   point:{point}')
+            
         if not findBrightest:
             # Default to the closest point (not brightest)
+            # problem: closest point on line but not actually a point stored within segments
+            logger.info("defaulting to closest point")
             anchor = segment.interpolate(minProjection)
             anchor = roundPoint(anchor, 1)
+            logger.info(f"anchor {anchor}")
+
+            if returnIndex:
+                logger.info(f"entering return index")
+                distanceStart = None
+                # find index of point in segment that is closest to minProjection
+                x, y = segment.xy
+                for i, val in enumerate(x):
+                    currentPoint = Point(x[i], y[i])
+                    logger.info(f"currentPoint {currentPoint}")
+                    # check the distance 
+                    distanceCheck = Point(anchor.x, anchor.y).distance(currentPoint)
+                    if distanceStart is None:
+                        distanceStart = distanceCheck
+
+                    if abs(distanceCheck) < abs(distanceStart): # check for closer point, where distance is less
+                        logger.info(f"distanceCheck {abs(distanceCheck)} < distanceStart {abs(distanceStart)}")
+                        pivotIndex = i
+                        distanceStart = distanceCheck
+                        logger.info(f"pivotIndex {pivotIndex}")
+               
+                return pivotIndex
+
+            # otherwise return anchor
             return anchor
 
         brightestPathDistance = self.analysisParams.getValue(
@@ -84,6 +117,29 @@ class AnnotationsInteractions(AnnotationsSegments):
         brightest = (pixels.apply(np.median) / targets.length).idxmax()
 
         return Point(targets[brightest].coords[1])
+    
+    #abj
+    def autoConnectBrightestIndex(self, spineId: SpineId,
+                      segmentID: SegmentId,
+                      point: Point,
+                      findBrightest : bool = True,
+                      ):
+        """ Calculates nearest (brightest) anchor and sets it
+
+        Args:
+            segmentID (SegmentId): The ID of the line segment.
+            point (Point): The point to find the nearest anchor to.
+
+
+        """  
+        anchor = self.nearestAnchor(segmentID, point, findBrightest)
+
+        self.updateSpine(spineId, Spine(
+            anchorZ=int(anchor.z),
+            anchor=Point(anchor.x, anchor.y),
+        ), replaceLog=True)
+
+        return True
 
     def snapBackgroundOffset(self, spineId: SpineId,
                              channel: int = None,
@@ -99,8 +155,20 @@ class AnnotationsInteractions(AnnotationsSegments):
         z = self.points[spineId, "z"]
 
         # create a grid of points to search for the best offset
-        grid = shapeGrid(roi, points=3, overlap=0.1)
+        points = self.analysisParams.getValue('backgroundROIGridPoint')
+        overlap = self.analysisParams.getValue('backgroundROIGridOverlap')
 
+        try:
+            grid = shapeGrid(roi, points=points, overlap=overlap) # abj
+            # grid = shapeGrid(roi, points=3, overlap=0.1)
+        except (ValueError) as e:
+            logger.error(f'   {e}')
+            logger.error(f'   spineId:{spineId}')
+            logger.error(f'   roi:{roi}')
+            print('   self.points[:]')
+            print(self.points[:])
+            return
+        
         # translate the roi by the grid points
         candidates = gp.GeoSeries(grid.apply(
             lambda x: shapely.affinity.translate(roi, x["x"], x["y"]), axis=1))
@@ -118,7 +186,7 @@ class AnnotationsInteractions(AnnotationsSegments):
             yBackgroundOffset=offset["y"],
         ), replaceLog=True)
 
-    def addSpine(self, segmentId: SpineId, x: int, y: int, z: int) -> Union[SpineId, None]:
+    def addSpine(self, segmentId: SegmentId, x: int, y: int, z: int) -> Union[SpineId, None]:
         """
         Adds a spine.
 
@@ -133,11 +201,21 @@ class AnnotationsInteractions(AnnotationsSegments):
             logger.warning(f'segmentId:{segmentId} not in self.segments.index')
             return None
 
+        # logger.error(f'1 FutureWarning: The `drop` keyword ...')
         anchor = self.nearestAnchor(segmentId, point, findBrightest=True)
+
+        # if segmentId == 5:
+        #     logger.warning(f'anchor:{anchor}')
 
         spineId = self.newUnassignedSpineId()
 
-        self.updateSpine(spineId, Spine.withDefaults(
+        # abb
+        spineId = int(spineId)
+
+        # if self._t in [1, 2]:
+        #     logger.info(f'spineId:{spineId} {type(spineId)} segmentId:{segmentId} anchor:{anchor}')
+
+        _spine = Spine.withDefaults(
             segmentID=segmentId,
             point=Point(point.x, point.y),
             z=int(z),
@@ -145,10 +223,22 @@ class AnnotationsInteractions(AnnotationsSegments):
             anchorZ=int(anchor.z),
             xBackgroundOffset=0.0,
             yBackgroundOffset=0.0,
-        ))
+            roiExtend = self.analysisParams.getValue("roiExtend"),
+            roiRadius = self.analysisParams.getValue("roiRadius")
+        )
+        self.updateSpine(spineId, _spine)
 
-        logger.error(f'4 FutureWarning: The `drop` keyword ...')
-        self.snapBackgroundOffset(spineId)
+        # if self._t in [1, 2]:
+        #     logger.info('after updateSpine')
+        #     logger.info(self)
+        #     print('self.points.index is:')
+        #     print(self.points.index)
+
+        # logger.error(f'4 FutureWarning: The `drop` keyword ...')
+        # abb 20240730 was causing exceptions
+        
+        # moving into PyMapManager so we can refresh with getTimePoint()
+        # self.snapBackgroundOffset(spineId)
 
         return spineId
 
@@ -204,7 +294,7 @@ class AnnotationsInteractions(AnnotationsSegments):
         # when moving, do not find brightest
         anchor = self.nearestAnchor(segmentId, Point(x, y, z))
 
-        logger.info(f'segmentId:{segmentId} anchor:{anchor}')
+        # logger.info(f'segmentId:{segmentId} anchor:{anchor}')
 
         self.updateSpine(spineId, Spine(
             anchorZ=int(anchor.z),
@@ -252,8 +342,9 @@ class AnnotationsInteractions(AnnotationsSegments):
             x, y]
 
         return True
-
-    def moveRoiExtend(self, spineId: SpineId, x: int, y: int, z: int = 0, state: DragState = DragState.MANUAL) -> bool:
+    
+    def moveRoiExtend(self, spineId: SpineId, x: int, y: int, z: int = 0, 
+                      state: DragState = DragState.MANUAL, roiExtend: int = None) -> bool:
         """
         Move the ROI extend for a given spine ID.
 
@@ -262,6 +353,8 @@ class AnnotationsInteractions(AnnotationsSegments):
             x (int): The x-coordinate of the cursor.
             y (int): The y-coordinate of the cursor.
             state (DragState): The state of the translation.
+            roiExtend (int): updates roiExtend for Spine if given a value (#abj)
+                - used to standardize the roiExtend of a point across multiple time points
 
         returns:
             bool: True if the ROI extend was successfully translated, False otherwise.
@@ -269,9 +362,14 @@ class AnnotationsInteractions(AnnotationsSegments):
 
         point = self.points[spineId, "point"]
 
-        self.updateSpine(spineId, Spine(
-            roiExtend=float(point.distance(Point(x, y)))
-        ), state != DragState.START and state != DragState.MANUAL)
+        if roiExtend is None:
+            self.updateSpine(spineId, Spine(
+                roiExtend=float(point.distance(Point(x, y)))
+            ), state != DragState.START and state != DragState.MANUAL)
+        else: #abj
+            self.updateSpine(spineId, Spine(
+                roiExtend=float(roiExtend)
+            ), state != DragState.START and state != DragState.MANUAL)
 
         return True
 
@@ -331,11 +429,17 @@ class AnnotationsInteractions(AnnotationsSegments):
             int: The ID of the new segment.
         """
         segmentId = self.newUnassignedSegmentId()
+        
+        # abb
+        segmentId = int(segmentId)
 
-        self.updateSegment(segmentId, Segment.withDefaults(
+        _segment = Segment.withDefaults(
             segment=LineString([]),
-            roughTracing=LineString([])
-        ))
+            roughTracing=LineString([]),
+            radius = self.analysisParams.getValue("segmentRadius")
+        )
+
+        self.updateSegment(segmentId, _segment)
 
         return segmentId
 
@@ -385,8 +489,22 @@ class AnnotationsInteractions(AnnotationsSegments):
                 roughTracing=LineString([])
             ))
 
+        # abb
+        # logger.info(f'segmentId:{segmentId} {type(segmentId)}')
+        # print('   self.segments:')
+        # # self.segments is mapmanagercore.annotations.single_time_point.base.SingleTimePointFrame
+        # print(self.segments)
+        
         roughTracing: Union[LineString,
                             Point] = self.segments[segmentId, "roughTracing"]
+        
+        # abb
+        # roughTracing is LINESTRING Z
+        if roughTracing is None:
+            logger.error(f'   segmentId:{segmentId} roughTracing IS NONE -->> ERROR')
+            logger.error('self.segments.index:')
+            print(self.segments.index)
+
         point = Point(x, y, z)
         first = len(roughTracing.coords) < 2 or point.distance(
             Point(roughTracing.coords[0])) < point.distance(Point(roughTracing.coords[-1]))
@@ -397,6 +515,7 @@ class AnnotationsInteractions(AnnotationsSegments):
             "segmentTracingMaxDistance")
 
         if maxTracingDistance is not None and point.distance(snappedPoint) > maxTracingDistance:
+            # logger.warning(f'abb return None for maxTracingDistance:{maxTracingDistance}')
             return None
 
         if first:
@@ -422,9 +541,56 @@ class AnnotationsInteractions(AnnotationsSegments):
             roughTracing = [*roughTracing.coords, point.coords[0]]
             idx = len(roughTracing) - 1
 
+        # logger.info(f'idx:{idx} roughTracing:{roughTracing}')
+        
         self.updateSegmentWithLiveTracing(
             segmentId, roughTracing, idx)
-        return 0 if first else len(roughTracing) - 1
+        
+        theRet = 0 if first else len(roughTracing) - 1
+        # logger.info(f'theRet:{theRet}')
+        return theRet
+    
+    def old_setPivotPoint(self, segmentId: SegmentId, clickedPoint: Point, speculate: bool = False) -> Point:
+        """ Sets pivotPoint of segment. 
+
+        Calculates pivot point by find closest brightest index point to the clicked Point
+        """
+        # pass
+
+        # auto set pivot point closest to click on line
+
+        closestPivotPoint = self.nearestAnchor(segmentID=segmentId, point=clickedPoint, findBrightest=False)
+        logger.info(f"closestPivotPoint {closestPivotPoint}")
+        # set pivot point in backend
+        self.updateSegment(segmentId, Segment(
+            pivotPoint=closestPivotPoint
+        ))
+
+        # used for verification
+        return closestPivotPoint
+    
+    def setPivotDistance(self, segmentId: SegmentId, clickedPoint: Point, speculate: bool = False) -> Point:
+        """ Sets pivotPoint of segment. 
+
+        Calculates pivot point by find closest brightest index point to the clicked Point
+        """
+        # use closest pivot point to find similar ID in the segments
+        closestPivotID = self.nearestAnchor(segmentID=segmentId, point=clickedPoint, findBrightest=False, returnIndex=True)
+        logger.info(f"closestPivotID {closestPivotID}")
+
+        # # get the value of 'distance' at closestPivotID within the segment
+        distanceList = self.segments[segmentId, "distance"]
+        closestPivotDistance = distanceList[closestPivotID]
+
+        logger.info(f"closestPivotDistance {closestPivotDistance}")
+
+        # set pivot point in backend
+        self.updateSegment(segmentId, Segment(
+            pivotDistance = closestPivotDistance
+        ))
+
+        # used for verification
+        return closestPivotDistance
 
     def moveSegmentPoint(self, segmentId: SegmentId, x: int, y: int, z: int, index: int, state: DragState = DragState.MANUAL) -> bool:
         """

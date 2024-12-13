@@ -154,7 +154,18 @@ class LazyGeoPandas:
     def _update(self, key: str, ids: Union[Hashable, Sequence[Hashable], pd.Index], value: Schema, replaceLog=False, skipLog=False):
         """
         Applies an update to a frame while adding a undo/redo log entry.
+        
+        Parameters
+        ----------
+        key : str
+            From ['Segments', 'Spines']
+        ids : slice
         """
+        
+        # logger.info(f'key:{key} {type(key)}')
+        # logger.info(f'ids:{ids} {type(ids)}')
+        # logger.info(f'value:{value}')
+        
         store = self._frames[key]
 
         if not isinstance(value, store._schema):
@@ -310,6 +321,10 @@ class LazyGeoFrame(Generic[T]):
         key = self._schema._key
         self.getStore().invalidateCachedColumns(ids, key, columns)
 
+    def __str__(self):
+        _ret = str(self._rootDf)
+        return _ret
+    
     def _updateColumns(self):
         """Updates the columns by collecting all the non-index columns from the scheme."""
         self._columns = []
@@ -413,6 +428,7 @@ class LazyGeoFrame(Generic[T]):
     @timer
     def _filter(self, index: pd.Index):
         """Creates a filtered copy of the frame."""
+        # logger.error(f'abb copy memory #5 self:{type(self)}')
         filtered = copy(self)
         if isinstance(index, pd.Series):
             index = index[index].index
@@ -459,6 +475,8 @@ class LazyGeoFrame(Generic[T]):
         """Modeled after the __getitem__ method of a pandas DataFrame."""
         row, key = self._parseKeyRow(items)
 
+        # logger.info(f'row:{row} key:{key}')
+
         filtered = self
         if row is not None:
             filtered = self._filter(row)
@@ -472,12 +490,26 @@ class LazyGeoFrame(Generic[T]):
                 key = filtered.columns
             filtered._insureComputed(key)
 
+        # logger.warning('=== !!!')
+        # print('   key:', key)
+        # print('   filtered._getFiltered(key):', filtered._getFiltered(key))
+
         df: pd.DataFrame = filtered._getFiltered(key)
         if len(df) <= 1 and (len(df.shape) == 1 or df.shape[1] < 1):
             if (isinstance(row, tuple) and df.index.nlevels == len(row)) or df.index.nlevels == 1 and self._schema.isIndexType(row):
                 if df.empty:
+                    logger.warning(f'returning none with items:{items}')
                     return None
+                # logger.warning('!!!=== returning df.values[0]')
+                # print(df.values[0])
+                # print('from df.values')
+                # print(df.values)
+
                 return df.values[0]
+            
+        # logger.warning(f'========= returning df with type {type(df)}')
+        # print(df)
+        
         return df
 
     @timer
@@ -541,6 +573,7 @@ class LazyGeoFrame(Generic[T]):
         if self._df.shape[0] == invalid.shape[0]:
             return self
 
+        # logger.error(f'abb copy memory #6 self:{type(self)}')
         filtered = copy(self)
         filtered._setFilterIndex(invalid.index)
         return filtered
@@ -578,11 +611,12 @@ class LazyGeoFrame(Generic[T]):
 
                     store = self._store()._frames[depStore]
                     ids = invalidClone._schema._mapIds(depStore, store._df)
+                    # logger.error(f'abb copy memory #7 store:{type(store)}')
                     storeClone = copy(store)
                     storeClone._setFilterIndex(store._df.loc[ids].index)
                     storeClone._insureComputed(deps)
                 logger.debug(
-                    f"Computing column {column} for {len(invalidClone)}")
+                    f'Computing column "{column}" for num invalid: {len(invalidClone)}')
                 results = attribute["_func"](invalidClone)
 
                 missingIndex = invalidClone._df.index
@@ -623,15 +657,15 @@ class LazyGeoFrame(Generic[T]):
             depsStore = dependents[column]
             for dependencyKey, invalidColumns in depsStore.items():
                 if not dependencyKey in invalidate:
+                    # logger.error(f'abb copy memory #8 store:{type(invalidColumns)}')
                     invalidate[dependencyKey] = copy(invalidColumns)
                 else:
                     invalidate[dependencyKey].update(invalidColumns)
 
         return invalidate
 
-    def toBytes(self):
+    def toBytes(self, version:int=0):
         return toBytes(self._rootDf)
-
 
 class LazyGeoSeries(LazyGeoFrame[T]):
     def __init__(self, schema: Schema, data: gp.GeoSeries = None, store: T = None):

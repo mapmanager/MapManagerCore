@@ -1,8 +1,8 @@
 import os
 from copy import copy
 from io import BytesIO
-from typing import Any, Tuple, Union
 import weakref
+from typing import Any, Tuple, Union, Optional
 import zipfile
 from mapmanagercore.lazy_geo_pd_images.loader.base import Position
 import numpy as np
@@ -19,8 +19,6 @@ import zarr
 import warnings
 from plotly.express.colors import sample_colorscale
 import geopandas as gp
-
-from mapmanagercore.analysis_params import AnalysisParams
 
 from mapmanagercore.analysis_params import AnalysisParams
 from mapmanagercore.logger import logger
@@ -66,17 +64,41 @@ class AnnotationsBase(LazyImagesGeoPandas):
         
 
     # abb
+    def getNumTimepoints(self):
+        return len(self._images.timePoints())
+
+    # abb
+    def getPointDataFrame(self, t : Optional[int] = None) -> pd.DataFrame:
+        """Get the full points dataframe.
+        """
+        pointsDf = self.points[:]
+        
+        if t is not None:
+
+            # move (,t) index into a column
+            pointsDf = pointsDf.reset_index(level=1)
+            # reduce my t==t
+            pointsDf = pointsDf[ pointsDf['t']==t ]
+        
+        return pointsDf
+    
+    # abb
     def __str__(self):
         """Print info about the map.
 
         See: _SingleTimePointAnnotationsBase()
         """
-        numTimepoints = len(self._images.timePoints())
-        numPnts = len(self.points._rootDf)
-        numSegments = len(self.segments._rootDf)
-
-        return f't:{numTimepoints}, points:{numPnts} segments:{numSegments} loader:{self.loader}'
-
+        timePoints = self._images.timePoints()
+        numTimepoints = len(timePoints)
+        numPnts = len(self.points)
+        numSegments = len(self.segments)
+        
+        theRet =  f'mmmap t:[{numTimepoints}], points:{numPnts} segments:{numSegments}\n'
+        for tpIdx in timePoints:
+            tp = self.getTimePoint(time=tpIdx)
+            theRet += f'      {tp}\n'
+        return theRet
+    
     @property
     def segments(self) -> LazyGeoFrame:
         return self._segments
@@ -93,6 +115,8 @@ class AnnotationsBase(LazyImagesGeoPandas):
         """
         Filters the points.
         """
+        # logger.error(f'abb copy memory #1 filter:{filter} {type(filter)}')
+        
         c = copy(self)
         c._points = c._points[filter]
         return c
@@ -101,6 +125,7 @@ class AnnotationsBase(LazyImagesGeoPandas):
         """
         Filters the segments.
         """
+        # logger.error(f'abb copy memory #2 filter:{filter} {type(filter)}')
         c = copy(self)
         c._segments = c._segments[filter]
         return c
@@ -139,6 +164,7 @@ class AnnotationsBase(LazyImagesGeoPandas):
 
     # Serialization
 
+    # abb
     @classmethod
     def checkFile(cls, path: str, lazy=True, verbose=False) -> bool:
         """Check if a zarr file is valid to load.
@@ -290,6 +316,10 @@ class AnnotationsBase(LazyImagesGeoPandas):
         if not path.endswith(".mmap"):
             path += ".mmap"
 
+        #abj - dont save if path is empty
+        if path == ".mmap":
+            return
+        
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
 

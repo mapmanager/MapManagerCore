@@ -15,7 +15,7 @@ import sys
 
 from logging.handlers import RotatingFileHandler
 
-def setLogLevel(newLogLevel : str = 'INFO'):
+def setLogLevel(newLogLevel : str = 'DEBUG'):
     """Set the global logging level.
     
     Can update this during runtime and all logs will follow the level.
@@ -51,7 +51,7 @@ def getLoggerFilePath():
     -----
     Mac: /Users/cudmore/Library/Application Support/MapManager
     Linux: /share/MapManager
-    Windows: 
+    Windows: /Users/johns/AppData/Local/MapManager
     """
     appName = 'MapManager'
     try:

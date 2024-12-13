@@ -1,19 +1,26 @@
+import time
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 
-from mapmanagercore import MapAnnotations, MMapLoader
+from mapmanagercore import MapAnnotations  # , MMapLoader
 from mapmanagercore.annotations.single_time_point import SingleTimePointAnnotations
 
 from mapmanagercore.logger import logger
 
-def connectSpines(map :MapAnnotations, tp1, tp2, segment1, segment2, thesholdDist : float = 10):
-    """Connect spines between tp1 and tp2.
+def _getConnectedSpines(map : MapAnnotations, tp1, tp2, segment1, segment2, thesholdDist : float = 10):
+    """Get connect spines between tp1 and tp2.
 
     Parameters
     ---------
     tp1,tp2 : int
         The timepoint (e.g. time or t) to connect between
-
+    segment1, segment2 : int
+        The segment ID
+        Note: segment ID needs to be the same
+    thesholdDist : int
+        The threshold to connect spines.
+        If <thesholdDist then connect, otherwise do not
 
     Returns
     -------
@@ -24,19 +31,22 @@ def connectSpines(map :MapAnnotations, tp1, tp2, segment1, segment2, thesholdDis
         toPosition
         dist
     """
+    
+    # second dimension (column index) into our internal 2D numpy array
     spineID = 0
-    position = 1
-    isLeft = 2
-    toSpineID = 3
-    toDistance = 4
-    toPosition = 5
-    # spineLength = 6
-    # toSpineLength = 7
-
-    # thesholdDist = 10
-    # print('thesholdDist:', thesholdDist)
+    # segmentID = 1
+    position = 2
+    isLeft = 3
+    toSpineID = 4
+    # toSegmentID = 5
+    toDistance = 6
+    toPosition = 7
+    
+    _totalNumColumns = 8
 
     def makeNp(tp : SingleTimePointAnnotations, segmentID):  # , isFrom : bool):
+        """What is this doing???
+        """
         points = tp.points[:]
         points = points[points['segmentID']==segmentID]
 
@@ -44,14 +54,25 @@ def connectSpines(map :MapAnnotations, tp1, tp2, segment1, segment2, thesholdDis
 
         # print(points['spineLength'].max())  # about 25
 
+        # columns = ['spineID', 'position', 'isLeft', 'toSpineID', 'toPosition', 'toDistance']
+        # df = pd.DataFrame(columns=columns)
+        # df['spineID'] = points.index.to_list()
+        # df['position'] = points['spinePosition']
+        # df['isLeft'] = (points['spineSide']=='Left')
+        # df['toSpineID'] = np.nan
+        # df['toPosition'] = np.nan
+        # df['toDistance'] = np.nan
+        
         m = len(points)
 
-        _np = np.zeros(shape=(m,6))
+        _np = np.zeros(shape=(m,_totalNumColumns))
         _np[:,spineID] = points.index.to_list()
+        # _np[:,segmentID] = points['segmentID']
         _np[:,position] = points['spinePosition']
         _np[:,isLeft] = points['isLeft']  # left -> 1, right -> 0
 
         _np[:,toSpineID] = np.nan
+        # _np[:,toSegmentID] = np.nan
         _np[:,toDistance] = np.nan
         _np[:,toPosition] = np.nan
 
@@ -66,19 +87,23 @@ def connectSpines(map :MapAnnotations, tp1, tp2, segment1, segment2, thesholdDis
     def connect(i, j):
         dist = abs(fromNp[i,position] - toNp[j,position])
         fromNp[i,toSpineID] = toNp[j, spineID]  # int(j)
+        # fromNp[i,toSegmentID] = toNp[j, segmentID]  # int(j)
         fromNp[i,toDistance] = dist
         fromNp[i, toPosition] = toNp[j,position]
         
         toNp[j, toSpineID] = fromNp[i, spineID]  # int(i)
+        # toNp[j, toSegmentID] = fromNp[i, segmentID]  # int(i)
         toNp[j, toDistance] = dist
         toNp[j, toPosition] = fromNp[i,position]  # not used
 
     def disconnect(i, j):
         fromNp[i,toSpineID] = np.nan
+        # fromNp[i,toSegmentID] = np.nan
         fromNp[i,toDistance] = np.nan
         fromNp[i,toPosition] = np.nan
         
         toNp[j, toSpineID] = np.nan
+        # toNp[j, toSegmentID] = np.nan
         toNp[j, toDistance] = np.nan
         toNp[j, toPosition] = np.nan
 
@@ -91,10 +116,12 @@ def connectSpines(map :MapAnnotations, tp1, tp2, segment1, segment2, thesholdDis
     m = len(fromNp)
     n = len(toNp)
     
+    # logger.info(f'm:{m} n:{n}')
+
     numTieBreakers = -1
     numIteration = 0
     while numTieBreakers != 0:
-        logger.info(f'iteration:{numIteration} tie breakers:{numTieBreakers}')
+        # logger.info(f'iteration:{numIteration} tie breakers:{numTieBreakers}')
 
         numTieBreakers = 0
         for i in range(m):
@@ -103,6 +130,7 @@ def connectSpines(map :MapAnnotations, tp1, tp2, segment1, segment2, thesholdDis
             for j in range(n):
                 jLeft = toNp[j,isLeft]
                 if iLeft != jLeft:
+                    # spines on opposite left/right sides are never connected
                     continue
                 
                 jIsTaken = ~np.isnan(toNp[j, toSpineID])
@@ -114,7 +142,9 @@ def connectSpines(map :MapAnnotations, tp1, tp2, segment1, segment2, thesholdDis
                         if dist < existingDist:
                             numTieBreakers += 1
                             _toSpineID = int(toNp[j,toSpineID])
-                            disconnect(_toSpineID, j)
+                            # abb
+                            # disconnect(_toSpineID, j)
+                            disconnect(i, j)
                             # print(f'jIsTaken broke tie {i} {j} existingDist:{existingDist} new dist:{dist}')
                         else:
                             # j is taken but current (i,j) dist does not beat it
@@ -136,13 +166,17 @@ def connectSpines(map :MapAnnotations, tp1, tp2, segment1, segment2, thesholdDis
         #
         numIteration += 1
 
-    logger.info(f'numIteration:{numIteration}')
+    # logger.info(f'numIteration:{numIteration}')
 
     dfRet = pd.DataFrame()
-    dfRet['spineID'] = fromNp[:, spineID]
+    dfRet['spineID'] = fromNp[:, spineID]  # will be float
+    dfRet['timepoint'] = tp1
+    dfRet['segmentID'] = segment1  # from segmentID
     dfRet['position'] = fromNp[:, position]
     
-    dfRet['toSpineID'] = fromNp[:, toSpineID]
+    dfRet['toSpineID'] = fromNp[:, toSpineID]  # will be float
+    dfRet['toTimepoint'] = tp2
+    dfRet['toSegmentID'] = segment2  # to segmentID
     dfRet['toPosition'] = fromNp[:, toPosition]
 
     dfRet['dist'] = dfRet['toPosition'] - dfRet['position']
@@ -150,7 +184,7 @@ def connectSpines(map :MapAnnotations, tp1, tp2, segment1, segment2, thesholdDis
     dfRet['spineLength'] = _fromTp.points[:].loc[dfRet['spineID']]['spineLength']
 
     # toSpineID will have nan
-    _df = dfRet['toSpineID'].dropna().to_list()
+    # _df = dfRet['toSpineID'].dropna().to_list()
     # print(_df)
     # _tmp = _toTp.points[:]['spineLength'].loc[_df].to_list()
     # print(_tmp)
@@ -172,7 +206,7 @@ def connectSpines(map :MapAnnotations, tp1, tp2, segment1, segment2, thesholdDis
 
     return dfRet
 
-def debugConnectSpines(map :MapAnnotations):
+def _debugConnectSpines(map :MapAnnotations):
     _tmp = map.points[ map.points['segmentID'] == 0 ]
     
     _indexSlice = pd.IndexSlice[5,:]  # all spines with id 5
@@ -195,28 +229,15 @@ def debugConnectSpines(map :MapAnnotations):
     print('_indexSlice:', _indexSlice)
     print(map.points[_indexSlice])
 
-def debugMultiIndex():
-
-    _index = [
-        (0,0),
-        (2,0),
-        
-        (2,1),
-        (5,1)
-    ]
-    df = pd.DataFrame(index=_index)
-    df['a'] = [
-        'a', 'b', 'c', 'd']
-    print(df)
-
-    _indexSlice = pd.IndexSlice[2,:]  # all spines with id 5
-    print('xxx:')
-    print(df.loc[_indexSlice])
-
 def _plotNp(dfRet):
+    """Plot a dendrogram of spine position from tp to tp+1
+    """
     fromPosition = dfRet['position']
     toPosition = dfRet['toPosition']
     
+    timepoint = dfRet.loc[0, 'timepoint']
+    toTimepoint = dfRet.loc[0, 'toTimepoint']
+
     xPlot = []
     yPlot = []
     for idx, position in enumerate(fromPosition):
@@ -224,30 +245,243 @@ def _plotNp(dfRet):
         yPlot.append(toPosition[idx])
         yPlot.append(np.nan)
 
-        xPlot.append(0)
-        xPlot.append(1)
+        xPlot.append(timepoint)
+        xPlot.append(toTimepoint)
+        
         xPlot.append(np.nan)
 
     import matplotlib.pyplot as plt
     plt.plot(xPlot, yPlot, 'o-')
     plt.show()
 
+def actuallyConnectSpines(map : MapAnnotations, thesholdDist= 10):
+    """Actually connect spines in map.
+    """
+    numSeg = 5
+    numTimepoints = map.getNumTimepoints()
+    n = range(numTimepoints-1)
+    
+    # debug
+    # n = range(2)
+    
+    for tp1 in n:
+        
+        for seg in range(numSeg):
+            logger.info(f'=== tp {tp1} -> {tp1+1} seg:{seg}')
+
+            df = _getConnectedSpines(map, tp1, tp1+1, seg, seg, thesholdDist=thesholdDist)
+
+            for rowLabel, rowDict in df.iterrows():
+                fromSpineID = rowDict['spineID']
+                toSpineID = rowDict['toSpineID']
+                
+                if np.isnan(toSpineID):
+                    # nothing to connect to
+                    continue
+
+                fromSpineID = int(fromSpineID)
+                toSpineID = int(toSpineID)
+                
+                fromSpine = (fromSpineID, tp1)
+                toSpine = (toSpineID, tp1+1)
+                
+                # logger.info(f'connecting {fromSpine} to {toSpine}')
+
+                connected = map.connect(fromSpine, toSpine)
+
+                # if not connected:
+                #     print(df)
+                #     break
+
+    map.points[:]
+    map.segments[:]
+    
+    # print('====== DONE map.points[:] is')
+    # print(map.getPointDataFrame(t=4))
+    savePath = '/Users/cudmore/Desktop/multi_timepoint_map_seg_spine_connected.mmap'
+    logger.info(f'saving: {savePath}')
+    map.save(savePath)
+
+def getPlotMapDict(map, xStat, yStat, segmentID) -> dict:
+    """Get a dict to plot a map.
+    """
+    startSec = time.time()
+
+    df = map.points[:]
+
+    # move row labels (spineID, t) to columns)
+    df = df.reset_index()
+
+    # reduce to segment id
+    df = df[ df['segmentID']==segmentID]
+
+    # scatter
+    xPlot = df[xStat].to_list()
+    yPlot = df[yStat].to_list()
+    
+    # for an x/y plot, each point in scatter has a spine id
+    # Note: spineID goes across timepoints
+    xyPlotSpineID = df['spineID'].to_list()
+
+    # each spineID has a timepoint
+    xyPlotTimepoint = df['t'].to_list()
+
+    # colorize the scatter of spine (points) to (add, subtract, persistent)
+    xPlotColor = np.zeros(len(xPlot))
+
+    # abb to colorize
+    # TODO: add
+    # list.index[value] as check for ValueError
+
+    # lines
+    spineIDs = df['spineID'].unique()
+    xPlotLines = []
+    yPlotLines = []
+    for spineID in spineIDs:
+        # grab rows of a spineID (across timepoints)
+        spineDf = df[ df['spineID']== spineID]
+        
+        xPlotLine = spineDf[xStat].to_list()
+        yPlotLine = spineDf[yStat].to_list()
+        
+        xPlotLines.append(xPlotLine)
+        yPlotLines.append(yPlotLine)
+        
+        xt = spineDf['t'].to_list()
+        if len(xt) == 1:
+            # 
+            # logger.info(f'spineID:{spineID} at tp {xt} is transient')
+            pass
+        else:
+            if xt[0] != 0:
+                # logger.info(f'spineID:{spineID} at tp {xt} is added at tp {xt[0]}')
+                pass
+            if xt[-1] != 4:
+                # logger.info(f'spineID:{spineID} at tp {xt} is subtracted at tp {xt[-1]}')
+                pass
+
+    retDict = {
+        'xStat' : xStat,
+        'yStat' : yStat,
+        
+        'xPlot' : xPlot,  # list of values for x-axis plot
+        'yPlot' : yPlot,
+
+        'xyPlotSpineID' : xyPlotSpineID,
+        'xyPlotTimepoint' : xyPlotTimepoint,
+
+        'xPlotLines' : xPlotLines,
+        'yPlotLines' : yPlotLines,
+        # 'spine_t' : xt
+        
+    }
+
+    stopSec = time.time()
+    logger.info(f'took {stopSec-startSec} s')
+
+    return retDict
+
+def plotMap(map : MapAnnotations):
+
+    xStat = 't'
+    yStat = 'spinePosition'
+    segmentID = 0
+    plotDict = getPlotMapDict(map, xStat=xStat, yStat=yStat, segmentID=segmentID)
+    
+    # print('=== xyPlotSpineID')
+    # print(plotDict['xyPlotSpineID'])
+
+    # print('=== xyPlotTimepoint')
+    # print(plotDict['xyPlotTimepoint'])
+
+    startSec = time.time()
+
+    plt.plot(plotDict['xPlot'], plotDict['yPlot'], 'ok')
+    
+    #lines
+    for idx, xPlotLine in enumerate(plotDict['xPlotLines']):
+        yPlotLine = plotDict['yPlotLines'][idx]
+        plt.plot(xPlotLine, yPlotLine, '-k')
+
+    # lines
+    # spineIDs = df['spineID'].unique()
+    # for spineID in spineIDs:
+    #     spineDf = df[ df['spineID']== spineID]
+        
+    #     xt = spineDf['t'].to_list()
+
+    #     xPlot = spineDf[xStat].to_list()
+    #     yPlot = spineDf[yStat].to_list()
+        
+    #     plt.plot(xPlot, yPlot, '-')
+
+    #     if len(xt) == 1:
+    #         # logger.info(f'{spineID} is transient')
+    #         pass
+    #     else:
+    #         if xt[0] != 0:
+    #             # logger.info(f'{spineID} is added at tp {xt[0]}')
+    #             pass
+    #         if xt[-1] != 4:
+    #             # logger.info(f'{spineID} is subtracted at tp {xt[-1]}')
+    #             pass
+
+    stopSec = time.time()
+    logger.info(f'took {stopSec-startSec} s')
+
+    plt.show()
+
+def _testSaveLoad(map):
+    # Save metadata as Parquet and bytes
+    df_buffer = io.BytesIO()
+    metadata.to_parquet(df_buffer)
+    root.create_dataset("metadata_parquet", data=[df_buffer.getbuffer().tobytes()], dtype=bytes)
+
+    # Read from Parquet
+    df_buffer = io.BytesIO()
+    df_buffer.write(root["metadata_parquet"][0])
+    metadata = pd.read_parquet(df_buffer)
+    assert isinstance(metadata, pd.DataFrame)
+
 if __name__ == '__main__':
     
     # a 2 session map
-    path = 'sandbox/data/rr30a_2tp.mmap'
-    map = MapAnnotations(MMapLoader('/Users/cudmore/Sites/MapManagerCore/sandbox/data/rr30a_2tp.mmap'))
+    # path = 'sandbox/data/rr30a_2tp.mmap'
+    # path = '/Users/cudmore/Sites/MapManagerCore/sandbox/data/rr30a_2tp.mmap'
+    # path = '/Users/cudmore/Sites/MapManagerCore/data/two_timepoint.mmap'
+    
+    # a map with connected segments and each segments have (disconnected) spines
+    path = '/Users/cudmore/Desktop/multi_timepoint_map_seg_connected.mmap'
+    
+    map = MapAnnotations.load(path)
 
-    tp1 = 0
-    tp2 = 1
-    segment1 = 0
-    segment2 = 0
-    thesholdDist = 10
-    df = connectSpines(map, tp1, tp2, segment1, segment2, thesholdDist=thesholdDist)
+    print(map)
 
-    # debugConnectSpines(map)
+    if 0:
+        tp1 = 0  # 1
+        tp2 = 1  # 2
+        segment1 = 1
+        segment2 = 1
+        thesholdDist = 10
+        df = _getConnectedSpines(map, tp1, tp2, segment1, segment2, thesholdDist=thesholdDist)
 
-    # debugMultiIndex()
+        # _debugConnectSpines(map)
+        # _debugMultiIndex()
 
-    # a plot for debugging
-    _plotNp(df)
+        # a plot for debugging
+        _plotNp(df)
+
+        print(df)
+
+    if 0:
+        actuallyConnectSpines(map)
+
+    # reload results of actuallyConnectSpines()
+    savePath = '/Users/cudmore/Desktop/multi_timepoint_map_seg_spine_connected.mmap'
+    logger.info(f'loading map:{savePath}')
+    map = MapAnnotations.load(savePath)
+    
+    print(map)
+    print(map.points[:])
+
+    plotMap(map)

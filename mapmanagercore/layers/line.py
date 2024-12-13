@@ -11,7 +11,6 @@ from ..benchmark import timer
 import math
 from math import pi as PI
 
-
 class MultiLineLayer(Layer):
     @Layer.setProperty
     def offset(self, offset: Union[int, Callable[[int], int]]) -> Self:
@@ -129,15 +128,26 @@ def getSide(a: Point, b: Point, c: Point):
 
 
 @ timer
-def getSpineSide(line: LineString, spine: Point):
+def getSpineSide(line: LineString, spine: Point, anchor:Point):
     """ Return a string representing the side at which the spine point is relative to its segment
 
     Args:
-        Line: segment in the for of a LineString
+        Line: segment in the form of a LineString
         Spine: point
+        anchor: point on segment line that spine point connects to
     """
+    # logger.info("Calculating spine side in mmc")
+    if line is None:
+        # logger.error(f'got None line for spine: {spine}')
+        return
+    
+    # old method getting first and last coordinate of segment
+    # first = Point(line.coords[0])
+    # last = Point(line.coords[-1])
+
     first = Point(line.coords[0])
-    last = Point(line.coords[-1])
+    last = anchor
+
     val = getSide(first, last, spine)
     return val
 
@@ -146,14 +156,17 @@ def getSpineSide(line: LineString, spine: Point):
 
 @ timer
 def getSpineAngle(spineLine: LineString):
-    """ Return the angle between the two Lines
-    Line 1: The line formed between the spine head and the anchor point
-    Line 2: The line formed by two points on the segment tracing. 
-    Grab two points, one “up” and the other “down” the segment from the spine anchor point. 
-    I think the anchor point on the segment tracing is our new “position”.
+    """ Return the angle of the spine Line by using the anchor point and the spine point
+    
+    Old Idea:
+        Return the angle between the two Lines
+        Line 1: The line formed between the spine head and the anchor point
+        Line 2: The line formed by two points on the segment tracing. 
+        Grab two points, one “up” and the other “down” the segment from the spine anchor point. 
+        I think the anchor point on the segment tracing is our new “position”.
 
     Args:
-        segmentLine: segment in the for of a LineString
+        deprecated - segmentLine: segment in the for of a LineString
         spineLine: Linestring of spine head to anchor point
     """
     spineLineCoord0 = Point(spineLine.coords[0])
@@ -171,15 +184,100 @@ def getSpineAngle(spineLine: LineString):
     angle_rad = math.atan2(dy, dx)
     angle_deg = angle_rad*180/PI
 
-    # Range: 0 - 360
-    # Check for Negative angle and add 360 degrees to determine counter clockwise value
+    # # Range: 0 - 360
+    # # Check for Negative angle and add 360 degrees to determine counter clockwise value
     if angle_deg < 0:
         angle_deg = angle_deg + 360
 
     # print("m1", m1, "m2", m2, "degree:", angle_deg)
-    # print("degree:", angle_deg)
     return angle_deg
 
+def old_get_angle(line1, line2):
+
+    #segment
+    line1Coord0 = Point(line1.coords[0]) # beginning of segment
+    line1Coord1 = Point(line1.coords[-1]) # end of segment
+    l1x0 = line1Coord0.x
+    l1y0 = line1Coord0.y
+    l1x1 = line1Coord1.x
+    l1y1 = line1Coord1.y
+
+    #spineline
+    line2Coord0 = Point(line2.coords[0]) # anchor
+    line2Coord1 = Point(line2.coords[-1]) # spine point
+    l2x0 = line2Coord0.x
+    l2y0 = line2Coord0.y
+    l2x1 = line2Coord1.x
+    l2y1 = line2Coord1.y
+
+    # Get directional vectors
+    d1 = (l1x1 - l1x0, l1y1 - l1y0)
+    d2 = (l2x1 - l2x0, l2y1 - l2y0)
+    # Compute dot product
+    p = d1[0] * d2[0] + d1[1] * d2[1]
+    # Compute norms
+    n1 = math.sqrt(d1[0] * d1[0] + d1[1] * d1[1])
+    n2 = math.sqrt(d2[0] * d2[0] + d2[1] * d2[1])
+    # Compute angle
+    ang = math.acos(p / (n1 * n2))
+    # Convert to degrees if you want
+    ang = math.degrees(ang)
+    return ang
+
+@ timer
+def old_getSpineAngle(segmentLine: LineString, spineLine: LineString):
+    """ 
+        Return the angle between the two Lines
+        Line 1: The line formed between the spine head and the anchor point
+        Line 2: The line formed by two points on the segment tracing. 
+    
+    Previous Idea:
+        Return the angle of the spine Line by using the anchor point and the spine point
+
+    Args:
+        segmentLine: segment in the for of a LineString
+        spineLine: Linestring of spine head to anchor point
+    """
+    angle = old_get_angle(segmentLine, spineLine)
+    # print("angle", angle)
+
+    return angle
+
+# abj
+@timer
+def calculateSegmentOffset(segmentLine: LineString, radiusOffset : int, isPositive: bool):
+    # radiusOffset = segmentRadius
+    if isPositive:
+        offsetSign = 1
+    else: 
+        offsetSign = -1
+    offsettedSegment = shapely.offset_curve(segmentLine, distance = radiusOffset * offsetSign, 
+                                            # quad_segs = 16,
+                                            join_style = "mitre"
+                                            # , mitre_limit = 15
+                                            )
+          
+    return offsettedSegment
+
+# abj
+def getRunningDistance(segmentLine: LineString):
+    """
+
+    Return:
+        List (same length as inputted segmentLine), that has the running sum distance at each point in the Line.
+    """
+    x, y = segmentLine.xy
+    runningDistanceList = []
+    currentSum = 0
+    prevPoint = Point(x[0], y[0]) # First point
+    for i, val in enumerate(x):
+        currentPoint = Point(x[i], y[i])
+        currentLineString = LineString([prevPoint, currentPoint])
+        currentSum = currentSum + currentLineString.length
+        runningDistanceList.append(currentSum)
+        prevPoint = currentPoint # keep track of previous point
+
+    return runningDistanceList
 
 @timer
 def calcSubLine(line: LineLayer, origin: Point, distance: int):
@@ -187,7 +285,6 @@ def calcSubLine(line: LineLayer, origin: Point, distance: int):
     sub = substring(line, start_dist=max(
         root - distance, 0), end_dist=root + distance)
     return sub
-
 
 @timer
 def extend(x: LineString, origin: Point, distance: float) -> Polygon:
@@ -203,7 +300,7 @@ def pushLine(segment, lines):
     lines.append(segment)
 
 
-def clipLines(series: gp.GeoSeries, zRange: Tuple[int, int]):
+def clipLines(series: gp.GeoSeries, zRange: Tuple[int, int]) -> gp.GeoSeries:
     # TODO: vectorized
     return series.apply(clipLine, zRange=zRange)
 

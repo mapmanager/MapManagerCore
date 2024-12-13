@@ -4,7 +4,6 @@ from .base import ImageLoader
 from typing import Iterator, List, Union
 import numpy as np
 
-
 class MultiImageLoader(ImageLoader):
     """
     Class for building an MultiImageLoader.
@@ -51,6 +50,7 @@ class MultiImageLoader(ImageLoader):
         self._metadata[time].channelNames[channel] = name
         self.paths.append([time, channel, path])
 
+    # abb TODO: this is never called?
     def readMetadata(self, metadata: Union[Metadata, str], time: int = 0):
         """
         Set the metadata for the given time index.

@@ -91,8 +91,12 @@ class LazyImagesGeoPandas(LazyGeoPandas):
 
             shapes["t"] = frame["t"] if timeIndexLevel is None else frame._df.index.get_level_values(
                 timeIndexLevel)
-            channels = list(channels) if len(
-                channels) > 1 else next(channels)
+            # abb >= 1
+            # FIXME: S: Channels should only be a list if there are multiple channels in which case we return a DataFrame instead of a single Series
+            # if the use case for a single channel isn't needed, we can remove the check and always return a DataFrame
+            # which will simplify the code base
+            channels = list(channels) if len(channels) >= 1 else next(channels)
+                #channels) > 1 else next(channels)
 
             # Compute the aggregates over the pixels
             pixels = weakSelf().getShapePixels(
