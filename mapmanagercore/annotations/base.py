@@ -4,6 +4,7 @@ from io import BytesIO
 from typing import Any, Tuple, Union
 import weakref
 import zipfile
+from mapmanagercore.lazy_geo_pd_images.loader.base import Position
 import numpy as np
 import pandas as pd
 
@@ -24,6 +25,7 @@ from mapmanagercore.analysis_params import AnalysisParams
 from mapmanagercore.analysis_params import AnalysisParams
 from mapmanagercore.logger import logger
 
+
 class AnnotationsBase(LazyImagesGeoPandas):
     _images: ImageLoader
 
@@ -32,7 +34,8 @@ class AnnotationsBase(LazyImagesGeoPandas):
                  lineSegments: Union[str, pd.DataFrame] = pd.DataFrame(),
                  points: Union[str, pd.DataFrame] = pd.DataFrame(),
                  analysisParams: AnalysisParams = AnalysisParams(),
-                 path: str = None):
+                 path: str = None,
+                 version: int = None):
 
         super().__init__(loader)
 
@@ -49,15 +52,23 @@ class AnnotationsBase(LazyImagesGeoPandas):
 
         self._segments = LazyGeoFrame(
             Segment, data=lineSegments, store=weakref.ref(self))
-        self._points = LazyGeoFrame(Spine, data=points, store=weakref.ref(self))
+        self._points = LazyGeoFrame(
+            Spine, data=points, store=weakref.ref(self))
 
         self.loader = loader
         self.path = path
+        
+        # To invalidate columns that were miss-computed in previous version
+        # we can conditionally check the version number
+        # if version === 0:
+        #  then we can invalidate the invalid columns by name
+        # self._segments.invalidateColumns([... columns ...])
+        
 
     # abb
     def __str__(self):
         """Print info about the map.
-        
+
         See: _SingleTimePointAnnotationsBase()
         """
         numTimepoints = len(self._images.timePoints())
@@ -65,7 +76,7 @@ class AnnotationsBase(LazyImagesGeoPandas):
         numSegments = len(self.segments._rootDf)
 
         return f't:{numTimepoints}, points:{numPnts} segments:{numSegments} loader:{self.loader}'
-    
+
     @property
     def segments(self) -> LazyGeoFrame:
         return self._segments
@@ -73,11 +84,11 @@ class AnnotationsBase(LazyImagesGeoPandas):
     @property
     def points(self) -> LazyGeoFrame:
         return self._points
-    
+
     @property
     def analysisParams(self) -> AnalysisParams:
         return self._analysisParams
-    
+
     def filterPoints(self, filter: Any):
         """
         Filters the points.
@@ -100,7 +111,7 @@ class AnnotationsBase(LazyImagesGeoPandas):
         """
         from .single_time_point import SingleTimePointAnnotations
         return SingleTimePointAnnotations(self, time)
-    
+
     def getPixels(self, time: int, channel: int, zRange: Tuple[int, int] = None, z: int = None, zSpread: int = 0) -> ImageSlice:
         """
         Loads the image data for a slice.
@@ -152,7 +163,7 @@ class AnnotationsBase(LazyImagesGeoPandas):
             store = zarr.DirectoryStore(path)
         else:
             store = zarr.ZipStore(path, mode="r")
-        
+
         group = zarr.group(store=store)
 
         if verbose:
@@ -191,7 +202,8 @@ class AnnotationsBase(LazyImagesGeoPandas):
 
         # (2) points
         try:
-            _points = group["points"]  # zarr.core.Array '/points' (255865,) uint8
+            # zarr.core.Array '/points' (255865,) uint8
+            _points = group["points"]
         except (KeyError) as e:
             logger.error('did not find group "points"')
             logger.error(f'   {e}')
@@ -216,7 +228,8 @@ class AnnotationsBase(LazyImagesGeoPandas):
             _errors += 1
         finally:
             try:
-                _lineSegments = pd.read_pickle(BytesIO(_lineSegments[:].tobytes()))
+                _lineSegments = pd.read_pickle(
+                    BytesIO(_lineSegments[:].tobytes()))
                 if verbose:
                     logger.info(f'lineSegments: {len(_lineSegments)}')
                     # print(_lineSegments.head())
@@ -244,24 +257,33 @@ class AnnotationsBase(LazyImagesGeoPandas):
             logger.info(f'encountered {_errors} errors while inspecting {path}')
 
         return _errors == 0
-    
+
+    def merge(self, loader: ImageLoader):
+        self.loader.merge(loader)
+
     @classmethod
     def load(cls, path: Union[str, None], lazy=False):
         loader = ZarrLoader(path, lazy=lazy)
-        points = pd.read_pickle(BytesIO(loader.group["points"][:].tobytes()))
-        points = gp.GeoDataFrame(points, geometry="point")
-        lineSegments = pd.read_pickle(
-            BytesIO(loader.group["lineSegments"][:].tobytes()))
-        lineSegments = gp.GeoDataFrame(lineSegments, geometry="segment")
 
-        # abb analysisparams
-        _analysisParams_json = loader.group.attrs['analysisParams']  # json str
-        analysisParams = AnalysisParams(loadJson=_analysisParams_json)
+        if "points" in loader.group:
+            points = pd.read_pickle(
+                BytesIO(loader.group["points"][:].tobytes()))
+            points = gp.GeoDataFrame(points, geometry="point")
+        else:
+            points = gp.GeoDataFrame()
 
+        if "lineSegments" in loader.group:
+            lineSegments = pd.read_pickle(
+                BytesIO(loader.group["lineSegments"][:].tobytes()))
+            lineSegments = gp.GeoDataFrame(lineSegments, geometry="segment")
+        else:
+            lineSegments = gp.GeoDataFrame()
+            
+        analysisParams = loader.analysisParams()
 
         return cls(loader, lineSegments, points, analysisParams, path)
 
-    def save(self, path: str=None, compression=zipfile.ZIP_STORED):
+    def save(self, path: str = None, compression=zipfile.ZIP_STORED):
         if path is None:
             path = self.path
 
@@ -279,7 +301,8 @@ class AnnotationsBase(LazyImagesGeoPandas):
 
             with fs as store:
                 group = zarr.group(store=store)
-                self._images.saveTo(group)
+                images = group.create_group("images");
+                self._images.saveTo(images)
                 group.create_dataset(
                     "points", data=self.points.toBytes(), dtype=np.uint8)
                 group.create_dataset(

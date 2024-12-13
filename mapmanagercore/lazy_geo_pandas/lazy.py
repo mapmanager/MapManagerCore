@@ -113,6 +113,7 @@ class LazyGeoPandas:
         if not skipLog:
             ids = ids if isinstance(ids, pd.Index) or isinstance(
                 ids, Sequence) else [ids]
+            print(ids)
             deletedData = df.loc[ids]
             self._log.push(
                 Op(key, deletedData, gp.GeoDataFrame(columns=df.columns)))
@@ -123,21 +124,31 @@ class LazyGeoPandas:
         if oldLen != df.shape[0]:
             store._state.increment()
 
-    def _invalidateCachedColumns(self, ids: pd.Index, key: str, columns: Iterator[str]):
+    def invalidateCachedColumns(self, ids: Union[pd.Index, None], frameKey: str, columns: Union[Iterator[str], None] = None):
         """
         Invalidates the cached computed columns of the dependent keys.
         """
-        store = self._frames[key]
+        store = self._frames[frameKey]
+        
+        if columns is None:
+            columns = [attr["key"] for attr in store._schema._attributes.values() if "_func" in attr]
+                
         invalid = store._getDependentColumns(columns)
         for depKey, invalidateCols in invalid.items():
             depStore = self._frames[depKey]
             df = depStore._df
             columns = df.columns.intersection(invalidateCols)
-            if depKey == key:
+            
+            if ids is None:
+                # clear all the rows
+                df.loc[:, columns] = False
+                continue
+            
+            if depKey == frameKey:
                 df.loc[ids, columns] = False
                 continue
 
-            newIds = depStore._schema._reverseMapIds(key, df, store._df, ids)
+            newIds = depStore._schema._reverseMapIds(frameKey, df, store._df, ids)
             df.loc[newIds, columns] = False
 
     def _update(self, key: str, ids: Union[Hashable, Sequence[Hashable], pd.Index], value: Schema, replaceLog=False, skipLog=False):
@@ -178,7 +189,7 @@ class LazyGeoPandas:
         df.sort_index(inplace=True)
         if not op.isEmpty():
             changed = op.changed.columns.get_level_values(0).unique()
-            self._invalidateCachedColumns(ids, key, changed.values)
+            self.invalidateCachedColumns(ids, key, changed.values)
 
         if oldLen != df.shape[0]:
             store._state.increment()
@@ -231,7 +242,7 @@ class LazyGeoPandas:
         Invalidates the cached computed columns of the dependent keys of an operation.
         """
         changedCols = op.changed.columns.get_level_values(0).unique()
-        self._invalidateCachedColumns(op.changed.index, op.type, changedCols)
+        self.invalidateCachedColumns(op.changed.index, op.type, changedCols)
 
 
 DEFAULT_SOURCE = LazyGeoPandas()
@@ -276,7 +287,7 @@ class LazyGeoFrame(Generic[T]):
     _columns: list[str]
     _computingColumns: list[list[str]]
 
-    def __init__(self, schema: Schema, data: gp.GeoDataFrame = None, store: weakref.ReferenceType[T] = None):
+    def __init__(self, schema: Schema = None, data: gp.GeoDataFrame = None, store: weakref.ReferenceType[T] = None):
         self._schema = schema
         if data is None:
             data = gp.GeoDataFrame()
@@ -290,6 +301,14 @@ class LazyGeoFrame(Generic[T]):
         self._updateColumns()
         self._rootDf = schema.setColumnTypes(data)
         self._store().addSchema(self)
+
+
+    def invalidateColumns(self, columns: Iterator[str] = None, ids: pd.Index = None):
+        """
+        Invalidates the cached computed columns of the dependent keys.
+        """
+        key = self._schema._key
+        self.getStore().invalidateCachedColumns(ids, key, columns)
 
     def _updateColumns(self):
         """Updates the columns by collecting all the non-index columns from the scheme."""
@@ -454,7 +473,6 @@ class LazyGeoFrame(Generic[T]):
             filtered._insureComputed(key)
 
         df: pd.DataFrame = filtered._getFiltered(key)
-
         if len(df) <= 1 and (len(df.shape) == 1 or df.shape[1] < 1):
             if (isinstance(row, tuple) and df.index.nlevels == len(row)) or df.index.nlevels == 1 and self._schema.isIndexType(row):
                 if df.empty:

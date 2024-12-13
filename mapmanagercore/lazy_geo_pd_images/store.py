@@ -13,6 +13,7 @@ import pandas as pd
 
 from mapmanagercore.logger import logger
 
+
 class ImageColumnAttributes(ColumnAttributes):
     """Attributes for image computed columns."""
 
@@ -75,7 +76,7 @@ class LazyImagesGeoPandas(LazyGeoPandas):
         tColumn = attributes["t"] if "t" in attributes else "t"
         timeIndexLevel = frame._schema._index.index(
             tColumn) if tColumn in frame._schema._index else None
-        
+
         weakSelf = weakref.ref(self)
 
         def wrappedFunc(frame: LazyGeoFrame[Self]):
@@ -122,7 +123,7 @@ class LazyImagesGeoPandas(LazyGeoPandas):
                 continue
             name = attributes["key"]
             wrappedFunc = self._genWrappedFunc(method, attributes, frame)
-            for channel in range(self._channels()):
+            for channel in range(self._maxChannels()):
                 for agg in attributes["_aggregate"]:
                     frame.addComputed(
                         f"{name}_ch{channel + 1}_{agg}",
@@ -138,16 +139,16 @@ class LazyImagesGeoPandas(LazyGeoPandas):
 
         return super().addSchema(frame)
 
-    def _channels(self):
-        return self._images.channels()
-    
+    def _maxChannels(self):
+        return self._images.maxChannels()
+
     def getAutoContrast_qt(self, time: int, channel: int) -> Tuple[int, int]:
         """Get the auto contrast from the entire image volume.
-        
+
         Used in PyQt interface.
         """
         return self._images.getAutoContrast_qt(time, channel)
-    
+
     def getPixels(self, time: int, channel: int, zRange: Tuple[int, int] = None, z: int = None, zSpread: int = 0) -> ImageSlice:
         """
         Loads the image data for a slice.

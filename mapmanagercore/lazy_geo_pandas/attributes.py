@@ -48,7 +48,7 @@ class _ColumnAttributes(ColumnAttributes):
     _dependencies: dict[str, list[str]]
     """The column name."""
     key: str
-
+        
     def normalize(attributes: ColumnAttributes, schemaKey: str) -> Self:
         """
         Normalizes the attributes of a column, and sets default values for missing attributes.

@@ -22,6 +22,7 @@ class Layer:
             self.series = series.series
             self.properties = series.properties
             return
+
         self.series = series
         self.series.name = "geo"
         self.series.index.name = "id"

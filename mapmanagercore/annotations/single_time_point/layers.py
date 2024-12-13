@@ -97,6 +97,7 @@ class AnnotationsLayers(AnnotationsInteractions):
         Returns:
             list: A list of layers containing the retrieved annotations.
         """
+        
         with warnings.catch_warnings():
             warnings.filterwarnings(
                 "ignore", category=ShapelyDeprecationWarning)
@@ -106,7 +107,7 @@ class AnnotationsLayers(AnnotationsInteractions):
             selections = options["annotationSelections"]
             segmentIDEditingPath = selections["segmentIDEditingPath"]
 
-            if segmentIDEditingPath:
+            if segmentIDEditingPath != None:
                 layers.extend(self._getEditingSegment(
                     zRange,
                     segmentIDEditingPath))
@@ -142,12 +143,15 @@ class AnnotationsLayers(AnnotationsInteractions):
         else:
             points = self.points
 
+        if points.index.empty:
+            return layers
+
         points = points[["point", "anchorLine", "anchor", "z", "anchorZ"]]
 
         visiblePoints = points["z"].between(
-            zRange[0], zRange[1], inclusive="right")
+            zRange[0], zRange[1], inclusive="left")
         visibleAnchors = points["anchorZ"].between(
-            zRange[0], zRange[1], inclusive="right")
+            zRange[0], zRange[1], inclusive="left")
 
         if not editing:
             points = points[visiblePoints | visibleAnchors]
@@ -293,7 +297,7 @@ class AnnotationsLayers(AnnotationsInteractions):
     def _getEditingSegment(self, zRange: Tuple[int, int], editSegPathId: SegmentId) -> List[Layer]:
         segments = self.segments[editSegPathId, ["roughTracing", "segment"]]
         self.segmentEditState.segmentId = editSegPathId
-        _, _, x, y = self.shape
+        _, x, y = self.shape
 
         def onClickHitTarget(_, x, y, z):
             self.segmentEditState.hoverSegment = None
@@ -401,11 +405,14 @@ class AnnotationsLayers(AnnotationsInteractions):
     @timer
     def _getSegments(self, zRange: Tuple[int, int], editSegId: SegmentId, selectedSegId: SegmentId, showLineSegmentsRadius: bool) -> List[Layer]:
         layers = []
-        segments = self.segments[["segment", "radius"]]
-                
+        segments = self.segments[:, ["segment", "radius"]]
+        
+        if not editSegId in segments.index:
+            editSegId = None
+
         def getStrokeColor(id: SegmentId):
             return Colors.segmentEditing if id == editSegId else (Colors.segmentSelected if id == selectedSegId else Colors.segment)
-
+        
         segment = (LineLayer(segments["segment"])
                    .id("segment")
                    .clipZ(zRange)

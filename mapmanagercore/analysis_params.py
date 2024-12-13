@@ -3,13 +3,15 @@ from typing import Optional
 
 from mapmanagercore.logger import logger
 
+
 class AnalysisParams():
-    def __init__(self, loadJson : str = None):
-        
+    def __init__(self, loadJson: str = None):
+
         # self.__version__ = 0.1
         # self.__version__ = 0.1  # switched to dict of dicts
         self.__version__ = 0.2  # 20240508 added anchorPointSearchDistance
         self.__version__ = 0.3  # segmentTracingMaxDistance
+        self.__version__ = 0.4  # maxChannels
 
         if loadJson is not None:
             self._dict = json.loads(loadJson)
@@ -17,7 +19,7 @@ class AnalysisParams():
                 self._getDefauls()
         else:
             self._getDefauls()
-    
+
     def getDict(self):
         return self._dict
 
@@ -29,7 +31,7 @@ class AnalysisParams():
         """
         self._dict = {
             '__version__': self.__version__,
-            
+
             # new spine
             'brightestPathDistance': {
                 'defaultValue': 10,
@@ -61,19 +63,25 @@ class AnalysisParams():
                 'currentValue': 4,
                 'description': 'Width of spine ROI.'
             },
-            
+
             # segment
             'segmentRadius': {
                 'defaultValue': 4,
                 'currentValue': 4,
                 'description': 'Radius of segment tracing.'
             },
-            
-            # The distance 
+
+            # The distance
             'segmentTracingMaxDistance': {
                 'defaultValue': 30,
                 'currentValue': 30,
                 'description': 'Max distance to trace a brightest path with relatively low performance cost.'
+            },
+
+            'maxChannels': {
+                'defaultValue': 2,
+                'currentValue': 2,
+                'description': 'Max number of channels.'
             },
 
             # anchor point search distance
@@ -90,7 +98,7 @@ class AnalysisParams():
         """
         return self.getValue(key)
 
-    def getValue(self, key : str) -> Optional[object]:
+    def getValue(self, key: str) -> Optional[object]:
         """Get the value for a key, return None of KeyError.
         """
         try:
@@ -98,7 +106,7 @@ class AnalysisParams():
         except (KeyError):
             logger.error(f'did not find key "{key}", possible keys are {self._dict.keys()}')
 
-    def setValue(self, key : str, value : object):
+    def setValue(self, key: str, value: object):
         try:
             self._dict[key]['currentValue'] = value
         except (KeyError):
@@ -109,9 +117,9 @@ class AnalysisParams():
         """
         pass
 
-    def load(self, path : str):
+    def load(self, path: str):
         """Load JSON from zarr file into our _dict.
-        
+
         Parameters
         ----------
         path : str

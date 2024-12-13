@@ -1,5 +1,8 @@
 import json
-from typing import Tuple
+from typing import List, Tuple, Union
+from mapmanagercore.lazy_geo_pd_images.loader.base import Position
+from mapmanagercore.lazy_geo_pd_images.loader.imageio import MultiImageLoader
+from mapmanagercore.lazy_geo_pd_images.loader.zarr import ZarrLoader
 import numpy as np
 from ..benchmark import timeAll
 from ..config import SpineId
@@ -10,6 +13,10 @@ from ..utils import filterMask
 from . import Annotations
 from pyodide.ffi import to_js
 from .single_time_point import SingleTimePointAnnotations
+from enum import Enum
+
+
+type ChangeOrError = Union[bool, str]
 
 
 class PyodideSingleTimePoint(SingleTimePointAnnotations):
@@ -30,7 +37,7 @@ class PyodideSingleTimePoint(SingleTimePointAnnotations):
         """Returns the position of a spine in the current time point."""
         if spineID not in self.points.index:
             return None
-        
+
         points = self.points[spineID, ["point", "z"]]
         return to_js([*list(*points["point"].coords), int(points["z"])])
 
@@ -79,8 +86,22 @@ class PyodideAnnotations(Annotations):
     """ PyodideAnnotations contains pyodide specific helper methods to allow JS to use Annotations.
     """
 
+    def mergeFile(self, path: str, timePoint: int = 0, channel: int = 0, name: str = None, position: Position = Position.OVER):
+        if name is None:
+            name = path
+        if path.endswith(".mmap"):
+            loader = ZarrLoader(path)
+        if path.endswith(".tif"):
+            loader = MultiImageLoader()
+            loader.read(path, time=timePoint, channel=channel, name=name)
+        self.loader.merge(loader)
+
     def timePoint_js(self, time: int):
         return PyodideSingleTimePoint(self, time)
+    
+    def metadata_json(self, time: int):
+        """Returns the metadata as a JSON string."""
+        return self.loader.metadata(time).to_json()
 
     def slices_js(self, time: int, channel: int, zRange: Tuple[int, int]) -> ImageSlice:
         """
@@ -129,3 +150,66 @@ class PyodideAnnotations(Annotations):
     def columnsAttributes_json(self):
         """Returns the columnsAttributes as a JSON string."""
         return json.dumps(self.points.columnsAttributes, skipkeys=True)
+
+    def dataTree(self):
+        return json.dumps(self.loader.dataTree(), skipkeys=True)
+
+    def createTimePoint(self) -> ChangeOrError:
+        try:
+            return self.loader.createTimePoint()
+        except Exception as e:
+            return str(e)
+
+    def appendChannelToTimePoint(self, srcTimePoint: int, srcChannel: int, destTimePoint: int) -> ChangeOrError:
+        try:
+            return self.loader.appendChannelToTimePoint(srcTimePoint, srcChannel, destTimePoint)
+        except Exception as e:
+            return str(e)
+
+    def moveChannel(self, srcTimePoint: int, srcChannel: int, destTimePoint: int, destChannel: int) -> ChangeOrError:
+        try:
+            return self.loader.moveChannel(srcTimePoint, srcChannel, destTimePoint, destChannel)
+        except Exception as e:
+            return str(e)
+
+    def moveTimePoint(self, srcTimePoint: int, destTimePoint: int, position: Position = Position.OVER) -> ChangeOrError:
+        try:
+            return self.loader.moveTimePoint(srcTimePoint, destTimePoint, int(position))
+        except Exception as e:
+            return str(e)
+
+    def deleteTimePoint(self, timePoint: int) -> ChangeOrError:
+        try:
+            return self.loader.deleteTimePoint(timePoint)
+        except Exception as e:
+            return str(e)
+
+    def deleteChannel(self, timePoint: int, channel: int) -> ChangeOrError:
+        try:
+            return self.loader.deleteChannel(timePoint, channel)
+        except Exception as e:
+            return str(e)
+
+    def updateChannel(self, timePoint: int, channel: int, updates: dict) -> ChangeOrError:
+        try:
+            return self.loader.updateChannel(timePoint, channel, updates.to_py())
+        except Exception as e:
+            return str(e)
+
+    def updateTimePoint(self, timePoint: int, updates: dict) -> ChangeOrError:
+        try:
+            return self.loader.updateTimePoint(timePoint, updates.to_py())
+        except Exception as e:
+            return str(e)
+
+    def maxChannels(self) -> int:
+        return self.loader.maxChannels()
+    
+    def timePoints_js(self):
+        return to_js(list(self.loader.timePoints()))
+
+    def setMaxChannels(self, maxChannels: int):
+        try:
+            return self.loader.setMaxChannels(maxChannels)
+        except Exception as e:
+            return str(e)

@@ -25,6 +25,7 @@ from mapmanagercore.analysis_params import AnalysisParams
 
 from mapmanagercore.logger import logger
 
+
 class SingleTimePointFrame(LazyGeoFrame):
     def __init__(self, frame: LazyGeoFrame, t: int):
         if isinstance(frame, SingleTimePointFrame):
@@ -43,11 +44,11 @@ class SingleTimePointFrame(LazyGeoFrame):
 
         self._currentVersion = self._root._state.version
 
-        if self._t not in self._root._df.index.get_level_values(1):
+        if self._t not in self._root._rootDf.index.get_level_values(1):
             self._root._setFilterIndex(pd.Index([]))
             return
 
-        self._root._setFilterIndex(self._root._df.xs(
+        self._root._setFilterIndex(self._root._rootDf.xs(
             self._t, level=1, drop_level=False).index)
 
     @timer
@@ -55,9 +56,12 @@ class SingleTimePointFrame(LazyGeoFrame):
         self._refreshIndex()
 
         result = self._root[items]
-        if isinstance(result, pd.DataFrame) or isinstance(result, gp.GeoDataFrame) or isinstance(result, pd.Series) or isinstance(result, gp.GeoSeries):
+        isDataFrame = isinstance(result, pd.DataFrame) or isinstance(result, gp.GeoDataFrame)
+        if isDataFrame or isinstance(result, pd.Series) or isinstance(result, gp.GeoSeries):
             if result.index is not None and result.index.nlevels > 1:
                 if result.empty:
+                    if isinstance(result, pd.Series):
+                        return result
                     return result.set_index(result.index.droplevel(1), inplace=False, drop=True)
                 result = result.xs(self._t, level=1, drop_level=True)
 
@@ -66,16 +70,15 @@ class SingleTimePointFrame(LazyGeoFrame):
 
         # extract single values if index is precisely one row
         if result.shape[0] <= 1:
-            if (len(result.shape) == 1 or result.shape[1] <= 1):
-                row, _key = self._parseKeyRow(items)
-                if self._root._schema.isIndexType(row):
-                    if result.empty:
-                        return None
-                    return result.values[0]
-            else:
-                if result.empty:
-                    return result
-                return result.iloc[0]
+            row, _key = self._parseKeyRow(items)
+            if self._root._schema.isIndexType(row):
+                if (len(result.shape) == 1 or result.shape[1] <= 1):
+                        if result.empty:
+                            return None
+                        return result.values[0]
+                else:
+                    if not result.empty:
+                        return result.iloc[0]
 
         return result
 
@@ -145,7 +148,7 @@ class _SingleTimePointAnnotationsBase:
     _t: int
 
     def __init__(self, annotations: Annotations, t: int):
-        self._annotations = copy(annotations)
+        self._annotations = annotations
 
         self._segments = SingleTimePointFrame(
             self._annotations._segments, t)
@@ -155,19 +158,10 @@ class _SingleTimePointAnnotationsBase:
         self._t = t
 
     def __str__(self):
-        logger.info('')
-        
-        # get the number of time points
-        numTimepoints = 'abb ???'
-        try:
-            numTimepoints = len(self._images._imagesSrcs.keys())
-        except (AttributeError) as e:
-            logger.error(e)
-
         numPnts = len(self._annotations._points._rootDf)
         numSegments = len(self._annotations._segments._rootDf)
-        return f't:{numTimepoints}, points:{numPnts} segments:{numSegments}'
-    
+        return f't:{self._t}, points:{numPnts} segments:{numSegments}'
+
     @property
     def points(self) -> LazyGeoFrame:
         return self._points
@@ -208,15 +202,16 @@ class SingleTimePointAnnotationsBase(_SingleTimePointAnnotationsBase):
 
     def getAutoContrast_qt(self, channel: int) -> Tuple[int, int]:
         """Get the auto contrast from the entire image volume.
-        
+
         Used in PyQt interface.
         """
-        theMin, theMax = self._annotations.getAutoContrast_qt(time=self._t, channel=channel)
+        theMin, theMax = self._annotations.getAutoContrast_qt(
+            time=self._t, channel=channel)
 
         return theMin, theMax
-    
+
     @property
-    def shape(self):
+    def shape(self) -> Tuple[int, int, int]:
         return self._annotations._images.shape(self._t)
 
     def getShapePixels(self, shapes: gp.GeoDataFrame, channel: Union[int, List[int]] = 0, zSpread: int = 0, z: int = None) -> pd.Series:

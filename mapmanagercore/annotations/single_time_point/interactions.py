@@ -17,7 +17,7 @@ pendingBackgroundRoiTranslation = None
 
 
 class AnnotationsInteractions(AnnotationsSegments):
-    
+
     # abb
     def getSpineDistance(self, segmentID: SegmentId,
                          point: Point):
@@ -27,11 +27,11 @@ class AnnotationsInteractions(AnnotationsSegments):
         # find the closest point on the segment to the `point`
         minProjection = segment.project(point)
         return minProjection
-    
+
     # abb added findBrightest=False, do not find brightest by default
     def nearestAnchor(self, segmentID: SegmentId,
                       point: Point,
-                      findBrightest : bool = False):
+                      findBrightest: bool = False):
         """Finds the nearest anchor point on a given line segment to a given point.
 
         Args:
@@ -42,23 +42,24 @@ class AnnotationsInteractions(AnnotationsSegments):
 
         Returns:
             Point: The nearest anchor point.
-        """            
+        """
         segment: LineString = self.segments[segmentID, "segment"]
         # find the closest point on the segment to the `point`
         minProjection = segment.project(point)
-        
+
         if np.isnan(minProjection):
             logger.warning(f'minProjection:{minProjection}')
             logger.warning(f'segment:{segment}')
             logger.warning(f'point:{point}')
-            
+
         if not findBrightest:
             # Default to the closest point (not brightest)
             anchor = segment.interpolate(minProjection)
             anchor = roundPoint(anchor, 1)
             return anchor
 
-        brightestPathDistance = self.analysisParams.getValue('brightestPathDistance')
+        brightestPathDistance = self.analysisParams.getValue(
+            'brightestPathDistance')
         channel = self.analysisParams.getValue('channel')
         zSpread = self.analysisParams.getValue('zSpread')
 
@@ -128,7 +129,10 @@ class AnnotationsInteractions(AnnotationsSegments):
         """
         point = Point(x, y, z)
 
-        logger.error(f'1 FutureWarning: The `drop` keyword ...')
+        if not segmentId in self.segments.index:
+            logger.warning(f'segmentId:{segmentId} not in self.segments.index')
+            return None
+
         anchor = self.nearestAnchor(segmentId, point, findBrightest=True)
 
         spineId = self.newUnassignedSpineId()
@@ -195,7 +199,7 @@ class AnnotationsInteractions(AnnotationsSegments):
             bool: True if the anchor point was successfully translated, False otherwise.
         """
         segmentId = self.points[spineId, "segmentID"]
-        
+
         # abb
         # when moving, do not find brightest
         anchor = self.nearestAnchor(segmentId, Point(x, y, z))
@@ -325,9 +329,9 @@ class AnnotationsInteractions(AnnotationsSegments):
 
         Returns:
             int: The ID of the new segment.
-        """        
+        """
         segmentId = self.newUnassignedSegmentId()
-        
+
         self.updateSegment(segmentId, Segment.withDefaults(
             segment=LineString([]),
             roughTracing=LineString([])
@@ -373,6 +377,13 @@ class AnnotationsInteractions(AnnotationsSegments):
         Returns:
             LineString: The updated rough tracing.
         """
+
+        if not (segmentId in self.segments.index):
+            # Create a new segment if it doesn't exist
+            self.updateSegment(segmentId, Segment.withDefaults(
+                segment=LineString([]),
+                roughTracing=LineString([])
+            ))
 
         roughTracing: Union[LineString,
                             Point] = self.segments[segmentId, "roughTracing"]

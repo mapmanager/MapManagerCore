@@ -1,8 +1,9 @@
-import json
+from mapmanagercore.analysis_params import AnalysisParams
 from mapmanagercore.lazy_geo_pd_images.metadata import Metadata
 from .base import ImageLoader
-from typing import Iterator, Union
+from typing import Iterator, List, Union
 import numpy as np
+
 
 class MultiImageLoader(ImageLoader):
     """
@@ -11,13 +12,17 @@ class MultiImageLoader(ImageLoader):
 
     def __init__(self):
         super().__init__()
-        self._images = {}
-        self.paths = [] # for logging only
-        
+        self._imagesSrc = {}
+        self._metadata = {}
+        self.paths = []  # for logging only
+
     def __str__(self):
         return f"Multi image Loader paths: {self.paths}"
+    
+    def metadata(self, t: int) -> Metadata:
+        return self._metadata[t] if t in self._metadata else Metadata()
 
-    def read(self, path: Union[str, np.ndarray], time: int = 0, channel: int = 0):
+    def read(self, path: Union[str, np.ndarray], time: int = 0, channel: int = 0, name=None):
         """
         Load an image from the given path and store it in the images array.
 
@@ -27,15 +32,23 @@ class MultiImageLoader(ImageLoader):
           channel (int): The channel index.
         """
         from imageio import imread
-        if time not in self._images:
-            self._images[time] = []
+        if name == None:
+            name = path
+
+        if time not in self._imagesSrc:
+            self._imagesSrc[time] = {}
+            self._metadata[time] = Metadata()
 
         if isinstance(path, str):
             imgData = imread(path)
         else:
             imgData = path
 
-        self._images[time].append([channel, imgData])
+        if channel > self.maxChannels():
+            self.setMaxChannels(channel)
+
+        self._imagesSrc[time][channel] = imgData
+        self._metadata[time].channelNames[channel] = name
         self.paths.append([time, channel, path])
 
     def readMetadata(self, metadata: Union[Metadata, str], time: int = 0):
@@ -51,40 +64,27 @@ class MultiImageLoader(ImageLoader):
             with open(metadata, "r") as metadataFile:
                 metadata = Metadata.from_json(metadataFile)
 
+        if time in self._metadata:
+            oldMetadata = self._metadata[time]
+            for channel in oldMetadata.channelNames:
+                if channel not in metadata.channelNames:
+                    metadata.channelNames[channel] = oldMetadata.channelNames[channel]
+
         self._metadata[time] = metadata
 
-    def build(self) -> ImageLoader:
-        images = {}
-
-        for time, values in self._images.items():
-            # if not (time in self._metadata):
-            #     raise ValueError(f"Metadata not found for time point {time}")
-
-            maxChannel = max(channel for channel, _ in values) + 1
-            maxSlice, maxX, maxY = values[0][1].shape
-            dimensions = [maxChannel, maxSlice, maxX, maxY]
-            images[time] = np.zeros(dimensions, dtype=np.uint16)
-            for channel, image in values:
-                images[time][channel] = image
-
-        return _MultiImageLoader(images, self._metadata)
-
-class _MultiImageLoader(ImageLoader):
-    """
-    A loader class for loading from imageio supported formats.
-    """
-
-    def __init__(self, images: dict[int, np.ndarray], metadata: dict[int, Metadata]):
+    def readAnalysisParams(self, analysisParams: Union[AnalysisParams, str]):
         """
-        Initialize the BaseImage class.
+        Set the analysisParams for the given time index.
 
         Args:
-          images (np.ndarray): [time, channel, slice].
-
+          analysisParams (AnalysisParams): The analysisParams.
         """
-        super().__init__()
-        self._imagesSrcs = images
-        self._metadata = metadata
+
+        if isinstance(analysisParams, str):
+            with open(analysisParams, "r") as analysisParamsFile:
+                analysisParams = AnalysisParams(loadJson=analysisParamsFile)
+
+        self._analysisParams = analysisParams
 
     def timePoints(self) -> Iterator[int]:
         """
@@ -93,7 +93,10 @@ class _MultiImageLoader(ImageLoader):
         Returns:
             An iterator that yields the time points of the images.
         """
-        return self._imagesSrcs.keys()
+        return self._imagesSrc.keys()
 
-    def _images(self, t: int) -> np.ndarray:
-        return self._imagesSrcs[t]
+    def channels(self, t: int) -> List[int]:
+        return list(self._imagesSrc[t].keys())
+
+    def _images(self, t: int, channel: int) -> np.ndarray:
+        return self._imagesSrc[t][channel]

@@ -1,6 +1,8 @@
+from enum import IntEnum
 from functools import lru_cache
-from typing import Iterator, List, Self, Tuple, Union
+from typing import Iterator, List, Self, Tuple, TypedDict, Union
 from mapmanagercore.analysis_params import AnalysisParams
+from mapmanagercore.lazy_geo_pd_images.metadata import Metadata
 import numpy as np
 import pandas as pd
 import geopandas as gp
@@ -9,8 +11,23 @@ from shapely.geometry import GeometryCollection, LineString, MultiPolygon, Polyg
 import shapely
 import skimage.draw
 
-from mapmanagercore.lazy_geo_pd_images.metadata import Metadata
-from mapmanagercore.logger import logger
+
+class Position(IntEnum):
+    OVER = 0
+    AT = 1
+
+
+class DataTreeNodeChannel(TypedDict):
+    channel: int
+    slices: int
+    width: int
+    height: int
+    name: str
+
+
+class DataTreeNode(TypedDict):
+    name: str
+    channels: List[DataTreeNodeChannel]
 
 
 def shapeIndexes(d: Union[Polygon, LineString]) -> Tuple[np.ndarray, np.ndarray]:
@@ -25,33 +42,55 @@ def shapeIndexes(d: Union[Polygon, LineString]) -> Tuple[np.ndarray, np.ndarray]
         d = next(s for s in d.geoms if isinstance(s, Polygon))
 
     if isinstance(d, Polygon):
-        x, y = zip(*d.exterior.coords)
-        return skimage.draw.polygon(x, y)
+        coords = d.exterior.coords.xy
+    else:
+        coords = d.coords.xy
 
-    x, y = zip(*d.coords)
-    return skimage.draw.line(int(x[0]), int(y[0]), int(x[1]), int(y[1]))
+    x, y = np.array(coords[0]), np.array(coords[1])
+    # Since skimage.draw does not support negative coordinates, we need to shift the coordinates.
+    minx, miny = int(min(min(x), 0)), int(min(0, min(y)))
+    x, y = x - minx, y - miny
+
+    if isinstance(d, Polygon):
+        xs, ys = skimage.draw.polygon(x, y)
+    else:
+        xs, ys = skimage.draw.line(int(x[0]), int(y[0]), int(x[1]), int(y[1]))
+
+    # Shift the coordinates back to the original position.
+    xs, ys = xs + minx, ys + miny
+    return xs, ys
 
 
 class ImageLoader:
     """
     Base class for image loaders.
     """
+    _metadata: List[Metadata]
+    _analysisParams: AnalysisParams
 
     def __init__(self):
-        self._metadata = {}
+        self._metadata = []
+        self._analysisParams = AnalysisParams()
 
     def __str__(self):
         return f"ImageLoader: time points: {self.timePoints()}"
 
+    def merge(self, loader: Self):
+        ("implemented by subclass", loader)
+        pass
+
+    def analysisParams(self):
+        return self._analysisParams
+
     def metadata(self, t: int) -> Metadata:
-        return self._metadata[t] if t in self._metadata else Metadata()
+        return self._metadata[t] if t < len(self._metadata) else Metadata()
 
     def timePoints(self) -> Iterator[int]:
         ("implemented by subclass")
         return []
 
-    def _images(self, t: int) -> np.ndarray:
-        ("implemented by subclass", t)
+    def _images(self, t: int, channel: int) -> np.ndarray:
+        ("implemented by subclass", t, channel)
         return np.array([])
 
     def loadSlice(self, time: int, channel: int, slice: int) -> np.ndarray:
@@ -66,7 +105,7 @@ class ImageLoader:
         Returns:
           np.ndarray: The loaded slice of data.
         """
-        return self._images(time)[channel][slice]
+        return self._images(time, channel)[slice]
 
     def dtype(self, t: int) -> np.dtype:
         """
@@ -77,39 +116,45 @@ class ImageLoader:
         """
         return np.dtype(str.lower(self.metadata(t)["dtype"]))
 
-    def shape(self, t: int) -> Tuple[int, int, int, int]:
+    def shape(self, t: int, channel: int = None) -> Tuple[int, int, int]:
         """
         Returns the shape of the image data.
 
         Returns:
-          Tuple[int, int, int, int]: The shape of the image data, (c,z,x,y).
+          Tuple[int, int, int]: The shape of the image data, (z,x,y).
         """
-        return self._images(t).shape
+        if t not in self.timePoints():
+            return (0, 0, 0)
+        if channel is None:
+            channels = self.channels(t)
 
-    def channels(self, t: int = None) -> int:
+            if len(channels) == 0:
+                return (0, 0, 0)
+
+            channel = channels[0]
+        return self._images(t, channel).shape
+
+    def channels(self, t: int) -> List[int]:
+        metaData = self.metadata(t)
+        return list(metaData.channelNames.keys())
+
+    def maxChannels(self) -> int:
+        return self._analysisParams.getValue("maxChannels")
+
+    def setMaxChannels(self, maxChannels: int) -> bool:
+        if self.maxChannels() == maxChannels:
+            return False
+        self._analysisParams.setValue("maxChannels", maxChannels)
+        return True
+
+    def slices(self, t: int, channel: int = 0) -> int:
         """
-        Returns the number of channels in the image data.
+        Returns the number of slices in the image data.
 
         Returns:
-          int: The number of channels in the image data.
+          int: The number of slices in the image data.
         """
-
-        if t is None:
-            if len(self.timePoints()) == 0:
-                return 0
-
-            return min(self.shape(t)[0] for t in self.timePoints())
-
-        return self.shape(t)[0]
-
-    def slices(self, t: int) -> int:
-        """
-        Returns the number of channels in the image data.
-
-        Returns:
-          int: The number of channels in the image data.
-        """
-        return self.shape(t)[1]
+        return self.shape(t, channel)[0]
 
     def saveTo(self, group: zarr.Group):
         """
@@ -119,11 +164,15 @@ class ImageLoader:
           store: The store to save the data to.
         """
         for t in self.timePoints():
-            image = self._images(t)
-            group.create_dataset(f"img-{t}", data=image, dtype=image.dtype)
-            group.attrs[f"metadata-{t}"] = self.metadata(t).to_json()
+            channels = self.channels(t)
+            timePoint = group.create_group(str(t))
+            metaData = self.metadata(t)
+            timePoint.attrs[f"metadata"] = metaData.to_json()
 
-        group.attrs["timePoints"] = list(self.timePoints())
+            for channel in channels:
+                image = self._images(t, channel)
+                timePoint.create_dataset(
+                    str(channel), data=image, dtype=image.dtype)
 
     def getAutoContrast_qt(self, time: int, channel: int) -> Tuple[int, int]:
         """Get the auto contrast from the entire image volume.
@@ -136,7 +185,7 @@ class ImageLoader:
         _percent_low = 30.0  # 0.5  # .30
         _percent_high = 99.95  # 100 - 0.5
 
-        imgData = self._images(time)[channel]
+        imgData = self._images(time, channel)
         percentiles = np.percentile(imgData, (_percent_low, _percent_high))
 
         theMin = int(percentiles[0])
@@ -162,10 +211,13 @@ class ImageLoader:
 
         # logger.warning(f'xxx {self._images(time)[channel].shape}')
 
+        z, _x, _y = self.shape(time, channel)
+        sliceRange = (max(0, sliceRange[0]), min(z, sliceRange[1]))
+
         if sliceRange[0] == sliceRange[1] - 1:
             return self.loadSlice(time, channel, sliceRange[0])
 
-        return np.max(self._images(time)[channel][sliceRange[0]:sliceRange[1]], axis=0)
+        return np.max(self._images(time, channel)[sliceRange[0]:sliceRange[1]], axis=0)
 
     def cached(self, maxsize=15) -> Self:
         """
@@ -261,13 +313,17 @@ class ImageLoader:
                     t, c, (z - zSpread, z + zSpread + 1)) for c in channel]
 
                 for idx, row in group.iterrows():
-                    xs, ys = shapeIndexes(row["shape"])
                     xLim, yLim = images[0].shape
-                    xBase = np.clip(xs, 0, xLim-1)
-                    yBase = np.clip(ys, 0, yLim-1)
+                    xs, ys = shapeIndexes(row["shape"])
+                    # Clip the coordinates to the image bounds.
+                    inBounds = (xs >= 0) & (xs < xLim) & (
+                        ys >= 0) & (ys < yLim)
+                    xs = np.clip(xs, 0, xLim - 1)
+                    ys = np.clip(ys, 0, yLim - 1)
 
+                    # inject the nan values where the shape is out of bounds.
                     results.append(
-                        [image[xBase, yBase] for image in images])
+                        [np.where(inBounds, image[xs, ys], np.nan) for image in images])
                     indexes.append(idx)
             return pd.DataFrame(results, indexes, columns=channel)
 
@@ -275,16 +331,16 @@ class ImageLoader:
             image = self.fetchSlices(
                 t, channel, (z - zSpread, z + zSpread + 1))
 
-            # logger.info(f'   t:{t} z:{z} image:{image.shape}')
-            # print('group')
-            # print(group)
-
             for idx, row in group.iterrows():
-                xs, ys = shapeIndexes(row["shape"])
                 xLim, yLim = image.shape
+                xs, ys = shapeIndexes(row["shape"])
+                # Clip the coordinates to the image bounds.
+                inBounds = (xs >= 0) & (xs < xLim) & (ys >= 0) & (ys < yLim)
+                xs = np.clip(xs, 0, xLim - 1)
+                ys = np.clip(ys, 0, yLim - 1)
 
-                results.append(
-                    image[np.clip(xs, 0, xLim-1), np.clip(ys, 0, yLim-1)])
+                # inject the nan values where the shape is out of bounds.
+                results.append(np.where(inBounds, image[xs, ys], np.nan))
                 indexes.append(idx)
 
         return pd.Series(results, indexes, name=channel)
@@ -297,6 +353,87 @@ class ImageLoader:
 
     def __exit__(self, exc_type, exc_value, traceback):
         self.close()
+
+    def dataTree(self) -> List[DataTreeNode]:
+        tree = []
+        timePoints = sorted(self.timePoints())
+        for t in timePoints:
+            channels = []
+            metadata = self.metadata(t)
+            channels_ = sorted(self.channels(t))
+            for channel in channels_:
+                shape = self.shape(t, channel)
+                name = metadata.channelNames[channel] if channel in metadata.channelNames else f"Unnamed Channel"
+
+                channels.append(DataTreeNodeChannel({
+                    "channel": channel,
+                    "name": name,
+                    "slices": shape[0],
+                    "width": shape[1],
+                    "height": shape[2],
+                }))
+
+            tree.append(DataTreeNode({
+                "name": metadata.name if metadata.name != "" else f"Unnamed Time Point",
+                "channels": channels
+            }))
+
+        return tree
+
+    def createTimePoint(self) -> bool:
+        return False
+
+    def appendChannelToTimePoint(self, srcTimePoint: int, srcChannel: int, destTimePoint: int) -> bool:
+        ("implemented by subclass", srcTimePoint, srcChannel, destTimePoint)
+        return False
+
+    def moveChannel(self, srcTimePoint: int, srcChannel: int, destTimePoint: int, destChannel: int) -> bool:
+        ("implemented by subclass", srcTimePoint,
+         srcChannel, destTimePoint, destChannel)
+        return False
+
+    def moveTimePoint(self, srcTimePoint: int, destTimePoint: int, position: Position = Position.OVER) -> bool:
+        ("implemented by subclass", srcTimePoint, destTimePoint, position)
+        return False
+
+    def deleteTimePoint(self, timePoint: int) -> bool:
+        ("implemented by subclass", timePoint)
+        return False
+
+    def deleteChannel(self, timePoint: int, channel: int) -> bool:
+        ("implemented by subclass", channel)
+        return False
+
+    def updateChannel(self, timePoint: int, channel: int, updates: dict) -> bool:
+        metadata = self.metadata(timePoint)
+        if "name" in updates:
+            metadata.channelNames[channel] = updates["name"]
+
+        newTimePoint = int(updates["timePoint"]) - 1
+        newChannel = int(updates["channel"]) - 1
+        if timePoint != newTimePoint or channel != newChannel:
+            self.moveChannel(timePoint, channel, newTimePoint, newChannel)
+
+        return True
+
+    def updateTimePoint(self, timePoint: int, updates: dict) -> bool:
+        metadata = self.metadata(timePoint)
+        metadata.name = updates.get("name", metadata.name)
+        metadata.physicalSize.x = float(updates.get(
+            "physicalSizeX", metadata.physicalSize.x))
+        metadata.physicalSize.y = float(updates.get(
+            "physicalSizeY", metadata.physicalSize.y))
+        metadata.physicalSize.unit = updates.get(
+            "physicalSizeUnit", metadata.physicalSize.unit)
+        metadata.voxel.x = float(updates.get("voxelX", metadata.voxel.x))
+        metadata.voxel.y = float(updates.get("voxelY", metadata.voxel.y))
+        metadata.voxel.z = float(updates.get("voxelZ", metadata.voxel.z))
+
+        newTimePoint = int(updates["timePoint"]) - 1
+        if timePoint != newTimePoint:
+            self.moveTimePoint(timePoint, newTimePoint)
+
+        return True
 
 
 def bounds(x: np.array):
