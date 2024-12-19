@@ -17,6 +17,7 @@ from typing import TypedDict, Tuple
 
 from mapmanagercore.logger import logger
 
+
 class AnnotationsSelection(TypedDict):
     """
     Represents a selection of annotations.
@@ -49,6 +50,7 @@ class AnnotationsOptions(TypedDict):
     zRange: Tuple[int, int]
     annotationSelections: AnnotationsSelection
     showLineSegments: bool
+    showLineSegmentsOrigin: bool
     showLineSegmentsRadius: bool
     showLabels: bool
     showAnchors: bool
@@ -98,7 +100,7 @@ class AnnotationsLayers(AnnotationsInteractions):
         Returns:
             list: A list of layers containing the retrieved annotations.
         """
-        
+
         with warnings.catch_warnings():
             warnings.filterwarnings(
                 "ignore", category=ShapelyDeprecationWarning)
@@ -119,7 +121,9 @@ class AnnotationsLayers(AnnotationsInteractions):
                         zRange,
                         selections["segmentIDEditing"],
                         selections["segmentID"],
-                        options["showLineSegmentsRadius"]))
+                        options["showLineSegmentsRadius"],
+                        options["showLineSegmentsOrigin"],
+                    ))
 
                 if options["showSpines"]:
                     layers.extend(self._getSpines(options))
@@ -147,12 +151,13 @@ class AnnotationsLayers(AnnotationsInteractions):
         if points.index.empty:
             return layers
 
-        points = points[["point", "anchorLine", "anchor", "z", "anchorZ"]]
+        points = points[["point", "anchorLine",
+                         "anchor", "z", "anchorZ", "isValid"]]
 
         # logger.warning(f'zRange:{zRange} {type(zRange[0])} {type(zRange[1])}')
         # logger.warning(f'points:{points}')
         # logger.warning(f'points["z"]:{points["z"]}')
-                       
+
         visiblePoints = points["z"].between(
             zRange[0], zRange[1], inclusive="left")
         visibleAnchors = points["anchorZ"].between(
@@ -167,10 +172,17 @@ class AnnotationsLayers(AnnotationsInteractions):
         colorOn = options["colorOn"] if "colorOn" in options else None
         colors = self.getColors(colorOn, function=True)
 
+        def pointFillColor(id):
+            if not points.loc[id, "isValid"]:
+                return Colors.invalidSpine
+            if id == selectedSpine:
+                return Colors.selectedSpine
+            return colors(id)
+
         spines = (PointLayer(points["point"])
                   .id("spine")
                   .on("select", "spineID")
-                  .fill(lambda id: Colors.selectedSpine if id == selectedSpine else colors(id)))
+                  .fill(pointFillColor))
 
         labels = None
         if options["showAnchors"] or options["showLabels"]:
@@ -243,6 +255,15 @@ class AnnotationsLayers(AnnotationsInteractions):
         backgroundRoiBase = (baseLayer
                              .copy(id="background", series=points.loc[[selectedSpine], "roiBaseBg"])
                              .stroke(Colors.roiBaseBg))
+
+        if not points.loc[selectedSpine, "rioInBounds"]:
+            headLayer = headLayer.stroke(Colors.invalidSpine).fill(Colors.invalidSpine)
+            baseLayer = baseLayer.stroke(Colors.invalidSpine).fill(Colors.invalidSpine)
+
+        if not points.loc[selectedSpine, "rioBgInBounds"]:
+            backgroundRoiHead = backgroundRoiHead.stroke(Colors.invalidSpine).fill(Colors.invalidSpine)
+            backgroundRoiBase = backgroundRoiBase.stroke(Colors.invalidSpine).fill(Colors.invalidSpine)
+        
         if editing:
             # Add larger interaction targets
             layers.append(backgroundRoiHead.copy(id="translate")
@@ -408,16 +429,16 @@ class AnnotationsLayers(AnnotationsInteractions):
         return layers
 
     @timer
-    def _getSegments(self, zRange: Tuple[int, int], editSegId: SegmentId, selectedSegId: SegmentId, showLineSegmentsRadius: bool) -> List[Layer]:
+    def _getSegments(self, zRange: Tuple[int, int], editSegId: SegmentId, selectedSegId: SegmentId, showLineSegmentsRadius: bool, showLineSegmentsOrigin: bool) -> List[Layer]:
         layers = []
         segments = self.segments[:, ["segment", "radius"]]
-        
+
         if not editSegId in segments.index:
             editSegId = None
 
         def getStrokeColor(id: SegmentId):
             return Colors.segmentEditing if id == editSegId else (Colors.segmentSelected if id == selectedSegId else Colors.segment)
-        
+
         segment = (LineLayer(segments["segment"])
                    .id("segment")
                    .clipZ(zRange)
@@ -460,6 +481,13 @@ class AnnotationsLayers(AnnotationsInteractions):
         # Add the line segment
         layers.append(segment.strokeWidth(
             lambda id: Config.segmentBoldWidth if id == editSegId else Config.segmentWidth))
+
+        if showLineSegmentsOrigin:
+            layers.append(PointLayer(self.segments[:, "pivotPoint"])
+                        .id("pivotPoint")
+                        .fill(Colors.pivotPoint)
+                        .radius(3)
+                        )
 
         return layers
 

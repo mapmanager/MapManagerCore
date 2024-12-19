@@ -240,8 +240,8 @@ class SingleTimePointFrame(LazyGeoFrame):
             ids = (ids, self._t)
         return self._root.update(ids, value, replaceLog, skipLog)
 
-    def invalidClone(self, depKey: str) -> Union[None, Self]:
-        return self._root.invalidClone(depKey)
+    def invalidClone(self, depKey: str, version: int) -> Union[None, Self]:
+        return self._root.invalidClone(depKey, version)
 
 
 # note hack to inherit types from Annotations

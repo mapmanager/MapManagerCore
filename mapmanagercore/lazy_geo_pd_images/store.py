@@ -146,6 +146,14 @@ class LazyImagesGeoPandas(LazyGeoPandas):
     def _maxChannels(self):
         return self._images.maxChannels()
 
+    def imageBounds(self, t: int = None, channel: int = None) -> gp.GeoSeries:
+        """Get the image bounds."""
+        if t == None:
+            t = next(iter(self._images.timePoints()))
+        if channel == None:
+            channel = next(iter(self._images.channels(t=t)))
+        return self._images.shape(t, channel)
+
     def getAutoContrast_qt(self, time: int, channel: int) -> Tuple[int, int]:
         """Get the auto contrast from the entire image volume.
 

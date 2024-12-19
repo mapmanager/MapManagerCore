@@ -186,6 +186,31 @@ class AnnotationsInteractions(AnnotationsSegments):
             yBackgroundOffset=offset["y"],
         ), replaceLog=True)
 
+    def setSegmentOrigin(self, segmentId: SegmentId, x: int, y: int, z: int) -> bool:
+        """
+        Sets the origin of the segment
+
+        segmentId (str): The ID of the segment.
+        x (int): The x coordinate of a point near the new origin.
+        y (int): The y coordinate of a point near the new origin.
+        z (int): The z coordinate of a point near the new origin.
+        """
+        point = Point(x, y, z)
+        
+        if not segmentId in self.segments.index:
+            logger.warning(f'segmentId:{segmentId} not in self.segments.index')
+            return False
+
+        segment: LineString = self.segments[segmentId, "segment"]
+
+        pivotDistance = segment.project(point)
+        self.updateSegment(segmentId, Segment(
+            pivotDistance=pivotDistance
+        ), replaceLog=False)
+        
+        return True
+
+
     def addSpine(self, segmentId: SegmentId, x: int, y: int, z: int) -> Union[SpineId, None]:
         """
         Adds a spine.
@@ -436,7 +461,7 @@ class AnnotationsInteractions(AnnotationsSegments):
         _segment = Segment.withDefaults(
             segment=LineString([]),
             roughTracing=LineString([]),
-            radius = self.analysisParams.getValue("segmentRadius")
+            radius = self.analysisParams.getValue("segmentRadius"),
         )
 
         self.updateSegment(segmentId, _segment)

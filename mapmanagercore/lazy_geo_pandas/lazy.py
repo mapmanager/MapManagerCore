@@ -141,15 +141,15 @@ class LazyGeoPandas:
             
             if ids is None:
                 # clear all the rows
-                df.loc[:, columns] = False
+                df.loc[:, columns] = -1
                 continue
             
             if depKey == frameKey:
-                df.loc[ids, columns] = False
+                df.loc[ids, columns] = -1
                 continue
 
             newIds = depStore._schema._reverseMapIds(frameKey, df, store._df, ids)
-            df.loc[newIds, columns] = False
+            df.loc[newIds, columns] = -1
 
     def _update(self, key: str, ids: Union[Hashable, Sequence[Hashable], pd.Index], value: Schema, replaceLog=False, skipLog=False):
         """
@@ -557,12 +557,12 @@ class LazyGeoFrame(Generic[T]):
         """Updates a row in the frame."""
         self._store()._update(self._schema._key, ids, value, replaceLog, skipLog)
 
-    def invalidClone(self, depKey: str) -> Union[None, Self]:
+    def invalidClone(self, depKey: str, version: int) -> Union[None, Self]:
         """Creates a clone of the frame with the invalid rows."""
         if depKey not in self._df.columns:
             return None if self._df.empty else self
         else:
-            filter = self._df[depKey] != True
+            filter = self._df[depKey] != version
             if not filter.any():
                 return None
             invalid = self._df[filter]
@@ -599,7 +599,8 @@ class LazyGeoFrame(Generic[T]):
                     continue  # Already computed
 
                 depKey = column + ".valid"
-                invalidClone = self.invalidClone(depKey)
+                version = attribute["version"]
+                invalidClone = self.invalidClone(depKey, version)
                 if invalidClone is None:
                     continue
 
@@ -637,7 +638,7 @@ class LazyGeoFrame(Generic[T]):
                         logger.error(e)
 
                 if len(attribute["_dependencies"]) != 0:
-                    df.loc[missingIndex, depKey] = True
+                    df.loc[missingIndex, depKey] = version
         finally:
             self._computingColumns.pop()
 

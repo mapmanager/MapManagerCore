@@ -26,6 +26,7 @@ class ColumnAttributes(TypedDict):
     colors: Union[List[Color], Dict[Any, Color]]
     symbols: Union[List[Symbol], Dict[Any, Symbol]]
     plot: bool
+    version: int
 
     def default():
         """
@@ -40,6 +41,7 @@ class ColumnAttributes(TypedDict):
             "divergent": False,
             "plot": True,
             "description": "",
+            "version": 0,
         })
 
 

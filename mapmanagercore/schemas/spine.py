@@ -1,7 +1,8 @@
+from mapmanagercore.lazy_geo_pd_images.store import LazyImagesGeoPandas
 import numpy as np
 from mapmanagercore.logger import logger
 from mapmanagercore.benchmark import timer
-from mapmanagercore.utils import union
+from mapmanagercore.utils import covered_by, union
 from ..layers.line import calcSubLine, extend, getSpineSide, getSpineAngle
 import shapely
 from ..lazy_geo_pandas import schema, compute, LazyGeoFrame
@@ -264,6 +265,24 @@ class Spine:
     @timer
     def roiBg(frame: LazyGeoFrame) -> gp.GeoSeries:
         return union(frame["roiBaseBg"], frame["roiHeadBg"], grid_size=0.25)
+
+    @compute(dependencies=["roi"], plot=False)
+    def rioInBounds(frame: LazyGeoFrame) -> gp.GeoSeries:
+        imageStore: LazyImagesGeoPandas = frame.getStore()
+        _, x, y = imageStore.imageBounds()
+        bounds = Polygon([(0, 0), (x, 0), (x, y), (0, y)])
+        return covered_by(frame["roi"], bounds)
+
+    @compute(dependencies=["roiBg"], plot=False)
+    def rioBgInBounds(frame: LazyGeoFrame) -> gp.GeoSeries:
+        imageStore: LazyImagesGeoPandas = frame.getStore()
+        _, x, y = imageStore.imageBounds()
+        bounds = Polygon([(0, 0), (x, 0), (x, y), (0, y)])
+        return covered_by(frame["roiBg"], bounds)
+    
+    @compute(dependencies=["rioInBounds", "rioBgInBounds"], plot=False)
+    def isValid(frame: LazyGeoFrame):
+        return frame["rioInBounds"] & frame["rioBgInBounds"]
 
     # Image based ROI computed stats
 

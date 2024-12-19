@@ -65,7 +65,8 @@ class Colors:
     """Default colors for the annotations."""
 
     selectedSpine: Color = [0, 255, 255]
-    spine: Color = [255, 0, 0]
+    invalidSpine: Color = [255, 0, 0, 128]
+    spine: Color = [0, 255, 0]
     anchorPoint: Color = [0, 0, 255]
     anchorLine: Color = [0, 0, 255]
     label: Color = [255, 255, 255]
@@ -84,6 +85,7 @@ class Colors:
     scalar: List[Color] = colorsRGB(colors.sequential.gray)
     divergent: List[Color] = colorsRGB(colors.diverging.balance)
     transparent: Color = [0, 0, 0, 0]
+    pivotPoint: Color = [255, 255, 255]
 
 
 class Config:
