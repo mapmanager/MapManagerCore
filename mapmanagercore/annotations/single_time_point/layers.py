@@ -256,11 +256,11 @@ class AnnotationsLayers(AnnotationsInteractions):
                              .copy(id="background", series=points.loc[[selectedSpine], "roiBaseBg"])
                              .stroke(Colors.roiBaseBg))
 
-        if not points.loc[selectedSpine, "rioInBounds"]:
+        if not points.loc[selectedSpine, "roiInBounds"]:
             headLayer = headLayer.stroke(Colors.invalidSpine).fill(Colors.invalidSpine)
             baseLayer = baseLayer.stroke(Colors.invalidSpine).fill(Colors.invalidSpine)
 
-        if not points.loc[selectedSpine, "rioBgInBounds"]:
+        if not points.loc[selectedSpine, "roiBgInBounds"]:
             backgroundRoiHead = backgroundRoiHead.stroke(Colors.invalidSpine).fill(Colors.invalidSpine)
             backgroundRoiBase = backgroundRoiBase.stroke(Colors.invalidSpine).fill(Colors.invalidSpine)
         

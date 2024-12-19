@@ -220,8 +220,11 @@ class AnnotationsInteractions(AnnotationsSegments):
         y (int): The y coordinate of the spine.
         z (int): The z coordinate of the spine.
         """
-        point = Point(x, y, z)
+        if not self._inBounds(x, y, z):
+            return None
 
+        point = Point(x, y, z)
+         
         if not segmentId in self.segments.index:
             logger.warning(f'segmentId:{segmentId} not in self.segments.index')
             return None
@@ -279,6 +282,21 @@ class AnnotationsInteractions(AnnotationsSegments):
             return 0
         return ids.max() + 1
 
+    def _inBounds(self, x: int, y: int, z: int) -> bool:
+        """
+        Checks if the given coordinates are within the bounds of the image.
+
+        Args:
+            x (int): The x-coordinate.
+            y (int): The y-coordinate.
+            z (int): The z-coordinate.
+
+        Returns:
+            bool: True if the coordinates are within the bounds of the image, False otherwise.
+        """
+        sz, sx, sy = self.shape
+        return x >= 0 and y >= 0 and z >= 0 and x < sx and y < sy and z < sz
+
     def moveSpine(self, spineId: SpineId, x: int, y: int, z: int, state: DragState = DragState.MANUAL) -> bool:
         """
         Moves the spine identified by `spineId` to the given `x` and `y` coordinates.
@@ -291,10 +309,24 @@ class AnnotationsInteractions(AnnotationsSegments):
         Returns:
             bool: True if the spine was successfully translated, False otherwise.
         """
+        
+        if not self._inBounds(x, y, z):
+            return False
+        
+        oldPoint = self.points[spineId, "point"]
+        oldZ = self.points[spineId, "z"]
+        wasInBounds = self.points[spineId, "isValid"]
+
         self.updateSpine(spineId, Spine(
             point=Point(x, y),
             z=z,
         ), state != DragState.START and state != DragState.MANUAL)
+        
+        if wasInBounds and not self.points[spineId, "isValid"]:
+            self.updateSpine(spineId, Spine(
+                point=oldPoint,
+                z=oldZ
+            ), True)
 
         return True
 
@@ -348,6 +380,7 @@ class AnnotationsInteractions(AnnotationsSegments):
             ))
             return True
 
+        wasInBounds = self.points[spineId, "roiBgInBounds"]
         point = self.points[spineId, [
             "xBackgroundOffset", "yBackgroundOffset"]]
 
@@ -356,13 +389,22 @@ class AnnotationsInteractions(AnnotationsSegments):
         if pendingBackgroundRoiTranslation is None or state == DragState.START:
             pendingBackgroundRoiTranslation = [x, y]
 
+        oldXBackgroundOffset = point["xBackgroundOffset"]
+        oldYBackgroundOffset = point["yBackgroundOffset"]
         self.updateSpine(spineId, Spine(
             xBackgroundOffset=float(
-                point["xBackgroundOffset"] + x - pendingBackgroundRoiTranslation[0]),
+                oldXBackgroundOffset + x - pendingBackgroundRoiTranslation[0]),
             yBackgroundOffset=float(
-                point["yBackgroundOffset"] + y - pendingBackgroundRoiTranslation[1]),
+                oldYBackgroundOffset + y - pendingBackgroundRoiTranslation[1]),
         ), state != DragState.START and state != DragState.MANUAL)
-
+        
+        # Revert to the previous offset if the Bg-ROI is out of bounds
+        if wasInBounds and not self.points[spineId, "roiBgInBounds"]:
+            self.updateSpine(spineId, Spine(
+                xBackgroundOffset=oldXBackgroundOffset,
+                yBackgroundOffset=oldYBackgroundOffset,
+            ), True)
+            
         pendingBackgroundRoiTranslation = None if state == DragState.END else [
             x, y]
 
@@ -388,13 +430,19 @@ class AnnotationsInteractions(AnnotationsSegments):
         point = self.points[spineId, "point"]
 
         if roiExtend is None:
+            roiExtend=float(point.distance(Point(x, y)))
+
+        oldRoiExtend = self.points[spineId, "roiExtend"]
+        wasInBounds = self.points[spineId, "isValid"]
+        self.updateSpine(spineId, Spine(
+            roiExtend=float(roiExtend)
+        ), state != DragState.START and state != DragState.MANUAL)
+        
+        # Revert to the previous offset if the ROI is out of bounds
+        if wasInBounds and not self.points[spineId, "isValid"]:
             self.updateSpine(spineId, Spine(
-                roiExtend=float(point.distance(Point(x, y)))
-            ), state != DragState.START and state != DragState.MANUAL)
-        else: #abj
-            self.updateSpine(spineId, Spine(
-                roiExtend=float(roiExtend)
-            ), state != DragState.START and state != DragState.MANUAL)
+                roiExtend=oldRoiExtend
+            ), True)
 
         return True
 
@@ -413,10 +461,19 @@ class AnnotationsInteractions(AnnotationsSegments):
         """
 
         point = self.points[spineId, "point"]
+        
+        wasInBounds = self.points[spineId, "isValid"]
+        oldRoiRadius = self.points[spineId, "roiRadius"]
 
         self.updateSpine(spineId, Spine(
             roiRadius=float(point.distance(Point(x, y)))
         ), state != DragState.START and state != DragState.MANUAL)
+        
+        # Revert to the previous offset if the ROI is out of bounds
+        if wasInBounds and not self.points[spineId, "isValid"]:
+            self.updateSpine(spineId, Spine(
+                roiRadius=oldRoiRadius
+            ), True)
 
         return True
 

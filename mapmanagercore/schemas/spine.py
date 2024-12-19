@@ -267,22 +267,22 @@ class Spine:
         return union(frame["roiBaseBg"], frame["roiHeadBg"], grid_size=0.25)
 
     @compute(dependencies=["roi"], plot=False)
-    def rioInBounds(frame: LazyGeoFrame) -> gp.GeoSeries:
+    def roiInBounds(frame: LazyGeoFrame) -> gp.GeoSeries:
         imageStore: LazyImagesGeoPandas = frame.getStore()
         _, x, y = imageStore.imageBounds()
         bounds = Polygon([(0, 0), (x, 0), (x, y), (0, y)])
         return covered_by(frame["roi"], bounds)
 
     @compute(dependencies=["roiBg"], plot=False)
-    def rioBgInBounds(frame: LazyGeoFrame) -> gp.GeoSeries:
+    def roiBgInBounds(frame: LazyGeoFrame) -> gp.GeoSeries:
         imageStore: LazyImagesGeoPandas = frame.getStore()
         _, x, y = imageStore.imageBounds()
         bounds = Polygon([(0, 0), (x, 0), (x, y), (0, y)])
         return covered_by(frame["roiBg"], bounds)
     
-    @compute(dependencies=["rioInBounds", "rioBgInBounds"], plot=False)
+    @compute(dependencies=["roiInBounds", "roiBgInBounds"], plot=False)
     def isValid(frame: LazyGeoFrame):
-        return frame["rioInBounds"] & frame["rioBgInBounds"]
+        return frame["roiInBounds"] & frame["roiBgInBounds"]
 
     # Image based ROI computed stats
 
