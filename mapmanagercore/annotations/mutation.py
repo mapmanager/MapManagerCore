@@ -69,16 +69,16 @@ class AnnotationsBaseMut(AnnotationsBase):
         Returns a new unassigned spine ID.
         """
         if len(self.points) == 0:
-            return 0
-        return self.points.index.get_level_values(0).max() + 1
+            return 1 # start from 1 to avoid confusion with counting from 0
+        return max(1, self.points.index.get_level_values(0).max() + 1)
 
     def newUnassignedSegmentId(self) -> SegmentId:
         """
         Returns a new unassigned segment ID.
         """
         if len(self.segments) == 0:
-            return 0
-        return self.segments.index.get_level_values(0).max() + 1
+            return 1 # start from 1 to avoid confusion with counting from 0
+        return max(1, self.segments.index.get_level_values(0).max() + 1)
 
     def connect(self, spineKey: Tuple[SpineId, int], toSpineKey: Tuple[SpineId, int]):
         

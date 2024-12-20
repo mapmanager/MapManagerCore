@@ -186,7 +186,7 @@ class AnnotationsInteractions(AnnotationsSegments):
             yBackgroundOffset=offset["y"],
         ), replaceLog=True)
 
-    def setSegmentOrigin(self, segmentId: SegmentId, x: int, y: int, z: int) -> bool:
+    def setSegmentOrigin(self, segmentId: SegmentId, x: int, y: int, z: int, replaceLog = False) -> bool:
         """
         Sets the origin of the segment
 
@@ -206,7 +206,7 @@ class AnnotationsInteractions(AnnotationsSegments):
         pivotDistance = segment.project(point)
         self.updateSegment(segmentId, Segment(
             pivotDistance=pivotDistance
-        ), replaceLog=False)
+        ), replaceLog=replaceLog)
         
         return True
 
@@ -277,10 +277,7 @@ class AnnotationsInteractions(AnnotationsSegments):
         Returns:
             int: new spine's ID.
         """
-        ids = self._annotations.points.index.get_level_values(0)
-        if len(ids) == 0:
-            return 0
-        return ids.max() + 1
+        return self._annotations.newUnassignedSpineId()
 
     def _inBounds(self, x: int, y: int, z: int) -> bool:
         """
@@ -532,10 +529,7 @@ class AnnotationsInteractions(AnnotationsSegments):
         Returns:
             int: new segment's ID.
         """
-        ids = self._annotations.segments.index.get_level_values(0)
-        if len(ids) == 0:
-            return 0
-        return ids.max() + 1
+        return self._annotations.newUnassignedSegmentId()
 
     def injectSegmentPoint(self, segmentId: SegmentId, x: int, y: int, z: int):
         segment: LineString = self.segments[segmentId, "segment"]

@@ -85,7 +85,7 @@ class Colors:
     scalar: List[Color] = colorsRGB(colors.sequential.gray)
     divergent: List[Color] = colorsRGB(colors.diverging.balance)
     transparent: Color = [0, 0, 0, 0]
-    pivotPoint: Color = [255, 255, 255]
+    pivotPoint: Color = [255, 0, 0]
 
 
 class Config:

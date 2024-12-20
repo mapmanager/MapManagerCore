@@ -117,7 +117,7 @@ class Spine:
     modified: np.datetime64
 
     roiExtend: float
-    roiRadius: float
+    roiRadius: float = 4.0
 
     note: str = ""
     userType: int = 0
@@ -236,6 +236,7 @@ class Spine:
     @timer
     def roiHead(frame: LazyGeoFrame) -> gp.GeoSeries:
         def computeRoiHead(x):
+            print(x, x["roiExtend"])
             head = extend(LineString([x["anchor"], x["point"]]), origin=x["anchor"],
                         distance=x["roiExtend"]).buffer(x["roiRadius"], cap_style=2)
             head = head.difference(x["roiBase"])

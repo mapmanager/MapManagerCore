@@ -128,9 +128,9 @@ class TestExamplesNotebook(unittest.TestCase):
                 "zRange": (18, 36),
                 "annotationSelections": {
                   "segmentIDEditing": 1,
-                  "segmentIDEditingPath": None,
                   "segmentID": 1,
-                  "spineID": 1
+                  "spineID": 1,
+                  "editMode": 0
                 },
                 "showLineSegments": True,
                 "showAnchors": True,
