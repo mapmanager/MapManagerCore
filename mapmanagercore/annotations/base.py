@@ -302,7 +302,7 @@ class AnnotationsBase(LazyImagesGeoPandas):
         version : int
             Verion to load, 0 (default) is original
         """
-        logger.info(f'lazy:{lazy} path:{path}')
+        # logger.info(f'lazy:{lazy} path:{path}')
 
         loader = ZarrLoader(path, lazy=lazy)
         
