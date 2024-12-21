@@ -9,7 +9,7 @@ loader = MultiImageLoader()
 path_ch1 = mapmanagercore.data.getTiffChannel_1()
 
 loader.read(path_ch1, channel=0)
-_build : ImageLoader = loader.build()
+_build : ImageLoader = loader
 map = MapAnnotations(_build)
 
 print("total channels", map._channels())

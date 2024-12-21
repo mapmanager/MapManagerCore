@@ -23,7 +23,7 @@ class TestExamplesNotebook(unittest.TestCase):
             
             
             # Create the annotation map
-            map = MapAnnotations(loader.build(),
+            map = MapAnnotations(loader,
                                  lineSegments="../data/rr30a_s0u/line_segments.csv",
                                  points="../data/rr30a_s0u/points.csv")
             map.points[:]
