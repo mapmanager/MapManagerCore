@@ -431,18 +431,6 @@ def plotMap(map : MapAnnotations):
 
     plt.show()
 
-def _testSaveLoad(map):
-    # Save metadata as Parquet and bytes
-    df_buffer = io.BytesIO()
-    metadata.to_parquet(df_buffer)
-    root.create_dataset("metadata_parquet", data=[df_buffer.getbuffer().tobytes()], dtype=bytes)
-
-    # Read from Parquet
-    df_buffer = io.BytesIO()
-    df_buffer.write(root["metadata_parquet"][0])
-    metadata = pd.read_parquet(df_buffer)
-    assert isinstance(metadata, pd.DataFrame)
-
 if __name__ == '__main__':
     
     # a 2 session map
@@ -451,6 +439,7 @@ if __name__ == '__main__':
     # path = '/Users/cudmore/Sites/MapManagerCore/data/two_timepoint.mmap'
     
     # a map with connected segments and each segments have (disconnected) spines
+    # output of import_mmap.py
     path = '/Users/cudmore/Desktop/multi_timepoint_map_seg_connected.mmap'
     
     map = MapAnnotations.load(path)
@@ -458,6 +447,7 @@ if __name__ == '__main__':
     print(map)
 
     if 0:
+        # testing connect spines
         tp1 = 0  # 1
         tp2 = 1  # 2
         segment1 = 1
@@ -473,12 +463,12 @@ if __name__ == '__main__':
 
         print(df)
 
-    if 0:
+    if 1:
         actuallyConnectSpines(map)
 
     # reload results of actuallyConnectSpines()
     savePath = '/Users/cudmore/Desktop/multi_timepoint_map_seg_spine_connected.mmap'
-    logger.info(f'loading map:{savePath}')
+    logger.info(f're-loading map:{savePath}')
     map = MapAnnotations.load(savePath)
     
     print(map)

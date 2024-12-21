@@ -1,8 +1,12 @@
+# import json
+import numpy as np
+
 from mapmanagercore.analysis_params import AnalysisParams
 from mapmanagercore.lazy_geo_pd_images.metadata import Metadata
 from .base import ImageLoader
 from typing import Iterator, List, Union
-import numpy as np
+from mapmanagercore.utils import getAutoContrast
+from mapmanagercore.logger import logger
 
 class MultiImageLoader(ImageLoader):
     """
@@ -30,18 +34,39 @@ class MultiImageLoader(ImageLoader):
           time (int): The time index.
           channel (int): The channel index.
         """
+        # TODO do not use imageio, use bioio
+        # note, imageio is silently installed when scikit-image is installed
+        # to update, see mapmanagercore.image_importers
         from imageio import imread
         if name == None:
             name = path
-
-        if time not in self._imagesSrc:
-            self._imagesSrc[time] = {}
-            self._metadata[time] = Metadata()
 
         if isinstance(path, str):
             imgData = imread(path)
         else:
             imgData = path
+            
+        if time not in self._imagesSrc:
+            self._imagesSrc[time] = {}
+            _metaData = Metadata()
+            # shape of imgData
+            _metaData.voxel.x = imgData.shape[2]
+            _metaData.voxel.y = imgData.shape[1]
+            _metaData.voxel.z = imgData.shape[0]
+
+            # physicaal units (um)
+            _metaData.physicalSize.x = 0.15
+            _metaData.physicalSize.y = 0.15
+            _metaData.physicalSize.z = 1
+
+            # contrast
+            _metaData.metadataContrast.color = 'TODO: fix this'
+            _metaData.metadataContrast.minInt = int(np.min(imgData))
+            _metaData.metadataContrast.maxInt = int(np.max(imgData))
+            minContrast, maxContrast = getAutoContrast(imgData)
+            _metaData.metadataContrast.minContrast = minContrast
+            _metaData.metadataContrast.maxContrast = maxContrast
+            self._metadata[time] = _metaData
 
         if channel > self.maxChannels():
             self.setMaxChannels(channel)
@@ -50,7 +75,7 @@ class MultiImageLoader(ImageLoader):
         self._metadata[time].channelNames[channel] = name
         self.paths.append([time, channel, path])
 
-    # abb TODO: this is never called?
+    # abb TODO: readMetadata, this is never called?
     def readMetadata(self, metadata: Union[Metadata, str], time: int = 0):
         """
         Set the metadata for the given time index.
@@ -100,3 +125,65 @@ class MultiImageLoader(ImageLoader):
 
     def _images(self, t: int, channel: int) -> np.ndarray:
         return self._imagesSrc[t][channel]
+
+    def readNewImages(self, path: Union[str, np.ndarray], time: int = 0, channel: int = 0):
+        """
+        Load an image from the given path and store it in the images array.
+
+        Args:
+          path (str): Either the path to the image file or a np array.
+          time (int): The time index.
+          channel (int): The channel index.
+        """
+
+        currentImages = {} # reformatted current images
+        if time not in currentImages:
+            logger.info(f"time not in current Images")
+            currentImages[time] = []
+
+        if isinstance(path, str):
+            from imageio import imread
+            imgData = imread(path)
+        else:
+            imgData = path
+
+        # self._imagesSrcs is current image
+        # append to it with new channel
+        # self._imagesSrcs[time].append([channel, imgData]
+        # Format of self._imagesSrcs: images[time][channel] = image
+
+        # print("self._imagesSrcs", self._imagesSrcs)
+
+        # Reformatting current images so that we can append new one right after
+        channelCount = -1
+        for time in self._imagesSrcs:
+            # print("time: ", time)
+            for channelImage in self._imagesSrcs[time]:
+                channelCount += 1
+                # .append([channel, imgData])
+                print("channelCount", channelCount)
+                # self._imagesLoaded[time].append([channel, imgData])
+                currentImages[time].append([channelCount, channelImage])
+
+                # TODO: create new metaData
+        
+        # TODO: need to create functionality for when user wants to switch channel numbers
+        # TODO: need to check to make sure new image channel has same size as previous  image channel
+        # append new images (channel)
+        if channel is None:
+            newChannel = channelCount + 1
+        else:
+            newChannel = channel
+         
+        currentImages[time].append([newChannel, imgData])
+
+        logger.info(f"compare 2 {currentImages}")
+        
+        # rebuild these images to correct form
+        newImages, metaData = self.build(currentImages = currentImages)
+
+        # set these images
+        self._imagesSrcs = newImages
+        self._metadata = metaData
+
+

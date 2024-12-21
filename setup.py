@@ -18,10 +18,13 @@ install_requires = [
     'imagecodecs',  # required for compression
     'platformdirs',  # to get platform specific App paths
     'plotly',  # needed for colors
-    "dataclasses-json",
+    # "dataclasses-json",  # abb removed 20241206
     'brightest-path-lib',
     'pooch',  # to load data from MapManagerCore-Data repo
     # 'bioio',  # TODO: use to load metadata and lazy load images
+    # install bioio from main branch of github repo (not pypi package)
+    'bioio @ git+ssh://git@github.com/bioio-devs/bioio.git',
+    'bioio-ome-zarr @ git+ssh://git@github.com/bioio-devs/bioio-ome-zarr.git',
 ]
 
 testRequirements = [

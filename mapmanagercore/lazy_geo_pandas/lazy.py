@@ -616,8 +616,11 @@ class LazyGeoFrame(Generic[T]):
                     storeClone = copy(store)
                     storeClone._setFilterIndex(store._df.loc[ids].index)
                     storeClone._insureComputed(deps)
-                logger.debug(
-                    f'Computing column "{column}" for num invalid: {len(invalidClone)}')
+                
+                # super usefull !!!
+                # logger.debug(
+                    # f'Computing column "{column}" for num invalid: {len(invalidClone)}')
+                
                 results = attribute["_func"](invalidClone)
 
                 missingIndex = invalidClone._df.index

@@ -18,16 +18,29 @@ class AnalysisParams():
         self.__version__ = 0.4 # abj: added saving and loading
         self.__version__ = 0.5 # abj: adding types and background calculations: Points, Overlap
         # self.__version__ = 0.6 # 20240823 adding type???
+        # self.__version__ = 0.6  # abb bumped so we get (backgroundROIGridPoint, backgroundROIGridOverlap)
+
+        self._getDefaults()
 
         if loadJson is not None:
-            self._dict = json.loads(loadJson)
-            logger.info(f"self._dict['__version__']: {self._dict['__version__'] }")
-            if self._dict['__version__'] < self.__version__:
-                logger.info("setting defaults")
-                self._getDefaults()
-        else:
-            self._getDefaults()
+            self._loadFromJson(loadJson)
+            # self._dict = json.loads(loadJson)
+            # logger.info(f"self._dict['__version__']: {self._dict['__version__'] }")
+            # if self._dict['__version__'] < self.__version__:
+            #     logger.info("   setting defaults")
+            #     self._getDefaults()
     
+    def _loadFromJson(self, loadedJson : str):
+        """Set values for keys we loaded that we know about.
+        """
+        _loadedDict = json.loads(loadedJson)
+        # logger.info(f'_loadedDict:{_loadedDict}')
+        for k,vDict in _loadedDict.items():
+            if k == '__version__':
+                continue
+            # logger.info(f'k:{k} v:{v}')
+            self.setValue(k, vDict['currentValue'])
+
     def getDict(self):
         return self._dict
 
@@ -35,7 +48,8 @@ class AnalysisParams():
         for k,v in self.getDict().items():
             print(f'{k} {v}')
 
-    def getJson(self):
+    def getJson(self, indent : int = 4):
+        # return json.dumps(self._dict, indent=indent)
         return json.dumps(self._dict)
     
     def setDict(self, newDict):
@@ -43,8 +57,7 @@ class AnalysisParams():
         """
         self._dict = newDict
     
-    #abj
-    def resetDefaults(self):
+    def resetDefaults(self) -> dict:
         """ reset and return the default dict
         """
         self._getDefaults()
@@ -60,14 +73,14 @@ class AnalysisParams():
             'brightestPathDistance': {
                 'defaultValue': 10,
                 'currentValue': 10,
-                'description': 'points along the tracing to find spine connection (anchor).',
+                'description': 'Points along the tracing to find spine connection (anchor).',
                 'type' : "int"
             },
 
             'channel': {
                 'defaultValue': 1,  # 0 based
                 'currentValue': 1,
-                'description': 'image color channel to find brightest connection of spine.',
+                'description': 'Image color channel to find brightest connection of spine.',
                 'type' : "int"
             },
 
@@ -129,7 +142,6 @@ class AnalysisParams():
                 'type' : "float"
             },
 
-
             # anchor point search distance
             # 'anchorPointSearchDistance': {
             #     'defaultValue': 10,
@@ -152,9 +164,10 @@ class AnalysisParams():
         except (KeyError):
             logger.error(f'did not find key "{key}", possible keys are {self._dict.keys()}')
 
-    def setValue(self, key: str, value: object):
+    def setValue(self, key : str, value : object) -> Optional[bool]:
         try:
             self._dict[key]['currentValue'] = value
+            return True
         except (KeyError):
             logger.error(f'did not find key "{key}", possible keys are {self._dict.keys()}')
 
@@ -177,7 +190,8 @@ class AnalysisParams():
         # abj
         # save back to zarr file
         if not os.path.isdir(path):
-            print('   error did not find zarr folder', path)
+            logger.warning(f'did not find zarr folder: {path}')
+            logger.warning('   you may have opened a zar zip, save as a zarr folder and try again')
             return
 
         zDS = zarr.DirectoryStore(path, 'w')
@@ -190,6 +204,7 @@ class AnalysisParams():
                 # _analysisParams_json = group.attrs['analysisParams']  # json str
                 # loadedAP = json.loads(_analysisParams_json)
                 if externalDict is not None:
+                    # currentJson = json.dumps(externalDict, indent=4)
                     currentJson = json.dumps(externalDict)
                 else:
                     currentJson = self.getJson()
@@ -202,48 +217,15 @@ class AnalysisParams():
             except TypeError as e:
                 logger.error(e)
 
-    def load(self, path: str):
-        """Load JSON from zarr file into our _dict.
-
-        abj: might not be necessary since we load directly from mmap in constructor?
+    def _getDocs(self) -> str:
+        """Make self documentation from our dict.
         
-        Parameters
-        ----------
-        path : str
-            Full path to the zar file.
+        Notes:
+            This is not ideal, we really want each key as a row
+            and all values like (currentValue, description) as columns
+        
+            - 5/23 Fixed with transpose
         """
-        # Maybe have an option for zip?
-        if not os.path.isdir(path):
-            print('   error did not find zarr folder', path)
-            return
-
-        zDS = zarr.DirectoryStore(path, 'r')
-
-        with zDS as store:
-            root = zarr.group(store=store)
-            # logger.info(f"root.attrs: {root.attrs}")
-            try:
-                _analysisParams_json = root.attrs['analysisParams']  # json str
-                loadedAP = json.loads(_analysisParams_json)
-                loadedVersion = loadedAP['__version__'] 
-                # logger.info(f"loadedVersion: {loadedVersion}")
-                logger.info(f"loading in loadedAP: {loadedAP}")
-                if loadedVersion < self.__version__:
-                    # use default
-                    logger.warning(
-                        "  older version found, reverting to current defaults"
-                    )
-                    logger.warning(
-                        f"  loadedVersion:{loadedVersion} currentVersion:{self._version}"
-                    )
-                    pass
-                else:
-                    return loadedAP
-            except(KeyError):
-                print('error, did not find key "analysisParams"')
-            except json.JSONDecodeError as e:
-                logger.error(e)
-            except TypeError as e:
-                logger.error(e)
-
-        # logger.info(f"self._dict {self._dict}")
+        import pandas as pd
+        df = pd.DataFrame(self._dict).transpose()
+        return df

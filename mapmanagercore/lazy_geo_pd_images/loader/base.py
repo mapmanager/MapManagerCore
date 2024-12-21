@@ -3,6 +3,8 @@ from functools import lru_cache
 from typing import Iterator, List, Self, Tuple, TypedDict, Union
 from mapmanagercore.analysis_params import AnalysisParams
 from mapmanagercore.lazy_geo_pd_images.metadata import Metadata
+from dataclasses import asdict
+# import json
 import numpy as np
 import pandas as pd
 import geopandas as gp
@@ -167,32 +169,41 @@ class ImageLoader:
             channels = self.channels(t)
             timePoint = group.create_group(str(t))
             metaData = self.metadata(t)
-            timePoint.attrs[f"metadata"] = metaData.to_json()
+            timePoint.attrs[f"metadata"] = asdict(metaData)
 
             for channel in channels:
                 image = self._images(t, channel)
                 timePoint.create_dataset(
                     str(channel), data=image, dtype=image.dtype)
 
-    def getAutoContrast_qt(self, time: int, channel: int) -> Tuple[int, int]:
+    def getAutoContrast_qt(self, time: int, channel: int) -> Tuple[int, int, int, int]:
         """Get the auto contrast from the entire image volume.
 
         Used in PyQt interface.
         """
 
         # logger.info(f'{self._images(time)[channel].shape} {np.min(self._images(time)[channel]), np.max(self._images(time)[channel])}')
+        
+        imgData = self._images(time)[channel]
 
-        _percent_low = 30.0  # 0.5  # .30
-        _percent_high = 99.95  # 100 - 0.5
+        # _percent_low = 25.0  #20.0 #0.5  # .30
+        # _percent_high = 99.8  # 99.95  #100 - 0.5
+        # percentiles = np.percentile(imgData, (_percent_low, _percent_high))
+        # theMin = int(percentiles[0])
+        # theMax = int(percentiles[1])
 
-        imgData = self._images(time, channel)
-        percentiles = np.percentile(imgData, (_percent_low, _percent_high))
+        # not working for a stack???
+        from mapmanagercore.utils import getAutoContrast
+        _maxProject = np.max(imgData, axis=0)
+        theMin, theMax = getAutoContrast(_maxProject)
 
-        theMin = int(percentiles[0])
-        theMax = int(percentiles[1])
+        globalMin = np.min(imgData)
+        globalMax = np.max(imgData)
 
-        return theMin, theMax
+        logger.warning(f'EXPENSIVE --> channel:{channel} shape:{imgData.shape} dtype:{imgData.dtype} globalMin:{globalMin} globalMax:{globalMax}')
 
+        return theMin, theMax, globalMin, globalMax
+    
     def fetchSlices(self, time: int, channel: int, sliceRange: Tuple[int, int]) -> np.ndarray:
         """
         Fetches a range of slices for the given time, channel, and slice range.

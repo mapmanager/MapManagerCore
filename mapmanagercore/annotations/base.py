@@ -1,3 +1,4 @@
+from datetime import datetime
 import os
 from copy import copy
 from io import BytesIO
@@ -10,6 +11,7 @@ import pandas as pd
 
 from mapmanagercore.benchmark import timer
 from mapmanagercore.config import Colors, scaleColors, symbols
+from mapmanagercore.lazy_geo_pd_images.loader.imageio import MultiImageLoader
 from mapmanagercore.lazy_geo_pd_images.loader.zarr import ZarrLoader
 from ..lazy_geo_pandas import LazyGeoFrame
 from ..schemas import Segment, Spine
@@ -25,15 +27,15 @@ from mapmanagercore.logger import logger
 
 
 class AnnotationsBase(LazyImagesGeoPandas):
-    _images: ImageLoader
+    _images: MultiImageLoader
 
     def __init__(self,
-                 loader: ImageLoader,
+                 loader: MultiImageLoader, # OLD: loader: ImageLoader,
                  lineSegments: Union[str, pd.DataFrame] = pd.DataFrame(),
                  points: Union[str, pd.DataFrame] = pd.DataFrame(),
                  analysisParams: AnalysisParams = AnalysisParams(),
                  path: str = None,
-                 version: int = None):
+                 lastSaveTime: str = ""):
 
         super().__init__(loader)
 
@@ -44,6 +46,9 @@ class AnnotationsBase(LazyImagesGeoPandas):
         if not isinstance(points, gp.GeoDataFrame):
             if not isinstance(points, pd.DataFrame):
                 points = pd.read_csv(points, index_col=False)
+
+        # abj
+        self._lastSaveTime = lastSaveTime
 
         # abb analysisparams
         self._analysisParams: AnalysisParams = analysisParams
@@ -63,11 +68,18 @@ class AnnotationsBase(LazyImagesGeoPandas):
         # self._segments.invalidateColumns([... columns ...])
         
 
-    # abb
+    # abj
+    def getLastSaveTime(self):
+        """
+        """
+        # get last save time from attributes
+        return self._lastSaveTime 
+
+    # abb convenience
     def getNumTimepoints(self):
         return len(self._images.timePoints())
 
-    # abb
+    # abb convenience
     def getPointDataFrame(self, t : Optional[int] = None) -> pd.DataFrame:
         """Get the full points dataframe.
         """
@@ -82,7 +94,13 @@ class AnnotationsBase(LazyImagesGeoPandas):
         
         return pointsDf
     
-    # abb
+    # abj
+    # def getChannelTotal(self, t : Optional[int] = None) -> int:
+    #     """Get total number of channel
+    #     """
+    #     return self._images.channels() 
+    
+    # abb convenience
     def __str__(self):
         """Print info about the map.
 
@@ -164,7 +182,7 @@ class AnnotationsBase(LazyImagesGeoPandas):
 
     # Serialization
 
-    # abb
+    # abb adding fn to check if mmap file is valid
     @classmethod
     def checkFile(cls, path: str, lazy=True, verbose=False) -> bool:
         """Check if a zarr file is valid to load.
@@ -307,7 +325,12 @@ class AnnotationsBase(LazyImagesGeoPandas):
             
         analysisParams = loader.analysisParams()
 
-        return cls(loader, lineSegments, points, analysisParams, path)
+        try:
+            lastSaveTime = loader.group.attrs['lastSaveTime']
+        except:
+            lastSaveTime = ""
+
+        return cls(loader, lineSegments, points, analysisParams, path, lastSaveTime)
 
     def save(self, path: str = None, compression=zipfile.ZIP_STORED):
         if path is None:
@@ -316,15 +339,16 @@ class AnnotationsBase(LazyImagesGeoPandas):
         if not path.endswith(".mmap"):
             path += ".mmap"
 
-        #abj - dont save if path is empty
+        # abj - dont save if path is empty
         if path == ".mmap":
+            logger.warning(f'did not save:{path}')
             return
         
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
 
             logger.info(f'saving to {path}')
-            if os.path.isdir(path):
+            if os.path.isdir(path) or compression is None:
                 fs = zarr.DirectoryStore(path)
             else:
                 fs = zarr.ZipStore(path, mode="w", compression=compression)
@@ -340,10 +364,19 @@ class AnnotationsBase(LazyImagesGeoPandas):
                 group.attrs["version"] = 1
 
                 # abb analysisparams
-                group.attrs['analysisParams'] = self._analysisParams.getJson()
+                group.attrs['analysisParams'] = self._analysisParams.getDict()
 
+                # abj
+                group.attrs["lastSaveTime"] = self.getCurrentTime()
+
+    def getCurrentTime(self):
+        currentTime = datetime.now()
+        # Format the current time
+        formatted_time = currentTime.strftime('%Y%m%d %H:%M')
+        logger.info(f"storeLastSaveTime {formatted_time}")
+        return formatted_time
+    
     # Context manager
-
     def __enter__(self):
         self._images = self._images.__enter__()
         return self
@@ -458,3 +491,18 @@ class AnnotationsBase(LazyImagesGeoPandas):
             return lambda x: symbols_[x]
 
         return values.apply(lambda x: symbols_[x])
+    
+    # abj
+    def loadInNewChannel(self, path: Union[str, np.ndarray], time: int = 0, channel: int = 0):
+        """ Load in new channel (tif image)
+        This function is called by fullMap within pymapmanager Desktop
+
+        Args:
+            path: directory str of tif file
+            time: time in series
+            channel: new channel value
+        """
+        # functions = [func for func in dir(self._images) if callable(getattr(self._images, func))]
+        # print(functions)
+
+        self._images.readNewImages(path = path, channel = channel)

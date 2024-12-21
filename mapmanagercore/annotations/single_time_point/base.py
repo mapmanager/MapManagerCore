@@ -20,7 +20,6 @@ from .. import Annotations
 from typing import Any, Callable, Hashable, List, Self, Tuple, Union
 from copy import copy
 
-# abb analysisparams
 from mapmanagercore.analysis_params import AnalysisParams
 
 from mapmanagercore.logger import logger
@@ -32,7 +31,6 @@ class SingleTimePointFrame(LazyGeoFrame):
         # frame does not have any computed values (columns)
         # 
         # logger.warning(f'SingleTimePointFrame constructor from frame: {type(frame)}')
-        # # abb no __str__ rep for LazyGeoFrame
         # logger.warning(f'frame is: {frame}')
         # print('frame._rootDf is:')
         # print(frame._rootDf.columns)
@@ -53,7 +51,7 @@ class SingleTimePointFrame(LazyGeoFrame):
             # logger.warning('abb SingleTimePointFrame removed copy v2')
             # self._root = frame
 
-        # abb
+        # abb debugging
         # if isinstance(frame, SingleTimePointFrame):
         #     self._root = frame._root
         # else:
@@ -108,7 +106,7 @@ class SingleTimePointFrame(LazyGeoFrame):
 
         return result
 
-    #abj johnson version
+    # abj johnson version
     @timer
     def __getitem__jv(self, items: Any) -> Any:
         """
@@ -164,7 +162,7 @@ class SingleTimePointFrame(LazyGeoFrame):
                     from shapely.geometry import LineString
                     return LineString([])
                     
-                    # abb was this
+                    # abb CRITICAL was this
                     # return None
                 
                 # logger.info('  (4) return result.values[0]')
@@ -180,7 +178,7 @@ class SingleTimePointFrame(LazyGeoFrame):
             # logger.error(f'result:{result} {type(result)}')
             result = gp.GeoSeries(result)
 
-        # abb never seems to get here???
+        # abb CRITICAL never seems to get here???
         # logger.info(f'  (6) final return result: {type(result)}')
         # print(result)
         
@@ -258,7 +256,7 @@ class _SingleTimePointAnnotationsBase:
         # but then self.points and self.segments are not updated?
         # they are another copy from SingleTimePointFrame
 
-        # was this
+        # abb CRITICAL was this
         # self._annotations = copy(annotations)
         logger.warning('abb turned OFF copy of Annotations in _SingleTimePointAnnotationsBase()')
         self._annotations = annotations
@@ -287,7 +285,6 @@ class _SingleTimePointAnnotationsBase:
 
         return self._segments
 
-    # abb
     @property
     def analysisParams(self) -> AnalysisParams:
         return self._annotations._analysisParams
@@ -304,7 +301,6 @@ Keys = Union[Key, list[Key]]
 
 class SingleTimePointAnnotationsBase(_SingleTimePointAnnotationsBase):
 
-    # abb
     def __str__(self):        
         numTimepoints = f'single timepoint ({self._t})'
         numPnts = len(self.points)
@@ -327,22 +323,19 @@ class SingleTimePointAnnotationsBase(_SingleTimePointAnnotationsBase):
         """
         return self._annotations.getPixels(self._t, channel, zRange, z, zSpread)
 
-    # abb
+    # abb depreciated
     def getAutoContrast_qt(self, channel: int) -> Tuple[int, int]:
         """Get the auto contrast from the entire image volume.
 
         Used in PyQt interface.
         """
-        theMin, theMax = self._annotations.getAutoContrast_qt(
-            time=self._t, channel=channel)
-
-        return theMin, theMax
-
+        return self._annotations.getAutoContrast_qt(time=self._t, channel=channel)
+    
     @property
     def shape(self) -> Tuple[int, int, int]:
         return self._annotations._images.shape(self._t)
 
-    # abb
+    # abb convenience
     @property
     def numChannels(self) -> int:
         """Get the number of image channels.
