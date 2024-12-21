@@ -1,6 +1,7 @@
 # Adds image slices to lazy geo pandas
 
 from typing import Callable, List, Self, Tuple, Union, Unpack
+import weakref
 import numpy as np
 from mapmanagercore.lazy_geo_pd_images.image_slices import ImageSlice
 from mapmanagercore.lazy_geo_pandas.attributes import ColumnAttributes
@@ -11,6 +12,7 @@ import geopandas as gp
 import pandas as pd
 
 from mapmanagercore.logger import logger
+
 
 class ImageColumnAttributes(ColumnAttributes):
     """Attributes for image computed columns."""
@@ -75,6 +77,8 @@ class LazyImagesGeoPandas(LazyGeoPandas):
         timeIndexLevel = frame._schema._index.index(
             tColumn) if tColumn in frame._schema._index else None
 
+        weakSelf = weakref.ref(self)
+
         def wrappedFunc(frame: LazyGeoFrame[Self]):
             (channels, aggregates) = parseColumns(
                 frame.pendingColumns(), name)
@@ -87,12 +91,15 @@ class LazyImagesGeoPandas(LazyGeoPandas):
 
             shapes["t"] = frame["t"] if timeIndexLevel is None else frame._df.index.get_level_values(
                 timeIndexLevel)
-            # abb CRITICAL added >= 1
+            # abb >= 1
+            # FIXME: S: Channels should only be a list if there are multiple channels in which case we return a DataFrame instead of a single Series
+            # if the use case for a single channel isn't needed, we can remove the check and always return a DataFrame
+            # which will simplify the code base
             channels = list(channels) if len(channels) >= 1 else next(channels)
                 #channels) > 1 else next(channels)
 
             # Compute the aggregates over the pixels
-            pixels = self.getShapePixels(
+            pixels = weakSelf().getShapePixels(
                 shapes, channel=channels, zSpread=zSpread)
 
             if isinstance(pixels, pd.Series):
@@ -103,6 +110,7 @@ class LazyImagesGeoPandas(LazyGeoPandas):
             return pd.DataFrame({
                 f"{name}_ch{channel + 1}_{agg}": pixels[channel].apply(lambda x: getattr(np, agg)(x)) for agg in aggregates for channel in channels
             }, index=pixels.index)
+
         return wrappedFunc
 
     def addSchema(self, frame: LazyGeoFrame[Self]):
@@ -119,7 +127,7 @@ class LazyImagesGeoPandas(LazyGeoPandas):
                 continue
             name = attributes["key"]
             wrappedFunc = self._genWrappedFunc(method, attributes, frame)
-            for channel in range(self._channels()):
+            for channel in range(self._maxChannels()):
                 for agg in attributes["_aggregate"]:
                     frame.addComputed(
                         f"{name}_ch{channel + 1}_{agg}",
@@ -135,16 +143,24 @@ class LazyImagesGeoPandas(LazyGeoPandas):
 
         return super().addSchema(frame)
 
-    def _channels(self):
-        return self._images.channels()
-    
+    def _maxChannels(self):
+        return self._images.maxChannels()
+
+    def imageBounds(self, t: int = None, channel: int = None) -> gp.GeoSeries:
+        """Get the image bounds."""
+        if t == None:
+            t = next(iter(self._images.timePoints()))
+        if channel == None:
+            channel = next(iter(self._images.channels(t=t)))
+        return self._images.shape(t, channel)
+
     def getAutoContrast_qt(self, time: int, channel: int) -> Tuple[int, int]:
         """Get the auto contrast from the entire image volume.
-        
+
         Used in PyQt interface.
         """
         return self._images.getAutoContrast_qt(time, channel)
-    
+
     def getPixels(self, time: int, channel: int, zRange: Tuple[int, int] = None, z: int = None, zSpread: int = 0) -> ImageSlice:
         """
         Loads the image data for a slice.

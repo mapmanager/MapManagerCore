@@ -1,9 +1,8 @@
+from mapmanagercore.lazy_geo_pd_images.store import LazyImagesGeoPandas
 import numpy as np
-# from mapmanagercore.analysis_params import AnalysisParams
-# from mapmanagercore.annotations.base import getAnalysisParams
 from mapmanagercore.logger import logger
 from mapmanagercore.benchmark import timer
-from mapmanagercore.utils import union
+from mapmanagercore.utils import covered_by, union
 from ..layers.line import calcSubLine, extend, getSpineSide, getSpineAngle
 import shapely
 from ..lazy_geo_pandas import schema, compute, LazyGeoFrame
@@ -118,7 +117,7 @@ class Spine:
     modified: np.datetime64
 
     roiExtend: float
-    roiRadius: float
+    roiRadius: float = 4.0
 
     note: str = ""
     userType: int = 0
@@ -193,7 +192,10 @@ class Spine:
     def anchorLine(frame: LazyGeoFrame):
         return frame[["anchor", "point"]].apply(lambda x: LineString([x["anchor"], x["point"]]), axis=1)
 
-    @compute(title="Spine Angle", dependencies=["point"])
+    @compute(title="Spine Angle", dependencies={
+        "Spine": ["segmentID", "point", "anchorLine"],
+        "Segment": ["segment"]
+    })
     def spineAngle(frame: LazyGeoFrame):
         
         # do this for all spines
@@ -230,6 +232,7 @@ class Spine:
     @timer
     def roiHead(frame: LazyGeoFrame) -> gp.GeoSeries:
         def computeRoiHead(x):
+            print(x, x["roiExtend"])
             head = extend(LineString([x["anchor"], x["point"]]), origin=x["anchor"],
                         distance=x["roiExtend"]).buffer(x["roiRadius"], cap_style=2)
             head = head.difference(x["roiBase"])
@@ -259,6 +262,24 @@ class Spine:
     @timer
     def roiBg(frame: LazyGeoFrame) -> gp.GeoSeries:
         return union(frame["roiBaseBg"], frame["roiHeadBg"], grid_size=0.25)
+
+    @compute(dependencies=["roi"], plot=False)
+    def roiInBounds(frame: LazyGeoFrame) -> gp.GeoSeries:
+        imageStore: LazyImagesGeoPandas = frame.getStore()
+        _, x, y = imageStore.imageBounds()
+        bounds = Polygon([(0, 0), (x, 0), (x, y), (0, y)])
+        return covered_by(frame["roi"], bounds)
+
+    @compute(dependencies=["roiBg"], plot=False)
+    def roiBgInBounds(frame: LazyGeoFrame) -> gp.GeoSeries:
+        imageStore: LazyImagesGeoPandas = frame.getStore()
+        _, x, y = imageStore.imageBounds()
+        bounds = Polygon([(0, 0), (x, 0), (x, y), (0, y)])
+        return covered_by(frame["roiBg"], bounds)
+    
+    @compute(dependencies=["roiInBounds", "roiBgInBounds"], plot=False)
+    def isValid(frame: LazyGeoFrame):
+        return frame["roiInBounds"] & frame["roiBgInBounds"]
 
     # Image based ROI computed stats
 

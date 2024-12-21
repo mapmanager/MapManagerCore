@@ -4,6 +4,7 @@ from typing import Optional
 import zarr
 from mapmanagercore.logger import logger
 
+
 class AnalysisParams():
     """
     """
@@ -67,7 +68,7 @@ class AnalysisParams():
         """
         self._dict = {
             '__version__': self.__version__,
-            
+
             # new spine
             'brightestPathDistance': {
                 'defaultValue': 10,
@@ -104,7 +105,7 @@ class AnalysisParams():
                 'description': 'Width of spine ROI.',
                 'type' : "int"
             },
-            
+
             # segment
             'segmentRadius': {
                 'defaultValue': 4,
@@ -112,13 +113,19 @@ class AnalysisParams():
                 'description': 'Radius of segment tracing.',
                 'type' : "int"
             },
-            
-            # The distance 
+
+            # The distance
             'segmentTracingMaxDistance': {
                 'defaultValue': 90,  # abb was 20
                 'currentValue': 90,
                 'description': 'Max distance to trace a brightest path with relatively low performance cost.',
                 'type' : "int"
+            },
+
+            'maxChannels': {
+                'defaultValue': 2,
+                'currentValue': 2,
+                'description': 'Max number of channels.'
             },
 
             'backgroundRoiGridPoints': {
@@ -149,7 +156,7 @@ class AnalysisParams():
         """
         return self.getValue(key)
 
-    def getValue(self, key : str) -> Optional[object]:
+    def getValue(self, key: str) -> Optional[object]:
         """Get the value for a key, return None of KeyError.
         """
         try:

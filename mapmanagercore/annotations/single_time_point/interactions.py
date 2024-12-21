@@ -26,7 +26,7 @@ class AnnotationsInteractions(AnnotationsSegments):
         # find the closest point on the segment to the `point`
         minProjection = segment.project(point)
         return minProjection
-    
+
     # abb added findBrightest=False, do not find brightest by default
     # abj added returnIndex=False, return Anchor point by default, return its index if True
     def nearestAnchor(self, segmentID: SegmentId,
@@ -44,7 +44,7 @@ class AnnotationsInteractions(AnnotationsSegments):
 
         Returns:
             Point: The nearest anchor point.
-        """            
+        """
         segment: LineString = self.segments[segmentID, "segment"]
 
         # find the closest point on the segment to the `point`
@@ -90,7 +90,8 @@ class AnnotationsInteractions(AnnotationsSegments):
             # otherwise return anchor
             return anchor
 
-        brightestPathDistance = self.analysisParams.getValue('brightestPathDistance')
+        brightestPathDistance = self.analysisParams.getValue(
+            'brightestPathDistance')
         channel = self.analysisParams.getValue('channel')
         zSpread = self.analysisParams.getValue('zSpread')
 
@@ -186,6 +187,31 @@ class AnnotationsInteractions(AnnotationsSegments):
             yBackgroundOffset=offset["y"],
         ), replaceLog=True)
 
+    def setSegmentOrigin(self, segmentId: SegmentId, x: int, y: int, z: int, replaceLog = False) -> bool:
+        """
+        Sets the origin of the segment
+
+        segmentId (str): The ID of the segment.
+        x (int): The x coordinate of a point near the new origin.
+        y (int): The y coordinate of a point near the new origin.
+        z (int): The z coordinate of a point near the new origin.
+        """
+        point = Point(x, y, z)
+        
+        if not segmentId in self.segments.index:
+            logger.warning(f'segmentId:{segmentId} not in self.segments.index')
+            return False
+
+        segment: LineString = self.segments[segmentId, "segment"]
+
+        pivotDistance = segment.project(point)
+        self.updateSegment(segmentId, Segment(
+            pivotDistance=pivotDistance
+        ), replaceLog=replaceLog)
+        
+        return True
+
+
     def addSpine(self, segmentId: SegmentId, x: int, y: int, z: int) -> Union[SpineId, None]:
         """
         Adds a spine.
@@ -195,10 +221,14 @@ class AnnotationsInteractions(AnnotationsSegments):
         y (int): The y coordinate of the spine.
         z (int): The z coordinate of the spine.
         """
-
-        # TODO: check bounds x < 0, y < 0, y or x > image size, z > number of slices or z < slices
+        if not self._inBounds(x, y, z):
+            return None
 
         point = Point(x, y, z)
+         
+        if not segmentId in self.segments.index:
+            logger.warning(f'segmentId:{segmentId} not in self.segments.index')
+            return None
 
         # logger.error(f'1 FutureWarning: The `drop` keyword ...')
         anchor = self.nearestAnchor(segmentId, point, findBrightest=True)
@@ -238,10 +268,22 @@ class AnnotationsInteractions(AnnotationsSegments):
         Returns:
             int: new spine's ID.
         """
-        ids = self._annotations.points.index.get_level_values(0)
-        if len(ids) == 0:
-            return 0
-        return ids.max() + 1
+        return self._annotations.newUnassignedSpineId()
+
+    def _inBounds(self, x: int, y: int, z: int) -> bool:
+        """
+        Checks if the given coordinates are within the bounds of the image.
+
+        Args:
+            x (int): The x-coordinate.
+            y (int): The y-coordinate.
+            z (int): The z-coordinate.
+
+        Returns:
+            bool: True if the coordinates are within the bounds of the image, False otherwise.
+        """
+        sz, sx, sy = self.shape
+        return x >= 0 and y >= 0 and z >= 0 and x < sx and y < sy and z < sz
 
     def moveSpine(self, spineId: SpineId, x: int, y: int, z: int, state: DragState = DragState.MANUAL) -> bool:
         """
@@ -255,10 +297,24 @@ class AnnotationsInteractions(AnnotationsSegments):
         Returns:
             bool: True if the spine was successfully translated, False otherwise.
         """
+        
+        if not self._inBounds(x, y, z):
+            return False
+        
+        oldPoint = self.points[spineId, "point"]
+        oldZ = self.points[spineId, "z"]
+        wasInBounds = self.points[spineId, "isValid"]
+
         self.updateSpine(spineId, Spine(
             point=Point(x, y),
             z=z,
         ), state != DragState.START and state != DragState.MANUAL)
+        
+        if wasInBounds and not self.points[spineId, "isValid"]:
+            self.updateSpine(spineId, Spine(
+                point=oldPoint,
+                z=oldZ
+            ), True)
 
         return True
 
@@ -309,6 +365,7 @@ class AnnotationsInteractions(AnnotationsSegments):
             ))
             return True
 
+        wasInBounds = self.points[spineId, "roiBgInBounds"]
         point = self.points[spineId, [
             "xBackgroundOffset", "yBackgroundOffset"]]
 
@@ -317,13 +374,22 @@ class AnnotationsInteractions(AnnotationsSegments):
         if pendingBackgroundRoiTranslation is None or state == DragState.START:
             pendingBackgroundRoiTranslation = [x, y]
 
+        oldXBackgroundOffset = point["xBackgroundOffset"]
+        oldYBackgroundOffset = point["yBackgroundOffset"]
         self.updateSpine(spineId, Spine(
             xBackgroundOffset=float(
-                point["xBackgroundOffset"] + x - pendingBackgroundRoiTranslation[0]),
+                oldXBackgroundOffset + x - pendingBackgroundRoiTranslation[0]),
             yBackgroundOffset=float(
-                point["yBackgroundOffset"] + y - pendingBackgroundRoiTranslation[1]),
+                oldYBackgroundOffset + y - pendingBackgroundRoiTranslation[1]),
         ), state != DragState.START and state != DragState.MANUAL)
-
+        
+        # Revert to the previous offset if the Bg-ROI is out of bounds
+        if wasInBounds and not self.points[spineId, "roiBgInBounds"]:
+            self.updateSpine(spineId, Spine(
+                xBackgroundOffset=oldXBackgroundOffset,
+                yBackgroundOffset=oldYBackgroundOffset,
+            ), True)
+            
         pendingBackgroundRoiTranslation = None if state == DragState.END else [
             x, y]
 
@@ -349,13 +415,19 @@ class AnnotationsInteractions(AnnotationsSegments):
         point = self.points[spineId, "point"]
 
         if roiExtend is None:
+            roiExtend=float(point.distance(Point(x, y)))
+
+        oldRoiExtend = self.points[spineId, "roiExtend"]
+        wasInBounds = self.points[spineId, "isValid"]
+        self.updateSpine(spineId, Spine(
+            roiExtend=float(roiExtend)
+        ), state != DragState.START and state != DragState.MANUAL)
+        
+        # Revert to the previous offset if the ROI is out of bounds
+        if wasInBounds and not self.points[spineId, "isValid"]:
             self.updateSpine(spineId, Spine(
-                roiExtend=float(point.distance(Point(x, y)))
-            ), state != DragState.START and state != DragState.MANUAL)
-        else: #abj
-            self.updateSpine(spineId, Spine(
-                roiExtend=float(roiExtend)
-            ), state != DragState.START and state != DragState.MANUAL)
+                roiExtend=oldRoiExtend
+            ), True)
 
         return True
 
@@ -374,10 +446,19 @@ class AnnotationsInteractions(AnnotationsSegments):
         """
 
         point = self.points[spineId, "point"]
+        
+        wasInBounds = self.points[spineId, "isValid"]
+        oldRoiRadius = self.points[spineId, "roiRadius"]
 
         self.updateSpine(spineId, Spine(
             roiRadius=float(point.distance(Point(x, y)))
         ), state != DragState.START and state != DragState.MANUAL)
+        
+        # Revert to the previous offset if the ROI is out of bounds
+        if wasInBounds and not self.points[spineId, "isValid"]:
+            self.updateSpine(spineId, Spine(
+                roiRadius=oldRoiRadius
+            ), True)
 
         return True
 
@@ -413,14 +494,14 @@ class AnnotationsInteractions(AnnotationsSegments):
 
         Returns:
             int: The ID of the new segment.
-        """        
+        """
         segmentId = self.newUnassignedSegmentId()
         segmentId = int(segmentId)
 
         _segment = Segment.withDefaults(
             segment=LineString([]),
             roughTracing=LineString([]),
-            radius = self.analysisParams.getValue("segmentRadius")
+            radius = self.analysisParams.getValue("segmentRadius"),
         )
 
         self.updateSegment(segmentId, _segment)
@@ -434,10 +515,7 @@ class AnnotationsInteractions(AnnotationsSegments):
         Returns:
             int: new segment's ID.
         """
-        ids = self._annotations.segments.index.get_level_values(0)
-        if len(ids) == 0:
-            return 0
-        return ids.max() + 1
+        return self._annotations.newUnassignedSegmentId()
 
     def injectSegmentPoint(self, segmentId: SegmentId, x: int, y: int, z: int):
         segment: LineString = self.segments[segmentId, "segment"]
@@ -465,6 +543,13 @@ class AnnotationsInteractions(AnnotationsSegments):
         Returns:
             LineString: The updated rough tracing.
         """
+
+        if not (segmentId in self.segments.index):
+            # Create a new segment if it doesn't exist
+            self.updateSegment(segmentId, Segment.withDefaults(
+                segment=LineString([]),
+                roughTracing=LineString([])
+            ))
 
         # abb debug
         # logger.info(f'segmentId:{segmentId} {type(segmentId)}')

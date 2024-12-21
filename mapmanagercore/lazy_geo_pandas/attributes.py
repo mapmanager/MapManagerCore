@@ -26,6 +26,7 @@ class ColumnAttributes(TypedDict):
     colors: Union[List[Color], Dict[Any, Color]]
     symbols: Union[List[Symbol], Dict[Any, Symbol]]
     plot: bool
+    version: int
 
     def default():
         """
@@ -40,6 +41,7 @@ class ColumnAttributes(TypedDict):
             "divergent": False,
             "plot": True,
             "description": "",
+            "version": 0,
         })
 
 
@@ -48,7 +50,7 @@ class _ColumnAttributes(ColumnAttributes):
     _dependencies: dict[str, list[str]]
     """The column name."""
     key: str
-
+        
     def normalize(attributes: ColumnAttributes, schemaKey: str) -> Self:
         """
         Normalizes the attributes of a column, and sets default values for missing attributes.

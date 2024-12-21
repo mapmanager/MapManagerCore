@@ -39,7 +39,7 @@ class ImageSlice:
         Returns:
             Tuple[int, int]: min and max range of the image data
         """
-        return (self._image.min(), self._image.max())
+        return (int(np.min(self._image)), int(np.max(self._image.max())))
 
     def bins(self, binCount: int = 256) -> List[Tuple[int, int]]:
         """
@@ -52,7 +52,7 @@ class ImageSlice:
           list: A list of tuples representing the histogram bins. Each tuple contains the bin center and the count.
         """
         counts, bounds = np.histogram(self._image, binCount)
-        return [((bounds[i] + bounds[i + 1]) / 2, int(counts[i])) for i in range(0, len(counts))]
+        return [(int((bounds[i] + bounds[i + 1]) / 2), int(counts[i])) for i in range(0, len(counts))]
 
     def plot(self, ax=None, cmap: str = 'viridis', **kwargs):
         """

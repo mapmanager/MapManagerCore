@@ -1,5 +1,7 @@
 from dataclasses import dataclass
+from enum import IntEnum
 import warnings
+from mapmanagercore.layers.symbols import cross, xCross
 from mapmanagercore.utils import force_2d
 from ...layers.polygon import PolygonLayer
 from ...config import Colors, Config, SegmentId, SpineId
@@ -8,14 +10,22 @@ from ...benchmark import timer
 from shapely.geometry import Point, LineString
 from shapely.errors import ShapelyDeprecationWarning
 from .interactions import AnnotationsInteractions
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 from typing import List
-from ...layers.layer import Layer
+from ...layers.layer import DragState, Layer
 from typing import List
 import geopandas as gpd
 from typing import TypedDict, Tuple
 
 from mapmanagercore.logger import logger
+
+
+class EditMode(IntEnum):
+    MoveSpine = 0
+    Path = 1
+    AddSpine = 2
+    setOrigin = 3
+
 
 class AnnotationsSelection(TypedDict):
     """
@@ -27,8 +37,8 @@ class AnnotationsSelection(TypedDict):
     """
     segmentID: SegmentId
     segmentIDEditing: SegmentId
-    segmentIDEditingPath: SegmentId
     spineID: SpineId
+    editMode: Optional[EditMode]
 
 
 class AnnotationsOptions(TypedDict):
@@ -49,6 +59,7 @@ class AnnotationsOptions(TypedDict):
     zRange: Tuple[int, int]
     annotationSelections: AnnotationsSelection
     showLineSegments: bool
+    showLineSegmentsOrigin: bool
     showLineSegmentsRadius: bool
     showLabels: bool
     showAnchors: bool
@@ -98,6 +109,7 @@ class AnnotationsLayers(AnnotationsInteractions):
         Returns:
             list: A list of layers containing the retrieved annotations.
         """
+
         with warnings.catch_warnings():
             warnings.filterwarnings(
                 "ignore", category=ShapelyDeprecationWarning)
@@ -105,12 +117,12 @@ class AnnotationsLayers(AnnotationsInteractions):
 
             zRange = options["zRange"]
             selections = options["annotationSelections"]
-            segmentIDEditingPath = selections["segmentIDEditingPath"]
+            modeMode = selections["editMode"]
 
-            if segmentIDEditingPath:
+            if modeMode == EditMode.Path:
                 layers.extend(self._getEditingSegment(
                     zRange,
-                    segmentIDEditingPath))
+                    selections["segmentIDEditing"]))
             else:
                 self.segmentEditState.clear()
                 if options["showLineSegments"]:
@@ -118,9 +130,12 @@ class AnnotationsLayers(AnnotationsInteractions):
                         zRange,
                         selections["segmentIDEditing"],
                         selections["segmentID"],
-                        options["showLineSegmentsRadius"]))
+                        options["showLineSegmentsRadius"],
+                        options["showLineSegmentsOrigin"],
+                        modeMode,
+                    ))
 
-                if options["showSpines"]:
+                if options["showSpines"] and modeMode != EditMode.setOrigin:
                     layers.extend(self._getSpines(options))
 
             layers = [layer for layer in layers if not layer.empty()]
@@ -143,22 +158,20 @@ class AnnotationsLayers(AnnotationsInteractions):
         else:
             points = self.points
 
-        # abb KeyError
-        try:
-            points = points[["point", "anchorLine", "anchor", "z", "anchorZ"]]
-        except (KeyError) as e:
-            logger.error(e)
-            logger.error(f'points.index is:{points.index}')
-            # logger.error(f'available columns are:{points.columns}')
+        if points.index.empty:
+            return layers
+
+        points = points[["point", "anchorLine",
+                         "anchor", "z", "anchorZ", "isValid"]]
 
         # logger.warning(f'zRange:{zRange} {type(zRange[0])} {type(zRange[1])}')
         # logger.warning(f'points:{points}')
         # logger.warning(f'points["z"]:{points["z"]}')
-                       
+
         visiblePoints = points["z"].between(
-            zRange[0], zRange[1], inclusive="right")
+            zRange[0], zRange[1], inclusive="left")
         visibleAnchors = points["anchorZ"].between(
-            zRange[0], zRange[1], inclusive="right")
+            zRange[0], zRange[1], inclusive="left")
 
         if not editing:
             points = points[visiblePoints | visibleAnchors]
@@ -169,10 +182,17 @@ class AnnotationsLayers(AnnotationsInteractions):
         colorOn = options["colorOn"] if "colorOn" in options else None
         colors = self.getColors(colorOn, function=True)
 
+        def pointFillColor(id):
+            if not points.loc[id, "isValid"]:
+                return Colors.invalidSpine
+            if id == selectedSpine:
+                return Colors.selectedSpine
+            return colors(id)
+
         spines = (PointLayer(points["point"])
                   .id("spine")
                   .on("select", "spineID")
-                  .fill(lambda id: Colors.selectedSpine if id == selectedSpine else colors(id)))
+                  .fill(pointFillColor))
 
         labels = None
         if options["showAnchors"] or options["showLabels"]:
@@ -245,6 +265,19 @@ class AnnotationsLayers(AnnotationsInteractions):
         backgroundRoiBase = (baseLayer
                              .copy(id="background", series=points.loc[[selectedSpine], "roiBaseBg"])
                              .stroke(Colors.roiBaseBg))
+
+        if not points.loc[selectedSpine, "roiInBounds"]:
+            headLayer = headLayer.stroke(
+                Colors.invalidSpine).fill(Colors.invalidSpine)
+            baseLayer = baseLayer.stroke(
+                Colors.invalidSpine).fill(Colors.invalidSpine)
+
+        if not points.loc[selectedSpine, "roiBgInBounds"]:
+            backgroundRoiHead = backgroundRoiHead.stroke(
+                Colors.invalidSpine).fill(Colors.invalidSpine)
+            backgroundRoiBase = backgroundRoiBase.stroke(
+                Colors.invalidSpine).fill(Colors.invalidSpine)
+
         if editing:
             # Add larger interaction targets
             layers.append(backgroundRoiHead.copy(id="translate")
@@ -304,7 +337,7 @@ class AnnotationsLayers(AnnotationsInteractions):
     def _getEditingSegment(self, zRange: Tuple[int, int], editSegPathId: SegmentId) -> List[Layer]:
         segments = self.segments[editSegPathId, ["roughTracing", "segment"]]
         self.segmentEditState.segmentId = editSegPathId
-        _, _, x, y = self.shape
+        _, x, y = self.shape
 
         def onClickHitTarget(_, x, y, z):
             self.segmentEditState.hoverSegment = None
@@ -339,12 +372,13 @@ class AnnotationsLayers(AnnotationsInteractions):
             .onHoverOut(onHoverOutHitTarget)
         )
 
-        segment = (LineLayer(segments["segment"])
+        editingSegmentSeries = gpd.GeoSeries(segments["segment"])
+        segment = (LineLayer(editingSegmentSeries)
                    .id("segment")
                    .clipZ(zRange)
                    .stroke(Colors.segment))
 
-        segmentGhost = (LineLayer(force_2d(segments["segment"]))
+        segmentGhost = (LineLayer(force_2d(editingSegmentSeries))
                         .id("segment-ghost")
                         .stroke(Colors.segment)
                         .opacity(Config.ghostOpacity))
@@ -409,9 +443,12 @@ class AnnotationsLayers(AnnotationsInteractions):
         return layers
 
     @timer
-    def _getSegments(self, zRange: Tuple[int, int], editSegId: SegmentId, selectedSegId: SegmentId, showLineSegmentsRadius: bool) -> List[Layer]:
+    def _getSegments(self, zRange: Tuple[int, int], editSegId: SegmentId, selectedSegId: SegmentId, showLineSegmentsRadius: bool, showLineSegmentsOrigin: bool, modeMode: EditMode) -> List[Layer]:
         layers = []
-        segments = self.segments[["segment", "radius"]]
+        segments = self.segments[:, ["segment", "radius"]]
+
+        if not editSegId in segments.index:
+            editSegId = None
 
         def getStrokeColor(id: SegmentId):
             return Colors.segmentEditing if id == editSegId else (Colors.segmentSelected if id == selectedSegId else Colors.segment)
@@ -420,8 +457,17 @@ class AnnotationsLayers(AnnotationsInteractions):
                    .id("segment")
                    .clipZ(zRange)
                    .on("select", "segmentID")
-                   .on("edit", "segmentIDEditing")
+                   .on("edit", EditMode.MoveSpine)
                    .stroke(getStrokeColor))
+
+        if modeMode == EditMode.setOrigin:
+            showLineSegmentsRadius = False
+
+            def setSegmentOrigin(id, x, y, z, dragState=None):
+                return self.setSegmentOrigin(id, x, y, z, dragState!=None)
+
+            segment = segment.onDrag(
+                setSegmentOrigin).onClick(setSegmentOrigin)
 
         boarderWidth = Config.segmentLeftRightStrokeWidth
 
@@ -453,11 +499,21 @@ class AnnotationsLayers(AnnotationsInteractions):
                           .strokeWidth(lambda id: segments.loc[id, "radius"])
                           .stroke(Colors.transparent))
         else:
-            segment = segment.on("edit", "segmentIDEditingPath")
+            segment = segment.on("edit", EditMode.Path)
 
         # Add the line segment
         layers.append(segment.strokeWidth(
             lambda id: Config.segmentBoldWidth if id == editSegId else Config.segmentWidth))
+
+        if showLineSegmentsOrigin:
+            pivotPoints = gpd.GeoSeries(self.segments[:, "pivotPoint"])
+            pivotPoints = pivotPoints[pivotPoints.z.between(
+                zRange[0], zRange[1], inclusive="left")]
+
+            pivotPoints = pivotPoints.apply(lambda x: xCross(x, 2))
+            layers.append(PolygonLayer(pivotPoints)
+                          .id("pivotPoint")
+                          .fill(Colors.pivotPoint))
 
         return layers
 
@@ -500,7 +556,7 @@ class AnnotationsLayers(AnnotationsInteractions):
                 .onDrag(self.moveSegmentRadius))
 
             # Add the ghost
-        layers.append(ghost.on("edit", "segmentIDEditingPath"))
+        layers.append(ghost.on("edit", EditMode.Path))
 
     def onDelete(self):
         if self.segmentEditState.selectedIndex is None:

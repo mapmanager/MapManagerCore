@@ -1,5 +1,6 @@
 from typing import Union
 from shapely.geometry import LineString, Point
+from mapmanagercore.utils import interpolate
 import numpy as np
 import geopandas as gpd
 from mapmanagercore.logger import logger
@@ -54,9 +55,11 @@ class Segment:
     radius: float
     modified: np.datetime64
 
-    # pivotPoint: Point # abj
+    pivotDistance: float = 0.0 # abj
 
-    pivotDistance: float # abj
+    @compute(title="Pivot Point", dependencies=["segment", "pivotDistance"])
+    def pivotPoint(frame: LazyGeoFrame):
+        return interpolate(frame['segment'], frame['pivotDistance'])
 
     # abj
     @compute(title="Left Radius", dependencies=["segment", "radius"])

@@ -1,7 +1,6 @@
 from typing import Callable, Self, Tuple, Union
 import numpy as np
 from mapmanagercore.utils import count_coordinates
-from mapmanagercore.logger import logger
 from ..layers.point import PointLayer
 from .layer import Layer
 from shapely.geometry import LineString, MultiLineString, Point, Polygon
@@ -11,8 +10,6 @@ import geopandas as gp
 from ..benchmark import timer
 import math
 from math import pi as PI
-
-from mapmanagercore.logger import logger
 
 class MultiLineLayer(Layer):
     @Layer.setProperty
@@ -110,22 +107,26 @@ def getTail(d):
     return Point(d.coords[1][0], d.coords[1][1])
 
 # abj
+
+
 def getSide(a: Point, b: Point, c: Point):
-  """ Calculate which side a point (c) is relative to a segment (AB)
-  Args:
-    a: Beginning point of line segment
-    b: End point of line segment
-    c: Point relative to line segment
-  """
-  crossProduct = (b.x - a.x)*(c.y - a.y) - (b.y - a.y)*(c.x - a.x)
-  if crossProduct > 0:
-    return "Right"
-  elif crossProduct < 0:
-    return "Left"
-  else:
-    return "On the Line"
+    """ Calculate which side a point (c) is relative to a segment (AB)
+    Args:
+      a: Beginning point of line segment
+      b: End point of line segment
+      c: Point relative to line segment
+    """
+    crossProduct = (b.x - a.x)*(c.y - a.y) - (b.y - a.y)*(c.x - a.x)
+    if crossProduct > 0:
+        return "Right"
+    elif crossProduct < 0:
+        return "Left"
+    else:
+        return "On the Line"
 
 # abj
+
+
 @ timer
 def getSpineSide(line: LineString, spine: Point, anchor:Point):
     """ Return a string representing the side at which the spine point is relative to its segment
@@ -151,6 +152,8 @@ def getSpineSide(line: LineString, spine: Point, anchor:Point):
     return val
 
 # abj
+
+
 @ timer
 def getSpineAngle(spineLine: LineString):
     """ Return the angle of the spine Line by using the anchor point and the spine point
@@ -175,7 +178,7 @@ def getSpineAngle(spineLine: LineString):
 
     # abj: 6/24
     dx = sl1x - sl0x
-    dy =  sl1y - sl0y
+    dy = sl1y - sl0y
 
     # Angle between p1 and p2 in radians
     angle_rad = math.atan2(dy, dx)
@@ -184,7 +187,7 @@ def getSpineAngle(spineLine: LineString):
     # # Range: 0 - 360
     # # Check for Negative angle and add 360 degrees to determine counter clockwise value
     if angle_deg < 0:
-        angle_deg = angle_deg + 360 
+        angle_deg = angle_deg + 360
 
     # print("m1", m1, "m2", m2, "degree:", angle_deg)
     return angle_deg
