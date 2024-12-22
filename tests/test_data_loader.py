@@ -14,7 +14,7 @@ def test_load_single_timepoint():
     print(f'mmapPath:{mmapPath}')
 
     # check we can load a map
-    ok = MapAnnotations.checkFile(mmapPath, verbose=False)
+    ok = MapAnnotations.checkFile(mmapPath, verbose=True)
     print(f'ok:{ok}')
     assert ok
 
@@ -38,6 +38,6 @@ def test_load_multi_timepoint():
     assert map is not None
 
 if __name__ == '__main__':
-    # test_load_single_timepoint()
-    test_load_multi_timepoint()
+    test_load_single_timepoint()
+    # test_load_multi_timepoint()
     

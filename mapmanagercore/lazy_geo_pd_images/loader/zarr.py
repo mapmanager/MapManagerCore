@@ -34,15 +34,17 @@ class ZarrLoader(ImageLoader):
             self.group = zarr.group(store=self._store)
 
             # abb analysisparams
-            a_json = self.group.attrs['analysisParams']
-            self._analysisParams = AnalysisParams(loadJson=a_json)
+            loadedDict = self.group.attrs['analysisParams']
+            self._analysisParams = AnalysisParams(loadedDict=loadedDict)
 
         self._imagesSrcs: List[Dict[int, np.ndarray]] = []
         self._metadata = []
         imagesGroup = self.group["images"]
         for t, group in imagesGroup.groups():
             t = int(t)
-            self._metadata.append(Metadata(json.loads(group.attrs["metadata"])))
+            # abb group.attrs["metadata"]) is now a dict
+            # self._metadata.append(Metadata(json.loads(group.attrs["metadata"])))
+            self._metadata.append(Metadata(group.attrs["metadata"]))
             channels = {}
             for channel, images in group.arrays():
                 channel = int(channel)

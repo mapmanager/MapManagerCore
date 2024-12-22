@@ -150,7 +150,13 @@ class AnnotationsInteractions(AnnotationsSegments):
         if zSpread is None:
             zSpread = self.analysisParams.getValue('zSpread')
 
+        # abb 20241221 after s-dev merge -->> ERROR
         roi = self.points[spineId, "roi"]
+        
+        # logger.error(f'spineId:{spineId} roi is:')
+        # print(type(roi))
+        # print(roi)
+
         z = self.points[spineId, "z"]
 
         # create a grid of points to search for the best offset
@@ -222,27 +228,22 @@ class AnnotationsInteractions(AnnotationsSegments):
         z (int): The z coordinate of the spine.
         """
         if not self._inBounds(x, y, z):
+            logger.warning(f'x:{x} y:{y} z:{z} is out of bound -> no new spine')
             return None
 
         point = Point(x, y, z)
          
-        if not segmentId in self.segments.index:
+        if segmentId not in self.segments.index:
             logger.warning(f'segmentId:{segmentId} not in self.segments.index')
             return None
 
         # logger.error(f'1 FutureWarning: The `drop` keyword ...')
         anchor = self.nearestAnchor(segmentId, point, findBrightest=True)
 
-        # if segmentId == 5:
-        #     logger.warning(f'anchor:{anchor}')
-
         spineId = self.newUnassignedSpineId()
 
-        # abb TODO we want our spine id(s) to be PYthon int, not numpy int64 ???
+        # abb TODO we want our spine id(s) to be Python int, not numpy int64 ???
         spineId = int(spineId)
-
-        # if self._t in [1, 2]:
-        #     logger.info(f'spineId:{spineId} {type(spineId)} segmentId:{segmentId} anchor:{anchor}')
 
         _spine = Spine.withDefaults(
             segmentID=segmentId,

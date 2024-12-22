@@ -1,11 +1,11 @@
 from dataclasses import dataclass, field
 # JSON used by pyodide to transfer metadata to JS
-from dataclasses_json import dataclass_json
+# from dataclasses_json import dataclass_json
 from typing import Dict, Literal
 
 from mapmanagercore.logger import logger
 
-@dataclass_json
+# @dataclass_json
 @dataclass
 class VoxelMetadata:
     """
@@ -24,7 +24,7 @@ class VoxelMetadata:
     #     ret = f'x:{self.x} y:{self.y} z:{self.z}'
     #     return ret
 
-@dataclass_json
+# @dataclass_json
 @dataclass
 class MetadataPhysicalSize:
     """
@@ -43,7 +43,7 @@ class MetadataPhysicalSize:
     #     ret = f'x:{self.x} y:{self.y} unit:{self.unit}'
     #     return ret
 
-@dataclass_json
+# @dataclass_json
 @dataclass
 class MetadataContrast:
     """
@@ -58,7 +58,7 @@ class MetadataContrast:
     #     ret = f'color:{self.color} minInt:{self.minInt} minInt:{self.maxInt} minContrast:{self.minContrast} maxContrast:{self.maxContrast}'
     #     return ret
 
-@dataclass_json
+# @dataclass_json
 @dataclass
 class Metadata:
     name: str = ''

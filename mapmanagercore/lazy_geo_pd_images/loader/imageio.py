@@ -38,7 +38,7 @@ class MultiImageLoader(ImageLoader):
         # note, imageio is silently installed when scikit-image is installed
         # to update, see mapmanagercore.image_importers
         from imageio import imread
-        if name == None:
+        if name is None:
             name = path
 
         if isinstance(path, str):
@@ -97,7 +97,8 @@ class MultiImageLoader(ImageLoader):
 
         self._metadata[time] = metadata
 
-    def readAnalysisParams(self, analysisParams: Union[AnalysisParams, str]):
+    # def abb not used 20241221
+    def _old_readAnalysisParams(self, analysisParams: Union[AnalysisParams, str]):
         """
         Set the analysisParams for the given time index.
 

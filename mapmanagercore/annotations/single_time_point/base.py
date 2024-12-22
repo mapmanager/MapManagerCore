@@ -77,9 +77,12 @@ class SingleTimePointFrame(LazyGeoFrame):
 
     @timer
     def __getitem__(self, items: Any) -> Any:
+        # logger.info(f'items:{items}')
+        
         self._refreshIndex()
 
         result = self._root[items]
+                
         isDataFrame = isinstance(result, pd.DataFrame) or isinstance(result, gp.GeoDataFrame)
         if isDataFrame or isinstance(result, pd.Series) or isinstance(result, gp.GeoSeries):
             if result.index is not None and result.index.nlevels > 1:

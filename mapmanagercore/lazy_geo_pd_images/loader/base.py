@@ -3,6 +3,8 @@ from functools import lru_cache
 from typing import Iterator, List, Self, Tuple, TypedDict, Union
 from mapmanagercore.analysis_params import AnalysisParams
 from mapmanagercore.lazy_geo_pd_images.metadata import Metadata
+from mapmanagercore.logger import logger
+
 from dataclasses import asdict
 # import json
 import numpy as np
@@ -167,14 +169,27 @@ class ImageLoader:
         """
         for t in self.timePoints():
             channels = self.channels(t)
-            timePoint = group.create_group(str(t))
+            # abb
+            tStr = str(t)
+            if tStr in group.keys():
+                # logger.error(f'abb {tStr} already exists in group {group}')
+                # logger.error('TODO check if we have new channels and save them')
+                timePoint = group[tStr]
+            else:
+                timePoint = group.create_group(str(t))
+            
             metaData = self.metadata(t)
             timePoint.attrs[f"metadata"] = asdict(metaData)
 
             for channel in channels:
+                strChannel = str(channel)
                 image = self._images(t, channel)
-                timePoint.create_dataset(
-                    str(channel), data=image, dtype=image.dtype)
+                if strChannel in timePoint.keys():
+                    # logger.error(f'channel {strChannel} is already in timepoint {timePoint}')
+                    pass
+                else:
+                    timePoint.create_dataset(
+                        str(channel), data=image, dtype=image.dtype)
 
     def getAutoContrast_qt(self, time: int, channel: int) -> Tuple[int, int, int, int]:
         """Get the auto contrast from the entire image volume.
@@ -184,7 +199,7 @@ class ImageLoader:
 
         # logger.info(f'{self._images(time)[channel].shape} {np.min(self._images(time)[channel]), np.max(self._images(time)[channel])}')
         
-        imgData = self._images(time)[channel]
+        imgData = self._images(time, channel)
 
         # _percent_low = 25.0  #20.0 #0.5  # .30
         # _percent_high = 99.8  # 99.95  #100 - 0.5

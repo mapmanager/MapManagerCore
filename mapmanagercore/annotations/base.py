@@ -134,7 +134,6 @@ class AnnotationsBase(LazyImagesGeoPandas):
         Filters the points.
         """
         # logger.error(f'abb copy memory #1 filter:{filter} {type(filter)}')
-        
         c = copy(self)
         c._points = c._points[filter]
         return c
@@ -183,6 +182,7 @@ class AnnotationsBase(LazyImagesGeoPandas):
     # Serialization
 
     # abb adding fn to check if mmap file is valid
+    # TODO move this to a standalone utils.py function
     @classmethod
     def checkFile(cls, path: str, lazy=True, verbose=False) -> bool:
         """Check if a zarr file is valid to load.
@@ -190,6 +190,7 @@ class AnnotationsBase(LazyImagesGeoPandas):
         This is a complex function, Python has never been good at this?
         Is there a better way to write it?
         """
+        from pprint import pprint
         from json import JSONDecodeError
         from pickle import UnpicklingError
         from mapmanagercore.lazy_geo_pd_images.metadata import Metadata
@@ -215,13 +216,21 @@ class AnnotationsBase(LazyImagesGeoPandas):
             for _key, _value in group.items():
                 logger.info(f'  {_key}: {_value}')
 
-            logger.info('file has the following attrs keys')
+            logger.info('file has the following attrs')
             for _key, _value in group.attrs.items():
-                logger.info(f'  {_key}: {_value}')
+                if isinstance(_value, dict):
+                    logger.info(f'  {_key}: is a dict')
+                    # pprint(_value)
+                else:
+                    logger.info(f'  {_key}: {_value}')
 
         _imagesSrcs = {}
         _metadata = {}
-        for t in group.attrs["timePoints"]:
+        if verbose:
+            logger.info('group["images"] has:')
+            print(group["images"])
+
+        for t in group.attrs["images"]:
             try:
                 images = group[f"img-{t}"]
             except (KeyError) as e:
@@ -240,7 +249,8 @@ class AnnotationsBase(LazyImagesGeoPandas):
                 logger.error(f'   {e}')
                 _errors += 1
             finally:
-                _metadata[t] = Metadata.from_json(group.attrs[f"metadata-{t}"])
+                # _metadata[t] = Metadata.from_json(group.attrs[f"metadata-{t}"])
+                _metadata[t] = Metadata(group.attrs[f"metadata-{t}"])
                 if verbose:
                     logger.info(f'metadata-{t}: {_metadata[t]}')
 
@@ -284,14 +294,15 @@ class AnnotationsBase(LazyImagesGeoPandas):
 
         # (4) analysisParams
         try:
-            _analysisParams_json = group.attrs['analysisParams']
+            _analysisParams_dict = group.attrs['analysisParams']
+            logger.warning(f'_analysisParams_dict: {_analysisParams_dict}')
         except (KeyError) as e:
             logger.error('did not find "analysisParams"')
             logger.error(f'   {e}')
             _errors += 1
         finally:
             try:
-                analysisParams = AnalysisParams(loadJson=_analysisParams_json)
+                analysisParams = AnalysisParams(loadedDict=_analysisParams_dict)
             except (JSONDecodeError) as e:
                 logger.error('did not parse json into AnalysisParams()')
                 logger.error(f'   {e}')
@@ -332,7 +343,20 @@ class AnnotationsBase(LazyImagesGeoPandas):
 
         return cls(loader, lineSegments, points, analysisParams, path, lastSaveTime)
 
-    def save(self, path: str = None, compression=zipfile.ZIP_STORED):
+    # abb TODO put in one place (this function is repeated elsewhere)
+    def _group_exists(self, store, group_path) -> bool:
+        """Check if a zarr group exists.
+        """
+        try:
+            with zarr.open_group(store, mode='r', path=group_path):
+                return True
+        except (zarr.errors.GroupNotFoundError, KeyError):
+            return False
+
+    def save(self, path: str = None, compression=None):
+        """
+        compression : zipfile.ZIP_STORED
+        """
         if path is None:
             path = self.path
 
@@ -349,18 +373,31 @@ class AnnotationsBase(LazyImagesGeoPandas):
 
             logger.info(f'saving to {path}')
             if os.path.isdir(path) or compression is None:
+                logger.info('   as a DirectoryStore')
                 fs = zarr.DirectoryStore(path)
             else:
-                fs = zarr.ZipStore(path, mode="w", compression=compression)
+                fs = zarr.ZipStore(path, mode="w", compression=zipfile.ZIP_STORED)
+                logger.info('   as a ZipStore')
 
             with fs as store:
                 group = zarr.group(store=store)
-                images = group.create_group("images");
+                # abb we need to interogate the existing mmap and
+                # see if we have some new image channels or timepoints to save
+                # # abb error on saving changes to existing mmap
+                # zarr.errors.ContainsGroupError: path 'images' contains a group
+                # if not self._group_exists(store, "images"):
+                if "images" not in group.keys():
+                    images = group.create_group("images")
+                else:
+                    images = zarr.group(store=store)['images']
                 self._images.saveTo(images)
+                
+                # abb added overwrite=True, need to implement dirty flag for points and segment
+                # zarr.errors.ContainsArrayError: path 'points' contains an array
                 group.create_dataset(
-                    "points", data=self.points.toBytes(), dtype=np.uint8)
+                    "points", data=self.points.toBytes(), dtype=np.uint8, overwrite=True)
                 group.create_dataset(
-                    "lineSegments", data=self.segments.toBytes(), dtype=np.uint8)
+                    "lineSegments", data=self.segments.toBytes(), dtype=np.uint8, overwrite=True)
                 group.attrs["version"] = 1
 
                 # abb analysisparams

@@ -295,12 +295,8 @@ def actuallyConnectSpines(map : MapAnnotations, thesholdDist= 10):
 
     map.points[:]
     map.segments[:]
-    
-    # print('====== DONE map.points[:] is')
-    # print(map.getPointDataFrame(t=4))
-    savePath = '/Users/cudmore/Desktop/multi_timepoint_map_seg_spine_connected.mmap'
-    logger.info(f'saving: {savePath}')
-    map.save(savePath)
+
+    return map
 
 def getPlotMapDict(map, xStat, yStat, segmentID) -> dict:
     """Get a dict to plot a map.
@@ -376,26 +372,20 @@ def getPlotMapDict(map, xStat, yStat, segmentID) -> dict:
         
     }
 
-    stopSec = time.time()
-    logger.info(f'took {stopSec-startSec} s')
+    # stopSec = time.time()
+    # logger.info(f'took {stopSec-startSec} s')
 
     return retDict
 
-def plotMap(map : MapAnnotations):
-
-    xStat = 't'
-    yStat = 'spinePosition'
-    segmentID = 0
-    plotDict = getPlotMapDict(map, xStat=xStat, yStat=yStat, segmentID=segmentID)
-    
-    # print('=== xyPlotSpineID')
-    # print(plotDict['xyPlotSpineID'])
-
-    # print('=== xyPlotTimepoint')
-    # print(plotDict['xyPlotTimepoint'])
+def plotMap(map : MapAnnotations, segmentID : int = 1):
+    logger.info('')
 
     startSec = time.time()
 
+    xStat = 't'
+    yStat = 'spinePosition'
+    plotDict = getPlotMapDict(map, xStat=xStat, yStat=yStat, segmentID=segmentID)
+        
     plt.plot(plotDict['xPlot'], plotDict['yPlot'], 'ok')
     
     #lines
@@ -433,24 +423,18 @@ def plotMap(map : MapAnnotations):
 
 if __name__ == '__main__':
     
-    # a 2 session map
-    # path = 'sandbox/data/rr30a_2tp.mmap'
-    # path = '/Users/cudmore/Sites/MapManagerCore/sandbox/data/rr30a_2tp.mmap'
-    # path = '/Users/cudmore/Sites/MapManagerCore/data/two_timepoint.mmap'
-    
     # a map with connected segments and each segments have (disconnected) spines
     # output of import_mmap.py
-    path = '/Users/cudmore/Desktop/multi_timepoint_map_seg_connected.mmap'
-    
-    map = MapAnnotations.load(path)
+    path = '/Users/cudmore/Desktop/multi_timepoint_seg_connected.mmap'
 
+    map = MapAnnotations.load(path)
     print(map)
 
     if 0:
         # testing connect spines
         tp1 = 0  # 1
         tp2 = 1  # 2
-        segment1 = 1
+        segment1 = 1  # both are '1' as segments are connected
         segment2 = 1
         thesholdDist = 10
         df = _getConnectedSpines(map, tp1, tp2, segment1, segment2, thesholdDist=thesholdDist)
@@ -464,14 +448,34 @@ if __name__ == '__main__':
         print(df)
 
     if 1:
-        actuallyConnectSpines(map)
+        spineMap = actuallyConnectSpines(map)
+        # print('====== DONE map.points[:] is')
+        # print(map.getPointDataFrame(t=4))
+        savePath = '/Users/cudmore/Desktop/multi_timepoint_seg_spine_connected.mmap'
+        logger.info(f'saving: {savePath}')
+        spineMap.save(savePath)
 
-    # reload results of actuallyConnectSpines()
-    savePath = '/Users/cudmore/Desktop/multi_timepoint_map_seg_spine_connected.mmap'
-    logger.info(f're-loading map:{savePath}')
-    map = MapAnnotations.load(savePath)
+        saveZipPath = '/Users/cudmore/Desktop/multi_timepoint_seg_spine_connected.zip.mmap'
+        logger.info(f'saveZipPath: {saveZipPath}')
+        spineMap.save(saveZipPath, compression='zip')
+
+        # plotMap(spineMap)
+
+    if 0:
+        # reload results of actuallyConnectSpines()
+        savePath = '/Users/cudmore/Desktop/multi_timepoint_seg_spine_connected.mmap'
+        logger.info(f're-loading map:{savePath}')
+        map = MapAnnotations.load(savePath)
     
-    print(map)
-    print(map.points[:])
+        # print('map.segments.index')
+        # print(map.segments.index)
 
-    plotMap(map)
+        # print('map.points.index')
+        # print(map.points.index)
+
+        plotMap(map, segmentID=2)
+
+    # print(map)
+    # print(map.points[:])
+
+    # plotMap(map)

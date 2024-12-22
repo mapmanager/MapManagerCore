@@ -8,7 +8,7 @@ from mapmanagercore.logger import logger
 class AnalysisParams():
     """
     """
-    def __init__(self, loadJson : str = None, path : str = None):
+    def __init__(self, loadedDict : dict = None, path : str = None):
         self.path = path
 
         # self.__version__ = 0.1
@@ -22,20 +22,23 @@ class AnalysisParams():
 
         self._getDefaults()
 
-        if loadJson is not None:
-            self._loadFromJson(loadJson)
+        if loadedDict is not None:
+            self._loadFromDict(loadedDict)
             # self._dict = json.loads(loadJson)
             # logger.info(f"self._dict['__version__']: {self._dict['__version__'] }")
             # if self._dict['__version__'] < self.__version__:
             #     logger.info("   setting defaults")
             #     self._getDefaults()
     
-    def _loadFromJson(self, loadedJson : str):
+    # abb this loads from dict
+    def _loadFromDict(self, loadedDict : dict):
         """Set values for keys we loaded that we know about.
         """
-        _loadedDict = json.loads(loadedJson)
+        # logger.info(f'loadedJson:{loadedDict}')
         # logger.info(f'_loadedDict:{_loadedDict}')
-        for k,vDict in _loadedDict.items():
+        if isinstance(loadedDict, str):
+            loadedDict = json.loads(loadedDict)
+        for k,vDict in loadedDict.items():
             if k == '__version__':
                 continue
             # logger.info(f'k:{k} v:{v}')
@@ -78,8 +81,8 @@ class AnalysisParams():
             },
 
             'channel': {
-                'defaultValue': 1,  # 0 based
-                'currentValue': 1,
+                'defaultValue': 0,  # 0 based
+                'currentValue': 0,
                 'description': 'Image color channel to find brightest connection of spine.',
                 'type' : "int"
             },
@@ -123,8 +126,10 @@ class AnalysisParams():
             },
 
             'maxChannels': {
-                'defaultValue': 2,
-                'currentValue': 2,
+                # 'defaultValue': 2,
+                # 'currentValue': 2,
+                'defaultValue': 0,
+                'currentValue': 0,
                 'description': 'Max number of channels.'
             },
 

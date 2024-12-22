@@ -298,11 +298,14 @@ class LazyGeoFrame(Generic[T]):
     _columns: list[str]
     _computingColumns: list[list[str]]
 
-    def __init__(self, schema: Schema = None, data: gp.GeoDataFrame = None, store: weakref.ReferenceType[T] = None):
+    def __init__(self,
+                 schema: Schema = None,
+                 data: gp.GeoDataFrame = None,
+                 store: weakref.ReferenceType[T] = None):
         self._schema = schema
         if data is None:
             data = gp.GeoDataFrame()
-        self._store = SOURCE if store == None else store
+        self._store = SOURCE if store is None else store
         self._columns = []
         self._filterIdx = None
         self._filterMask = None

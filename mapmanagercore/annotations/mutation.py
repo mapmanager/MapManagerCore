@@ -133,13 +133,27 @@ class AnnotationsBaseMut(AnnotationsBase):
         ))
 
     def connectSegment(self, segmentKey: Tuple[SegmentId, int], toSegmentKey: Tuple[SegmentId, int]):
-        if segmentKey[1] == toSegmentKey[1]:
-            raise ValueError(
-                "Cannot connect segments in the same time points.")
+        logger.info(f'segmentKey:{segmentKey}')
+        logger.info(f'toSegmentKey:{toSegmentKey}')
+        # logger.info('self.segments.index')
+        # print(self.segments.index)
 
+        if segmentKey[1] == toSegmentKey[1]:
+            # raise ValueError(
+            #     "Cannot connect segments in the same time points.")
+            logger.warning('Cannot connect segments in the same time points.')
+            return
+        
+        newPostKey = (segmentKey[0], toSegmentKey[1])
+        if newPostKey in self.segments.index:
+            logger.warning(f'newPostKey:{newPostKey} already in index')
+            return
+
+        # TODO if segment key is connect downstream -> disconnect
+        # TODO if toSegmentKey key is connect upstream -> disconnect
         # check if the key already exists in the time point
         existingKey = (toSegmentKey[0], segmentKey[1])
-        if existingKey in self.segments.index:
+        if 0 and existingKey in self.segments.index:
             logger.info(f'   calling disconnectSegment() for existingKey:{existingKey}')
             self.disconnectSegment(existingKey)
 
@@ -147,7 +161,8 @@ class AnnotationsBaseMut(AnnotationsBase):
         # was this
         # _slice = slice(segmentKey, segmentKey[0])
         # logger.info(f'   _slice:{(segmentKey, segmentKey[0])}')
-        # abb multi timepoint error connectSegment works for transient (1 tp) segments, does not get any other downstream
+        # abb multi timepoint error connectSegment works for transient (1 tp) segments,
+        #   does not get any other downstream
         _slice = toSegmentKey  # ('bar',)
 
         _segment = Segment(
@@ -173,6 +188,8 @@ class AnnotationsBaseMut(AnnotationsBase):
 
         self.updateSpine(spineRows, _spine)
 
+        return True
+    
     def disconnectSegment(self, segmentKey: Tuple[SegmentId, int]):
         newID = self.newUnassignedSegmentId()
 

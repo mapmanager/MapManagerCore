@@ -29,6 +29,8 @@ class ImageColumnAttributes(ColumnAttributes):
 
 def parseColumns(columns: List[str], prefix: str) -> Tuple[set[int], set[str]]:
     """Parse the roi computed columns to get the channels and aggregates."""
+    logger.error(f'columns:{columns} prefix:{prefix}')
+    
     channels = set()
     aggregates = set()
     for column in columns:
@@ -96,7 +98,9 @@ class LazyImagesGeoPandas(LazyGeoPandas):
             # if the use case for a single channel isn't needed, we can remove the check and always return a DataFrame
             # which will simplify the code base
             channels = list(channels) if len(channels) >= 1 else next(channels)
-                #channels) > 1 else next(channels)
+
+            logger.error(f'post channels:{channels}')
+            # logger.error(f'next(channels):{next(channels)}')
 
             # Compute the aggregates over the pixels
             pixels = weakSelf().getShapePixels(
