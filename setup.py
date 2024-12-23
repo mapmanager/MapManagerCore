@@ -21,6 +21,7 @@ install_requires = [
     # "dataclasses-json",  # abb removed 20241206
     'brightest-path-lib',
     'pooch',  # to load data from MapManagerCore-Data repo
+    'tifffile',
     # 'bioio',  # TODO: use to load metadata and lazy load images
     # install bioio from main branch of github repo (not pypi package)
     # 'bioio @ git+ssh://git@github.com/bioio-devs/bioio.git',

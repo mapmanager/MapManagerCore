@@ -125,12 +125,14 @@ class AnalysisParams():
                 'type' : "int"
             },
 
+            # abj
             'maxChannels': {
                 # 'defaultValue': 2,
                 # 'currentValue': 2,
                 'defaultValue': 0,
                 'currentValue': 0,
-                'description': 'Max number of channels.'
+                'description': 'Max number of channels.',
+                'type' : "int"
             },
 
             'backgroundRoiGridPoints': {

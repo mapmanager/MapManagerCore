@@ -1,5 +1,5 @@
-# import json
 import numpy as np
+import tifffile
 
 from mapmanagercore.analysis_params import AnalysisParams
 from mapmanagercore.lazy_geo_pd_images.metadata import Metadata
@@ -34,15 +34,16 @@ class MultiImageLoader(ImageLoader):
           time (int): The time index.
           channel (int): The channel index.
         """
-        # TODO do not use imageio, use bioio
+        # TODO for tif files, do not use imageio, use tifffile
         # note, imageio is silently installed when scikit-image is installed
         # to update, see mapmanagercore.image_importers
-        from imageio import imread
+        # from imageio import imread
         if name is None:
             name = path
 
         if isinstance(path, str):
-            imgData = imread(path)
+            # imgData = imread(path)
+            imgData = tifffile.imread(path)
         else:
             imgData = path
             
@@ -143,8 +144,8 @@ class MultiImageLoader(ImageLoader):
             currentImages[time] = []
 
         if isinstance(path, str):
-            from imageio import imread
-            imgData = imread(path)
+            # from imageio import imread
+            imgData = tifffile.imread(path)
         else:
             imgData = path
 

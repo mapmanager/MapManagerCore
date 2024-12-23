@@ -27,6 +27,7 @@ class ZarrLoader(ImageLoader):
             self.group = zarr.group()
             self.group.create_group("images")
         else:
+            # need to check if local files exist (not https)
             if os.path.isdir(path):
                 self._store = zarr.DirectoryStore(path)
             else:

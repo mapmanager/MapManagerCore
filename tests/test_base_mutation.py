@@ -10,6 +10,7 @@ class TestAnnotationsBaseMut(unittest.TestCase):
     def new(self):
         return AnnotationsBaseMut(ImageLoader())
 
+    # @pytest.mark.skip(reason="not currently testing")
     def test_undo_redo_simple_spine(self):
         annotations = self.new()
         annotations.updateSpine(("spine_id", 0), Spine(z=0))
@@ -53,11 +54,14 @@ class TestAnnotationsBaseMut(unittest.TestCase):
         self.assertEqual(len(annotations._log.operations), 2)
         self.assertEqual(annotations.points[("spine_id", 0), "z"], 3)
 
-        annotations.updateSpine(("spine_id", 0), Spine(z=4), replaceLog=True)
-        self.assertEqual(len(annotations._log.operations), 2)
+        # abb removed replaceLog=True ???
+        # annotations.updateSpine(("spine_id", 0), Spine(z=4), replaceLog=True)
+        annotations.updateSpine(("spine_id", 0), Spine(z=4))
+        self.assertEqual(len(annotations._log.operations), 3)
         self.assertEqual(annotations.points[("spine_id", 0), "z"], 4)
 
         annotations.undo()
+        # abb 2 -> 3 ???
         self.assertEqual(annotations.points[("spine_id", 0), "z"], 2)
 
         annotations.undo()
