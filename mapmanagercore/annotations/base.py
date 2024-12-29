@@ -30,7 +30,7 @@ class AnnotationsBase(LazyImagesGeoPandas):
     _images: MultiImageLoader
 
     def __init__(self,
-                 loader: MultiImageLoader, # OLD: loader: ImageLoader,
+                 loader: MultiImageLoader,
                  lineSegments: Union[str, pd.DataFrame] = pd.DataFrame(),
                  points: Union[str, pd.DataFrame] = pd.DataFrame(),
                  analysisParams: AnalysisParams = AnalysisParams(),
@@ -181,138 +181,6 @@ class AnnotationsBase(LazyImagesGeoPandas):
 
     # Serialization
 
-    # abb adding fn to check if mmap file is valid
-    # TODO move this to a standalone utils.py function
-    @classmethod
-    def checkFile(cls, path: str, lazy=True, verbose=False) -> bool:
-        """Check if a zarr file is valid to load.
-
-        This is a complex function, Python has never been good at this?
-        Is there a better way to write it?
-        """
-        from pprint import pprint
-        from json import JSONDecodeError
-        from pickle import UnpicklingError
-        from mapmanagercore.lazy_geo_pd_images.metadata import Metadata
-
-        _errors = 0
-
-        if verbose:
-            logger.info(f'inspecting zarr file: {path}')
-
-        # (1) taken from ZarrLoader (it loads images)
-        # loader = ZarrLoader(path, lazy=lazy)
-        # error when trying to load a zipstore
-        # zarr.errors.FSPathExistNotDir: path exists but is not a directory: %r
-        if os.path.isdir(path):
-            store = zarr.DirectoryStore(path)
-        else:
-            store = zarr.ZipStore(path, mode="r")
-
-        group = zarr.group(store=store)
-
-        if verbose:
-            logger.info('file has the following groups')
-            for _key, _value in group.items():
-                logger.info(f'  {_key}: {_value}')
-
-            logger.info('file has the following attrs')
-            for _key, _value in group.attrs.items():
-                if isinstance(_value, dict):
-                    logger.info(f'  {_key}: is a dict')
-                    # pprint(_value)
-                else:
-                    logger.info(f'  {_key}: {_value}')
-
-        _imagesSrcs = {}
-        _metadata = {}
-        if verbose:
-            logger.info('group["images"] has:')
-            print(group["images"])
-
-        for t in group.attrs["images"]:
-            try:
-                images = group[f"img-{t}"]
-            except (KeyError) as e:
-                logger.error(f'did not find group "img-{t}"')
-                logger.error(f'   {e}')
-                _errors += 1
-            finally:
-                _imagesSrcs[t] = images if lazy else images[:]
-                if verbose:
-                    logger.info(f'img-{t}: {_imagesSrcs[t].shape}')
-
-            try:
-                group.attrs[f"metadata-{t}"]
-            except (KeyError) as e:
-                logger.error(f'did not find group "metadata-{t}"')
-                logger.error(f'   {e}')
-                _errors += 1
-            finally:
-                # _metadata[t] = Metadata.from_json(group.attrs[f"metadata-{t}"])
-                _metadata[t] = Metadata(group.attrs[f"metadata-{t}"])
-                if verbose:
-                    logger.info(f'metadata-{t}: {_metadata[t]}')
-
-        # (2) points
-        try:
-            # zarr.core.Array '/points' (255865,) uint8
-            _points = group["points"]
-        except (KeyError) as e:
-            logger.error('did not find group "points"')
-            logger.error(f'   {e}')
-            _errors += 1
-        finally:
-            try:
-                _points = pd.read_pickle(BytesIO(_points[:].tobytes()))
-                if verbose:
-                    logger.info(f'points: {len(_points)}')
-                    # print(_points.head())
-            except (UnpicklingError) as e:
-                logger.error('error reading pickel from points')
-                logger.error(f'   {e}')
-                _errors += 1
-
-        # (3) lineSegments
-        try:
-            _lineSegments = group["lineSegments"]
-        except (KeyError) as e:
-            logger.error('did not find group "lineSegments"')
-            logger.error(f'   {e}')
-            _errors += 1
-        finally:
-            try:
-                _lineSegments = pd.read_pickle(
-                    BytesIO(_lineSegments[:].tobytes()))
-                if verbose:
-                    logger.info(f'lineSegments: {len(_lineSegments)}')
-                    # print(_lineSegments.head())
-            except (UnpicklingError) as e:
-                logger.error('error reading pickel from lineSegments')
-                logger.error(f'   {e}')
-                _errors += 1
-
-        # (4) analysisParams
-        try:
-            _analysisParams_dict = group.attrs['analysisParams']
-            logger.warning(f'_analysisParams_dict: {_analysisParams_dict}')
-        except (KeyError) as e:
-            logger.error('did not find "analysisParams"')
-            logger.error(f'   {e}')
-            _errors += 1
-        finally:
-            try:
-                analysisParams = AnalysisParams(loadedDict=_analysisParams_dict)
-            except (JSONDecodeError) as e:
-                logger.error('did not parse json into AnalysisParams()')
-                logger.error(f'   {e}')
-                _errors += 1
-
-        if verbose:
-            logger.info(f'encountered {_errors} errors while inspecting {path}')
-
-        return _errors == 0
-
     def merge(self, loader: ImageLoader):
         self.loader.merge(loader)
 
@@ -320,6 +188,8 @@ class AnnotationsBase(LazyImagesGeoPandas):
     def load(cls, path: Union[str, None], lazy=False):
         loader = ZarrLoader(path, lazy=lazy)
 
+        # abb read_pickle() is failing if we have an older version of numpy
+        # when building for pyinstaller, we end up with numpy==1.26.4
         if "points" in loader.group:
             points = pd.read_pickle(
                 BytesIO(loader.group["points"][:].tobytes()))
@@ -336,10 +206,11 @@ class AnnotationsBase(LazyImagesGeoPandas):
             
         analysisParams = loader.analysisParams()
 
-        try:
+        # try:
+        if 1:
             lastSaveTime = loader.group.attrs['lastSaveTime']
-        except:
-            lastSaveTime = ""
+        # except:
+        #     lastSaveTime = ""
 
         return cls(loader, lineSegments, points, analysisParams, path, lastSaveTime)
 

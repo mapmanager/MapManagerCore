@@ -34,9 +34,9 @@ def test_load_multi_timepoint():
     print(f'mmapPath:{mmapPath}')
 
     # check we can load a map
-    ok = MapAnnotations.checkFile(mmapPath, verbose=False)
-    print(f'ok:{ok}')
-    assert ok
+    # ok = MapAnnotations.checkFile(mmapPath, verbose=False)
+    # print(f'ok:{ok}')
+    # assert ok
 
     # actually load the map
     map = MapAnnotations.load(mmapPath)

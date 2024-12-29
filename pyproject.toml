@@ -4,9 +4,9 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools_scm]
 write_to = "mapmanagercore/_version.py"
-version_scheme = "post-release"
-#local_scheme = "dirty-tag"
-local_scheme = "no-local-version"
+# version_scheme = "post-release"
+# #local_scheme = "dirty-tag"
+# local_scheme = "no-local-version"
 
 [tool.ruff]
 ignore = [

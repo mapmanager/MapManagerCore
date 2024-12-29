@@ -4,7 +4,7 @@ import warnings
 from mapmanagercore.layers.symbols import cross, xCross
 from mapmanagercore.utils import force_2d
 from ...layers.polygon import PolygonLayer
-from ...config import Colors, Config, SegmentId, SpineId
+from mapmanagercore.config import Colors, Config, SegmentId, SpineId
 from ...layers import LineLayer, PointLayer, Layer
 from ...benchmark import timer
 from shapely.geometry import Point, LineString

@@ -1,5 +1,5 @@
 from typing import Tuple, Union
-from shapely.geometry import Point
+# from shapely.geometry import Point
 
 from ..schemas import Spine, Segment
 from ..config import SegmentId, SpineId

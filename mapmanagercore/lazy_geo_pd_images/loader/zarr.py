@@ -1,12 +1,13 @@
 import os
-from mapmanagercore.analysis_params import AnalysisParams
-import json
-from mapmanagercore.lazy_geo_pd_images.metadata import Metadata
-from .base import ImageLoader, Position
+# import json
 from typing import Any, Dict, Iterator, List, Union
 import numpy as np
 import zarr
 
+from mapmanagercore.analysis_params import AnalysisParams
+from mapmanagercore.lazy_geo_pd_images.metadata import Metadata
+from .base import ImageLoader, Position
+from mapmanagercore.logger import logger
 
 class ZarrLoader(ImageLoader):
     """A loader for images stored in a zarr file."""
@@ -27,7 +28,9 @@ class ZarrLoader(ImageLoader):
             self.group = zarr.group()
             self.group.create_group("images")
         else:
-            # need to check if local files exist (not https)
+            # abb need to check if local files exist (not https)
+            # _isHttps = path.startswith('https')
+            # if _isHttps or os.path.isdir(path):
             if os.path.isdir(path):
                 self._store = zarr.DirectoryStore(path)
             else:
@@ -35,8 +38,13 @@ class ZarrLoader(ImageLoader):
             self.group = zarr.group(store=self._store)
 
             # abb analysisparams
-            loadedDict = self.group.attrs['analysisParams']
-            self._analysisParams = AnalysisParams(loadedDict=loadedDict)
+            try:
+                loadedDict = self.group.attrs['analysisParams']
+                self._analysisParams = AnalysisParams(loadedDict=loadedDict)
+            except (KeyError) as e:
+                logger.error(e)
+                logger.error(f'available keys are {self.group.attrs.keys()}')
+                self._analysisParams = AnalysisParams()
 
         self._imagesSrcs: List[Dict[int, np.ndarray]] = []
         self._metadata = []

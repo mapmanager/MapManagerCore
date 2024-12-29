@@ -49,12 +49,10 @@ setup(
     # the package name (on PyPi), still use 'import mapmanagercore'
     name='mapmanagercore',
     # version=VERSION,
-    description='MapManagerCore is a Python library that provides the core functionality for MapManager.',
+    description='MapManagerCore is a Python package that provides the core functionality for MapManager.',
     long_description=long_description,
     long_description_content_type='text/markdown',
-    # TODO: assign to url of mapmanagercore
-    # url='http://github.com/cudmore/SanPy',
-    # how do we specify multiple authors?
+    url='https://github.com/mapmanager/MapManagerCore',
     author='Robert H Cudmore',
     author_email='robert.cudmore@gmail.com',
     license='GNU General Public License, Version 3',
@@ -81,7 +79,7 @@ setup(
 
     packages=foundPackages,
 
-    include_package_data=True,  # uses manifest.in
+    include_package_data=True,  # uses manifest.ini
 
     use_scm_version=True,
     setup_requires=['setuptools_scm'],

@@ -12,6 +12,7 @@ import zarr
 from mapmanagercore import MapAnnotations, MultiImageLoader, MMapLoader
 from mapmanagercore.logger import logger
 
+# abb is this used at runtime or just as a script?
 def _getCreateData():
     # some fake (points, lines, images, analysisParams)
 
@@ -48,6 +49,7 @@ def _toBytes(df: pd.DataFrame):
     df.to_pickle(buffer)
     return np.frombuffer(buffer.getvalue(), dtype=np.uint8)
 
+# abb is this used at runtime or just called as a script?
 def createZarr(path, zipStore=False):
     """Create and save a new zarr.
 

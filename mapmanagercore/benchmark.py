@@ -1,7 +1,11 @@
 from time import time
 import pandas as pd
 
-_times = pd.DataFrame([], columns=["name", "time"])
+# abb
+# File "lib.pyx", line 2538, in pandas._libs.lib.maybe_convert_objects
+#TypeError: Cannot convert numpy.ndarray to numpy.ndarray
+# _times = pd.DataFrame([], columns=["name", "time"])
+_times = pd.DataFrame(columns=["name", "time"])
 _disabled = True
 
 
