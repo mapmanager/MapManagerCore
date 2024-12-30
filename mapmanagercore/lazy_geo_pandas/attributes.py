@@ -1,6 +1,6 @@
 from typing import Any, Callable, Dict, List, Optional, Self, TypedDict, Union
 import pandas as pd
-from ..config import Color, Symbol
+from ..config import Colors, Symbol  # abb Color to Colors
 from typing import List, Dict, Any, Union
 
 class ColumnAttributes(TypedDict):
@@ -23,7 +23,7 @@ class ColumnAttributes(TypedDict):
     divergent: bool
     description: str
     group: str
-    colors: Union[List[Color], Dict[Any, Color]]
+    colors: Union[List[Colors], Dict[Any, Colors]]  # abb Color to Colors
     symbols: Union[List[Symbol], Dict[Any, Symbol]]
     plot: bool
     version: int
