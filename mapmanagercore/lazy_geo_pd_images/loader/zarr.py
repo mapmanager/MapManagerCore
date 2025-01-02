@@ -1,6 +1,4 @@
-import os
 from mapmanagercore.analysis_params import AnalysisParams
-import json
 from mapmanagercore.lazy_geo_pd_images.metadata import Metadata
 from .base import ImageLoader, Position
 from typing import Any, Dict, Iterator, List, Union
@@ -27,22 +25,22 @@ class ZarrLoader(ImageLoader):
             self.group = zarr.group()
             self.group.create_group("images")
         else:
-            if os.path.isdir(path):
-                self._store = zarr.DirectoryStore(path)
-            else:
-                self._store = zarr.ZipStore(path, mode="r")
+            # if os.path.isdir(path):
+            self._store = zarr.DirectoryStore(path)
+            # else:
+                # self._store = zarr.ZipStore(path, mode="r")
             self.group = zarr.group(store=self._store)
 
             # abb analysisparams
-            a_json = self.group.attrs['analysisParams']
-            self._analysisParams = AnalysisParams(loadJson=a_json)
+            self._analysisParams = AnalysisParams()
+            self._analysisParams.setDict(self.group.attrs['analysisParams'])
 
         self._imagesSrcs: List[Dict[int, np.ndarray]] = []
         self._metadata = []
         imagesGroup = self.group["images"]
         for t, group in imagesGroup.groups():
             t = int(t)
-            self._metadata.append(Metadata(json.loads(group.attrs["metadata"])))
+            self._metadata.append(Metadata(**group.attrs["metadata"]))
             channels = {}
             for channel, images in group.arrays():
                 channel = int(channel)
@@ -144,7 +142,7 @@ class ZarrLoader(ImageLoader):
         a = self._metadata[timePoint].channelNames.pop(channel, None)
         b = self._imagesSrcs[timePoint].pop(channel, None)
 
-        return a != None or b != None
+        return not (isinstance(a, type(None)) and isinstance(b, type(None)))
 
     def merge(self, loader: ImageLoader):
         times = sorted(loader.timePoints())

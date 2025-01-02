@@ -60,7 +60,7 @@ class MetadataContrast:
 
 @dataclass_json
 @dataclass
-class Metadata:
+class Metadata():
     name: str = ''
     channelNames: Dict[int, str] = field(default_factory=lambda:{})
     voxel: VoxelMetadata = field(default_factory=lambda: VoxelMetadata())

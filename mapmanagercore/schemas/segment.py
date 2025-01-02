@@ -2,13 +2,9 @@ from typing import Union
 from shapely.geometry import LineString, Point
 from mapmanagercore.utils import interpolate
 import numpy as np
-import geopandas as gpd
-from mapmanagercore.logger import logger
-from mapmanagercore.layers.line import calculateSegmentOffset, getRunningDistance
+from mapmanagercore.layers.line import calculateSegmentOffset
 
 from ..lazy_geo_pandas import schema, compute, LazyGeoFrame
-# from ..lazy_geo_pandas import schema
-
 
 @schema(
     index=["segmentID", "t"],
@@ -65,41 +61,21 @@ class Segment:
     @compute(title="Left Radius", dependencies=["segment", "radius"])
     def leftRadius(frame: LazyGeoFrame):
         df = frame[["segment", "radius"]]
-        df["z"] = (df['segment'].apply(lambda geom: [coord[2] for coord in geom.coords]))  
-        offsettedSegment = df.apply(lambda d: calculateSegmentOffset(d["segment"], d["radius"], isPositive=False), axis=1)
-        df["x"] = (offsettedSegment.apply(lambda geom: [coord[0] for coord in geom.coords]))
-        df["y"] = (offsettedSegment.apply(lambda geom: [coord[1] for coord in geom.coords]))
-        newDF = gpd.GeoSeries(df[["x", "y", "z"]].apply(lambda ldf: LineString(Point(ldf["x"][i], ldf["y"][i], ldf["z"][i]) 
-                                                                               for i, val in enumerate(ldf["x"])), axis=1))
-        # newDF = gpd.GeoSeries(df[["x", "y"]].apply(lambda ldf: LineString(Point(ldf["x"][i], ldf["y"][i]) 
-        #                                                                 for i, val in enumerate(ldf["x"])), axis=1))
-
-        # logger.info(f"newDF {newDF}")
-        return newDF
+        return calculateSegmentOffset(df["segment"], df["radius"], isPositive=False)
     
     @compute(title="Right Radius", dependencies=["segment", "radius"])
     def rightRadius(frame: LazyGeoFrame):
         df = frame[["segment", "radius"]]
-        # logger.info(f" df[radius] {df['radius']}")
-        df["z"] = (df['segment'].apply(lambda geom: [coord[2] for coord in geom.coords]))  
-        offsettedSegment = df.apply(lambda d: calculateSegmentOffset(d["segment"], d["radius"], isPositive=True), axis=1)
-        df["x"] = (offsettedSegment.apply(lambda geom: [coord[0] for coord in geom.coords]))
-        df["y"] = (offsettedSegment.apply(lambda geom: [coord[1] for coord in geom.coords]))
-
-        newDF = gpd.GeoSeries(df[["x", "y", "z"]].apply(lambda ldf: LineString(Point(ldf["x"][i], ldf["y"][i], ldf["z"][i]) 
-                                                                            for i, val in enumerate(ldf["x"])), axis=1))
-
-        # newDF = gpd.GeoSeries(df[["x", "y"]].apply(lambda ldf: LineString(Point(ldf["x"][i], ldf["y"][i]) 
-        #                                                                        for i, val in enumerate(ldf["x"])), axis=1))
-        return newDF
-    
-    @compute(title="distance", dependencies=["segment"])
-    def distance(frame: LazyGeoFrame): # distance of each point from beginning of the segment
-        df = frame["segment"]
-        distanceList = df.apply(lambda d: getRunningDistance(d))
-        # distanceList = df.apply(lambda d: getRunningDistance(d["segment"]))
-        # list of distances, same length as segment: linestring
-        return distanceList
+        return calculateSegmentOffset(df["segment"], df["radius"], isPositive=True)
+  
+    # Unneeded remove
+    # @compute(title="distance", dependencies=["segment"])
+    # def distance(frame: LazyGeoFrame): # distance of each point from beginning of the segment
+    #     df = frame["segment"]
+    #     distanceList = df.apply(lambda d: getRunningDistance(d))
+    #     # distanceList = df.apply(lambda d: getRunningDistance(d["segment"]))
+    #     # list of distances, same length as segment: linestring
+    #     return distanceList
 
 
 

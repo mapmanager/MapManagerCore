@@ -165,16 +165,29 @@ class ImageLoader:
         Args:
           store: The store to save the data to.
         """
+        
+        deleteGroups = set(group.keys())
         for t in self.timePoints():
             channels = self.channels(t)
-            timePoint = group.create_group(str(t))
+            timePoint = group.create_group(str(t)) if str(t) not in group else group[str(t)]
+            deleteGroups.discard(str(t))
             metaData = self.metadata(t)
             timePoint.attrs[f"metadata"] = asdict(metaData)
 
+            deleteChannels = set(timePoint.keys())
             for channel in channels:
                 image = self._images(t, channel)
+                deleteChannels.discard(str(channel))
                 timePoint.create_dataset(
-                    str(channel), data=image, dtype=image.dtype)
+                    str(channel), data=image, dtype=image.dtype, overwrite=True)
+
+            # delete old channels
+            for key in deleteChannels:
+                del timePoint[key]
+
+        # delete old images
+        for key in deleteGroups:
+            del group[key]
 
     def getAutoContrast_qt(self, time: int, channel: int) -> Tuple[int, int, int, int]:
         """Get the auto contrast from the entire image volume.

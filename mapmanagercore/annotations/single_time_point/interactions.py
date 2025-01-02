@@ -611,48 +611,52 @@ class AnnotationsInteractions(AnnotationsSegments):
         theRet = 0 if first else len(roughTracing) - 1
         # logger.info(f'theRet:{theRet}')
         return theRet
-    
-    def old_setPivotPoint(self, segmentId: SegmentId, clickedPoint: Point, speculate: bool = False) -> Point:
-        """ Sets pivotPoint of segment. 
 
-        Calculates pivot point by find closest brightest index point to the clicked Point
-        """
-        # pass
+    # Use setSegmentOrigin instead
+    # def old_setPivotPoint(self, segmentId: SegmentId, clickedPoint: Point, speculate: bool = False) -> Point:
+    #     """ Sets pivotPoint of segment. 
 
-        # auto set pivot point closest to click on line
+    #     Calculates pivot point by find closest brightest index point to the clicked Point
+    #     """
+    #     # pass
 
-        closestPivotPoint = self.nearestAnchor(segmentID=segmentId, point=clickedPoint, findBrightest=False)
-        logger.info(f"closestPivotPoint {closestPivotPoint}")
-        # set pivot point in backend
-        self.updateSegment(segmentId, Segment(
-            pivotPoint=closestPivotPoint
-        ))
+    #     # auto set pivot point closest to click on line
 
-        # used for verification
-        return closestPivotPoint
-    
-    def setPivotDistance(self, segmentId: SegmentId, clickedPoint: Point, speculate: bool = False) -> Point:
-        """ Sets pivotPoint of segment. 
+    #     closestPivotPoint = self.nearestAnchor(segmentID=segmentId, point=clickedPoint, findBrightest=False)
+    #     logger.info(f"closestPivotPoint {closestPivotPoint}")
+    #     # set pivot point in backend
+    #     self.updateSegment(segmentId, Segment(
+    #         pivotPoint=closestPivotPoint
+    #     ))
 
-        Calculates pivot point by find closest brightest index point to the clicked Point
-        """
-        # use closest pivot point to find similar ID in the segments
-        closestPivotID = self.nearestAnchor(segmentID=segmentId, point=clickedPoint, findBrightest=False, returnIndex=True)
-        logger.info(f"closestPivotID {closestPivotID}")
+    #     # used for verification
+    #     return closestPivotPoint
 
-        # # get the value of 'distance' at closestPivotID within the segment
-        distanceList = self.segments[segmentId, "distance"]
-        closestPivotDistance = distanceList[closestPivotID]
+    # Use setSegmentOrigin instead
+    # def setPivotDistance(self, segmentId: SegmentId, clickedPoint: Point, speculate: bool = False) -> Point:
+    #     """ Sets pivotPoint of segment. 
 
-        logger.info(f"closestPivotDistance {closestPivotDistance}")
+    #     Calculates pivot point by find closest brightest index point to the clicked Point
+        
+    #     Deprecated: Use setSegmentOrigin instead
+    #     """
+    #     # use closest pivot point to find similar ID in the segments
+    #     closestPivotID = self.nearestAnchor(segmentID=segmentId, point=clickedPoint, findBrightest=False, returnIndex=True)
+    #     logger.info(f"closestPivotID {closestPivotID}")
 
-        # set pivot point in backend
-        self.updateSegment(segmentId, Segment(
-            pivotDistance = closestPivotDistance
-        ))
+    #     # # get the value of 'distance' at closestPivotID within the segment
+    #     distanceList = self.segments[segmentId, "distance"]
+    #     closestPivotDistance = distanceList[closestPivotID]
 
-        # used for verification
-        return closestPivotDistance
+    #     logger.info(f"closestPivotDistance {closestPivotDistance}")
+
+    #     # set pivot point in backend
+    #     self.updateSegment(segmentId, Segment(
+    #         pivotDistance = closestPivotDistance
+    #     ))
+
+    #     # used for verification
+    #     return closestPivotDistance
 
     def moveSegmentPoint(self, segmentId: SegmentId, x: int, y: int, z: int, index: int, state: DragState = DragState.MANUAL) -> bool:
         """

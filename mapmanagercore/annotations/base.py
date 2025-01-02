@@ -203,10 +203,10 @@ class AnnotationsBase(LazyImagesGeoPandas):
         # loader = ZarrLoader(path, lazy=lazy)
         # error when trying to load a zipstore
         # zarr.errors.FSPathExistNotDir: path exists but is not a directory: %r
-        if os.path.isdir(path):
-            store = zarr.DirectoryStore(path)
-        else:
-            store = zarr.ZipStore(path, mode="r")
+        # if os.path.isdir(path):
+        store = zarr.DirectoryStore(path)
+        # else:
+            # store = zarr.ZipStore(path, mode="r")
 
         group = zarr.group(store=store)
 
@@ -284,14 +284,15 @@ class AnnotationsBase(LazyImagesGeoPandas):
 
         # (4) analysisParams
         try:
-            _analysisParams_json = group.attrs['analysisParams']
+            _analysisParams_dict = group.attrs['analysisParams']
         except (KeyError) as e:
             logger.error('did not find "analysisParams"')
             logger.error(f'   {e}')
             _errors += 1
         finally:
             try:
-                analysisParams = AnalysisParams(loadJson=_analysisParams_json)
+                analysisParams = AnalysisParams()
+                analysisParams.setDict(_analysisParams_dict)
             except (JSONDecodeError) as e:
                 logger.error('did not parse json into AnalysisParams()')
                 logger.error(f'   {e}')
@@ -348,19 +349,20 @@ class AnnotationsBase(LazyImagesGeoPandas):
             warnings.simplefilter("ignore")
 
             logger.info(f'saving to {path}')
-            if os.path.isdir(path) or compression is None:
-                fs = zarr.DirectoryStore(path)
-            else:
-                fs = zarr.ZipStore(path, mode="w", compression=compression)
+            # if os.path.isdir(path) or compression is None:
+            fs = zarr.DirectoryStore(path)
+            # else:
+            #     fs = zarr.ZipStore(path, mode="w", compression=compression)
 
             with fs as store:
                 group = zarr.group(store=store)
-                images = group.create_group("images");
+                images = group.create_group("images") if "images" not in group else group["images"]
+
                 self._images.saveTo(images)
                 group.create_dataset(
-                    "points", data=self.points.toBytes(), dtype=np.uint8)
+                    "points", data=self.points.toBytes(), dtype=np.uint8, overwrite=True)
                 group.create_dataset(
-                    "lineSegments", data=self.segments.toBytes(), dtype=np.uint8)
+                    "lineSegments", data=self.segments.toBytes(), dtype=np.uint8, overwrite=True)
                 group.attrs["version"] = 1
 
                 # abb analysisparams
