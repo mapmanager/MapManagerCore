@@ -161,7 +161,7 @@ class MultiImageLoader(ImageLoader):
             for channelImage in self._imagesSrcs[time]:
                 channelCount += 1
                 # .append([channel, imgData])
-                print("channelCount", channelCount)
+                # print("channelCount", channelCount)
                 # self._imagesLoaded[time].append([channel, imgData])
                 currentImages[time].append([channelCount, channelImage])
 

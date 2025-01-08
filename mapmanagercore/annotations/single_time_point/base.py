@@ -141,8 +141,8 @@ class SingleTimePointFrame(LazyGeoFrame):
 
         if isinstance(result, LazyGeoFrame):
             logger.info('  (2) return SingleTimePointFrame')
-            print('self._t:', self._t, type(self._t))
-            print('result:', result)
+            # print('self._t:', self._t, type(self._t))
+            # print('result:', result)
 
             return SingleTimePointFrame(result, self._t)
 

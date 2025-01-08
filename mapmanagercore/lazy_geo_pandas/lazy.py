@@ -113,7 +113,6 @@ class LazyGeoPandas:
         if not skipLog:
             ids = ids if isinstance(ids, pd.Index) or isinstance(
                 ids, Sequence) else [ids]
-            print(ids)
             deletedData = df.loc[ids]
             self._log.push(
                 Op(key, deletedData, gp.GeoDataFrame(columns=df.columns)))
@@ -637,7 +636,7 @@ class LazyGeoFrame(Generic[T]):
                         logger.error(f'column:{column}')
                         logger.error(f'results:{results}')
                         logger.error(f'type results:{type(results)}')
-                        print(df.dtypes)
+                        # print(df.dtypes)
                         logger.error(e)
 
                 if len(attribute["_dependencies"]) != 0:

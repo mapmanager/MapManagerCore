@@ -245,7 +245,7 @@ def matchZToSegment(lineWithout: LineString, lineWithZ: LineString):
 @timer
 def calculateSegmentOffset(segmentLine: gp.GeoSeries, radiusOffset: pd.Series, isPositive: bool):
     distance = radiusOffset if isPositive else -radiusOffset
-    offsetSegment: gp.GeoSeries = shapely.offset_curve(segmentLine, distance = distance, 
+    offsetSegment: gp.GeoSeries = shapely.offset_curve(segmentLine, distance = distance.values, 
                                             # quad_segs = 16,
                                             join_style = "mitre"
                                             # , mitre_limit = 15

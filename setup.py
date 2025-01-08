@@ -25,15 +25,6 @@ install_requires = [
     'pooch',  # to load data from MapManagerCore-Data repo
 ]
 
-if not pyodide:
-    install_requires.extend([
-        # Not supported by pyodide
-        'bioio',  # TODO: use to load metadata and lazy load images
-        # install bioio from main branch of github repo (not pypi package)
-        'bioio @ git+ssh://git@github.com/bioio-devs/bioio.git',
-        'bioio-ome-zarr @ git+ssh://git@github.com/bioio-devs/bioio-ome-zarr.git',
-    ])
-
 testRequirements = [
     'tox',
     'pytest',
