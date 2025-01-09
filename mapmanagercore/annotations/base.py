@@ -401,16 +401,17 @@ class AnnotationsBase(LazyImagesGeoPandas):
         return values.apply(lambda x: symbols_[x])
     
     # abj
-    def loadInNewChannel(self, path: Union[str, np.ndarray], time: int = 0, channel: int = 0):
-        """ Load in new channel (tif image)
-        This function is called by fullMap within pymapmanager Desktop
+    # def loadInNewChannel(self, path: Union[str, np.ndarray], time: int = 0, channel: int = 0):
+    #     """ Load in new channel (tif image)
+    #     This function is called by fullMap within pymapmanager Desktop
 
-        Args:
-            path: directory str of tif file
-            time: time in series
-            channel: new channel value
-        """
-        # functions = [func for func in dir(self._images) if callable(getattr(self._images, func))]
-        # print(functions)
+    #     Args:
+    #         path: directory str of tif file
+    #         time: time in series
+    #         channel: new channel value
+    #     """
+    #     # functions = [func for func in dir(self._images) if callable(getattr(self._images, func))]
+    #     # print(functions)
 
-        self._images.readNewImages(path = path, channel = channel)
+    #     self._images.readNewImages(path = path, channel = channel)
+        # self._images.appendChannelToTimePoint()

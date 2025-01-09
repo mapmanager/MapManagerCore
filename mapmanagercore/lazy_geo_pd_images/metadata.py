@@ -66,6 +66,7 @@ class Metadata:
     voxel: VoxelMetadata = field(default_factory=lambda: VoxelMetadata())
     physicalSize: MetadataPhysicalSize = field(default_factory=lambda: MetadataPhysicalSize())
     metadataContrast : MetadataContrast = field(default_factory=lambda: MetadataContrast())
+    numberOfChannels: int = 0
 
     # def __str__(self):
     #     str = f'VoxelMetadata {self.voxel} MetadataPhysicalSize {self.physicalSize}'

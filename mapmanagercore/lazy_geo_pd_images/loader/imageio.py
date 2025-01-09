@@ -128,64 +128,64 @@ class MultiImageLoader(ImageLoader):
     def _images(self, t: int, channel: int) -> np.ndarray:
         return self._imagesSrc[t][channel]
 
-    def readNewImages(self, path: Union[str, np.ndarray], time: int = 0, channel: int = 0):
-        """
-        Load an image from the given path and store it in the images array.
+    # def readNewImages(self, path: Union[str, np.ndarray], time: int = 0, channel: int = 0):
+    #     """
+    #     Load an image from the given path and store it in the images array.
 
-        Args:
-          path (str): Either the path to the image file or a np array.
-          time (int): The time index.
-          channel (int): The channel index.
-        """
+    #     Args:
+    #       path (str): Either the path to the image file or a np array.
+    #       time (int): The time index.
+    #       channel (int): The channel index.
+    #     """
 
-        currentImages = {} # reformatted current images
-        if time not in currentImages:
-            logger.info(f"time not in current Images")
-            currentImages[time] = []
+    #     currentImages = {} # reformatted current images
+    #     if time not in currentImages:
+    #         logger.info(f"time not in current Images")
+    #         currentImages[time] = []
 
-        if isinstance(path, str):
-            # from imageio import imread
-            imgData = tifffile.imread(path)
-        else:
-            imgData = path
+    #     if isinstance(path, str):
+    #         # from imageio import imread
+    #         imgData = tifffile.imread(path)
+    #     else:
+    #         imgData = path
 
-        # self._imagesSrcs is current image
-        # append to it with new channel
-        # self._imagesSrcs[time].append([channel, imgData]
-        # Format of self._imagesSrcs: images[time][channel] = image
+    #     # self._imagesSrcs is current image
+    #     # append to it with new channel
+    #     # self._imagesSrcs[time].append([channel, imgData]
+    #     # Format of self._imagesSrcs: images[time][channel] = image
 
-        # print("self._imagesSrcs", self._imagesSrcs)
+    #     # print("self._imagesSrcs", self._imagesSrcs)
 
-        # Reformatting current images so that we can append new one right after
-        channelCount = -1
-        for time in self._imagesSrcs:
-            # print("time: ", time)
-            for channelImage in self._imagesSrcs[time]:
-                channelCount += 1
-                # .append([channel, imgData])
-                print("channelCount", channelCount)
-                # self._imagesLoaded[time].append([channel, imgData])
-                currentImages[time].append([channelCount, channelImage])
+    #     # Reformatting current images so that we can append new one right after
+    #     channelCount = -1
+    #     for time in self._imagesSrcs:
+    #         # print("time: ", time)
+    #         for channelImage in self._imagesSrcs[time]:
+    #             channelCount += 1
+    #             # .append([channel, imgData])
+    #             print("channelCount", channelCount)
+    #             # self._imagesLoaded[time].append([channel, imgData])
+    #             currentImages[time].append([channelCount, channelImage])
 
-                # TODO: create new metaData
+    #             # TODO: create new metaData
         
-        # TODO: need to create functionality for when user wants to switch channel numbers
-        # TODO: need to check to make sure new image channel has same size as previous  image channel
-        # append new images (channel)
-        if channel is None:
-            newChannel = channelCount + 1
-        else:
-            newChannel = channel
+    #     # TODO: need to create functionality for when user wants to switch channel numbers
+    #     # TODO: need to check to make sure new image channel has same size as previous  image channel
+    #     # append new images (channel)
+    #     if channel is None:
+    #         newChannel = channelCount + 1
+    #     else:
+    #         newChannel = channel
          
-        currentImages[time].append([newChannel, imgData])
+    #     currentImages[time].append([newChannel, imgData])
 
-        logger.info(f"compare 2 {currentImages}")
+    #     logger.info(f"compare 2 {currentImages}")
         
-        # rebuild these images to correct form
-        newImages, metaData = self.build(currentImages = currentImages)
+    #     # rebuild these images to correct form
+    #     newImages, metaData = self.build(currentImages = currentImages)
 
-        # set these images
-        self._imagesSrcs = newImages
-        self._metadata = metaData
+    #     # set these images
+    #     self._imagesSrcs = newImages
+    #     self._metadata = metaData
 
 

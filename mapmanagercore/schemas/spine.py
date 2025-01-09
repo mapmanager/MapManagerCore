@@ -280,6 +280,13 @@ class Spine:
     @compute(dependencies=["roiInBounds", "roiBgInBounds"], plot=False)
     def isValid(frame: LazyGeoFrame):
         return frame["roiInBounds"] & frame["roiBgInBounds"]
+    
+    # abj
+    @compute(dependencies=["roiInBounds"], plot=False)
+    def intBad(frame: LazyGeoFrame):
+        """ Denotes that spine's ROI Intensity is bad. Keep Spine but set its intensity to zero
+        """
+        return ~(frame["roiInBounds"] .astype(bool))
 
     # Image based ROI computed stats
 
