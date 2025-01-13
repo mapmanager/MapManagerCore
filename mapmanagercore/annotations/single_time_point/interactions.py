@@ -632,28 +632,30 @@ class AnnotationsInteractions(AnnotationsSegments):
         # used for verification
         return closestPivotPoint
     
-    def setPivotDistance(self, segmentId: SegmentId, clickedPoint: Point, speculate: bool = False) -> Point:
+    def setPivotDistance(self, segmentId: SegmentId, clickedPoint: Point, speculate: bool = False) -> float:
         """ Sets pivotPoint of segment. 
 
-        Calculates pivot point by find closest brightest index point to the clicked Point
+        Given a point, finds the distance along the line to that (projected) point.
         """
-        # use closest pivot point to find similar ID in the segments
-        closestPivotID = self.nearestAnchor(segmentID=segmentId, point=clickedPoint, findBrightest=False, returnIndex=True)
-        logger.info(f"closestPivotID {closestPivotID}")
+        
+        segment: LineString = self.segments[segmentId, "segment"]
 
-        # # get the value of 'distance' at closestPivotID within the segment
-        distanceList = self.segments[segmentId, "distance"]
-        closestPivotDistance = distanceList[closestPivotID]
+        # line_locate_point: Returns the distance to the line origin of given point.
+        #  if point is not on line, first applies project
+        pivotDistance = shapely.line_locate_point(segment, clickedPoint)
 
-        logger.info(f"closestPivotDistance {closestPivotDistance}")
+        logger.info(f'segmentId:{segmentId} pivotDistance:{pivotDistance}')
+
+        # reverse back to point
+        _reversePoint = shapely.line_interpolate_point(segment, pivotDistance)
+        logger.info(f'   _reversePoint:{_reversePoint}')
 
         # set pivot point in backend
         self.updateSegment(segmentId, Segment(
-            pivotDistance = closestPivotDistance
+            pivotDistance = pivotDistance
         ))
 
-        # used for verification
-        return closestPivotDistance
+        return pivotDistance
 
     def moveSegmentPoint(self, segmentId: SegmentId, x: int, y: int, z: int, index: int, state: DragState = DragState.MANUAL) -> bool:
         """
