@@ -1,7 +1,9 @@
 from dataclasses import dataclass, field
 # JSON used by pyodide to transfer metadata to JS
 # from dataclasses_json import dataclass_json
-from typing import Dict, Literal
+from typing import Dict, Literal, List
+
+import numpy as np
 
 from mapmanagercore.logger import logger
 
@@ -37,7 +39,7 @@ class MetadataPhysicalSize:
     """
     x: float = 1
     y: float = 1
-    unit: Literal["µm"] = "µm"
+    unit: Literal["µm"] = "micrometer"  # abb from µm
 
     # def __str__(self):
     #     ret = f'x:{self.x} y:{self.y} unit:{self.unit}'
@@ -53,12 +55,7 @@ class MetadataContrast:
     minContrast: int = 1
     maxContrast: int = 1
     color : str = "0x00FF00"  # map -> 'green'
-
-    # def __str__(self):
-    #     ret = f'color:{self.color} minInt:{self.minInt} minInt:{self.maxInt} minContrast:{self.minContrast} maxContrast:{self.maxContrast}'
-    #     return ret
-
-# @dataclass_json
+    
 @dataclass
 class Metadata:
     name: str = ''
@@ -68,7 +65,3 @@ class Metadata:
     metadataContrast : MetadataContrast = field(default_factory=lambda: MetadataContrast())
     numberOfChannels: int = 0
 
-    # def __str__(self):
-    #     str = f'VoxelMetadata {self.voxel} MetadataPhysicalSize {self.physicalSize}'
-    #     str += f'metadataContrast:{self.metadataContrast}'
-    #     return str     
