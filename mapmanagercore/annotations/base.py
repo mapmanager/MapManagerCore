@@ -224,26 +224,32 @@ class AnnotationsBase(LazyImagesGeoPandas):
         except (zarr.errors.GroupNotFoundError, KeyError):
             return False
 
-    def save(self, path: str = None, compression=None):
-        """
-        compression : zipfile.ZIP_STORED
+    def save(self, path: str = None):
+        """Save the mmap
+
+        PArameters
+        ----------
+        path : str
+            Pat to save to, if a folder then save as zarr DirectoryStore, otherwise save as single file zip.
         """
         if path is None:
             path = self.path
 
-        if not path.endswith(".mmap"):
-            path += ".mmap"
+        # if not path.endswith(".mmap"):
+        #     path += ".mmap"
 
-        # abj - dont save if path is empty
-        if path == ".mmap":
-            logger.warning(f'did not save:{path}')
-            return
+        # # abj - dont save if path is empty
+        # if path == ".mmap":
+        #     logger.warning(f'did not save:{path}')
+        #     return
         
+        _lastSaveTime = self.getCurrentTime()
+
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
 
             logger.info(f'saving to {path}')
-            if os.path.isdir(path) or compression is None:
+            if os.path.isdir(path):
                 logger.info('   as a DirectoryStore')
                 fs = zarr.DirectoryStore(path)
             else:
@@ -275,13 +281,15 @@ class AnnotationsBase(LazyImagesGeoPandas):
                 group.attrs['analysisParams'] = self._analysisParams.getDict()
 
                 # abj
-                group.attrs["lastSaveTime"] = self.getCurrentTime()
+                group.attrs["lastSaveTime"] = _lastSaveTime
+
+        self._lastSaveTime = _lastSaveTime
 
     def getCurrentTime(self):
         currentTime = datetime.now()
         # Format the current time
         formatted_time = currentTime.strftime('%Y%m%d %H:%M')
-        logger.info(f"storeLastSaveTime {formatted_time}")
+        # logger.info(f"storeLastSaveTime {formatted_time}")
         return formatted_time
     
     # Context manager

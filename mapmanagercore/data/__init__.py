@@ -31,7 +31,8 @@ def getTiffChannel_2() -> str:
     return ch2Path
 
 def getSingleTimepointMap() -> str:
-    urlMap = 'https://github.com/mapmanager/MapManagerCore-Data/raw/main/data/single_timepoint.zip.mmap'
+    # TODO put the zip back into mapmanagercore-data
+    urlMap = 'https://github.com/mapmanager/MapManagerCore-Data/raw/main/data/single_timepoint.mmap.zip'
     mapPath = pooch.retrieve(
         url=urlMap,
         known_hash=None,
@@ -39,7 +40,7 @@ def getSingleTimepointMap() -> str:
     return mapPath
 
 def getMultiTimepointMap() -> str:
-    urlMap = 'https://github.com/mapmanager/MapManagerCore-Data/raw/main/data/multi_timepoint.zip.mmap'
+    urlMap = 'https://github.com/mapmanager/MapManagerCore-Data/raw/main/data/multi_timepoint.mmap.zip'
     mapPath = pooch.retrieve(
         url=urlMap,
         known_hash=None,
