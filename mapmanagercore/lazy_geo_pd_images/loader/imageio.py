@@ -98,6 +98,49 @@ class MultiImageLoader(ImageLoader):
 
         self._metadata[time] = metadata
 
+    # abj 
+    def deleteChannel(self, time, channel) -> bool:
+        """ delete channel, remove from multImageLoader
+        
+        Args:
+          time (int): The time index.
+          channel (int): The channel index.
+        """
+        if time >= len(self._metadata):
+            return False
+
+        a = self._metadata[time].channelNames.pop(channel, None)
+        b = self._imagesSrc[time].pop(channel, None)
+
+        logger.info(f"self._imagesSrc {self._imagesSrc}")
+
+        return a != None or b != None
+
+    # abj
+    def moveChannel(self, srcTimePoint: int, srcChannel: int, destTimePoint: int, destChannel: int) -> bool:
+        """ Same as move channel in zarr.py, but for the use of multiImageLoaders
+        """
+        if srcTimePoint == destTimePoint and srcChannel == destChannel:
+            return False
+        
+        if srcTimePoint >= len(self._imagesSrc) or destTimePoint >= len(self._imagesSrc):
+            return False
+        
+        if srcChannel not in self._imagesSrc[srcTimePoint]:
+            return False
+    
+        channel = self._imagesSrc[srcTimePoint].pop(srcChannel)
+        name = self._metadata[srcTimePoint].channelNames.pop(srcChannel, None)
+
+        if destChannel in self._imagesSrc[destTimePoint]:    
+            self._imagesSrc[srcTimePoint][srcChannel] = self._imagesSrc[destTimePoint].pop(destChannel)
+            if destChannel in self._metadata[destTimePoint].channelNames:
+                self._metadata[srcTimePoint].channelNames[srcChannel] = self._metadata[destTimePoint].channelNames.pop(destChannel)
+
+        self._imagesSrc[destTimePoint][destChannel] = channel
+        if name is not None:
+            self._metadata[destTimePoint].channelNames[destChannel] = name
+
     # def abb not used 20241221
     def _old_readAnalysisParams(self, analysisParams: Union[AnalysisParams, str]):
         """
@@ -128,64 +171,5 @@ class MultiImageLoader(ImageLoader):
     def _images(self, t: int, channel: int) -> np.ndarray:
         return self._imagesSrc[t][channel]
 
-    # def readNewImages(self, path: Union[str, np.ndarray], time: int = 0, channel: int = 0):
-    #     """
-    #     Load an image from the given path and store it in the images array.
-
-    #     Args:
-    #       path (str): Either the path to the image file or a np array.
-    #       time (int): The time index.
-    #       channel (int): The channel index.
-    #     """
-
-    #     currentImages = {} # reformatted current images
-    #     if time not in currentImages:
-    #         logger.info(f"time not in current Images")
-    #         currentImages[time] = []
-
-    #     if isinstance(path, str):
-    #         # from imageio import imread
-    #         imgData = tifffile.imread(path)
-    #     else:
-    #         imgData = path
-
-    #     # self._imagesSrcs is current image
-    #     # append to it with new channel
-    #     # self._imagesSrcs[time].append([channel, imgData]
-    #     # Format of self._imagesSrcs: images[time][channel] = image
-
-    #     # print("self._imagesSrcs", self._imagesSrcs)
-
-    #     # Reformatting current images so that we can append new one right after
-    #     channelCount = -1
-    #     for time in self._imagesSrcs:
-    #         # print("time: ", time)
-    #         for channelImage in self._imagesSrcs[time]:
-    #             channelCount += 1
-    #             # .append([channel, imgData])
-    #             print("channelCount", channelCount)
-    #             # self._imagesLoaded[time].append([channel, imgData])
-    #             currentImages[time].append([channelCount, channelImage])
-
-    #             # TODO: create new metaData
-        
-    #     # TODO: need to create functionality for when user wants to switch channel numbers
-    #     # TODO: need to check to make sure new image channel has same size as previous  image channel
-    #     # append new images (channel)
-    #     if channel is None:
-    #         newChannel = channelCount + 1
-    #     else:
-    #         newChannel = channel
-         
-    #     currentImages[time].append([newChannel, imgData])
-
-    #     logger.info(f"compare 2 {currentImages}")
-        
-    #     # rebuild these images to correct form
-    #     newImages, metaData = self.build(currentImages = currentImages)
-
-    #     # set these images
-    #     self._imagesSrcs = newImages
-    #     self._metadata = metaData
 
 

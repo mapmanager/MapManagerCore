@@ -14,7 +14,7 @@ import zarr
 from shapely.geometry import GeometryCollection, LineString, MultiPolygon, Polygon
 import shapely
 import skimage.draw
-
+from PIL import Image
 
 class Position(IntEnum):
     OVER = 0
@@ -428,6 +428,7 @@ class ImageLoader:
 
     def deleteChannel(self, timePoint: int, channel: int) -> bool:
         ("implemented by subclass", channel)
+        # logger.info(f"deleting channel in mmc")
         return False
 
     def updateChannel(self, timePoint: int, channel: int, updates: dict) -> bool:
@@ -460,7 +461,36 @@ class ImageLoader:
             self.moveTimePoint(timePoint, newTimePoint)
 
         return True
+    
+    def validateImageSize(self, newTifPath, timePoint):
+        """ Check if image size of new image is the same as previous images
+
+        Args:
+            newTifPath: Path to new channel image
+
+        Return:
+            True is yes
+            False if no
+        
+        """
+            
+        with Image.open(newTifPath) as img:
+            newImgWidth, newImgHeight = img.size
+            print("Width:", newImgWidth)
+            print("Height:", newImgHeight)
+            newImgSlices = img.n_frames  # z dimension
+            logger.info(f"z slices: {newImgSlices}")
+
+        # Get old tif image dimensions
+        _z, _x, _y = self.shape(t=timePoint)
+
+        if newImgHeight != _y or newImgWidth != _x or newImgSlices != _z:
+            logger.error(f'Incorrect shape when loading in new image.')
+            return False
+        
+        return True
 
 
 def bounds(x: np.array):
     return (x.min(), int(x.max()) + 1)
+
