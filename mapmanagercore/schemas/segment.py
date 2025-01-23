@@ -13,14 +13,14 @@ from ..lazy_geo_pandas import schema, compute, LazyGeoFrame
 @schema(
     index=["segmentID", "t"],
     properties={
-        "t": {
-            "title": "Time",
-            "description": "Time of the segment"
-        },
         "segmentID": {
             "categorical": True,
             "title": "Segment ID",
             "description": "Unique identifier for each segment"
+        },
+        "t": {
+            "title": "Time",
+            "description": "Time of the segment"
         },
         "segment": {
             "title": "Segment",
@@ -40,6 +40,16 @@ from ..lazy_geo_pandas import schema, compute, LazyGeoFrame
             "title": "Modified",
             "description": "Time of last modification",
             "plot": False
+        },
+        "pivotDistance": {
+            "title": "Pivot Distance",
+            "description": "Distance along tracing to use as 0 coordinate",
+            "plot": False
+        },
+        "color": {
+            "title": "Color",
+            "description": "Color to plot the segment",
+            "plot": False
         }
     }
 )
@@ -55,7 +65,10 @@ class Segment:
     radius: float
     modified: np.datetime64
 
-    pivotDistance: float = 0.0 # abj
+    pivotDistance: float = 0.0
+
+    color: str = '#FF00FF'
+    """Color of segment."""
 
     @compute(title="Pivot Point", dependencies=["segment", "pivotDistance"])
     def pivotPoint(frame: LazyGeoFrame):
@@ -71,10 +84,6 @@ class Segment:
         df["y"] = (offsettedSegment.apply(lambda geom: [coord[1] for coord in geom.coords]))
         newDF = gpd.GeoSeries(df[["x", "y", "z"]].apply(lambda ldf: LineString(Point(ldf["x"][i], ldf["y"][i], ldf["z"][i]) 
                                                                                for i, val in enumerate(ldf["x"])), axis=1))
-        # newDF = gpd.GeoSeries(df[["x", "y"]].apply(lambda ldf: LineString(Point(ldf["x"][i], ldf["y"][i]) 
-        #                                                                 for i, val in enumerate(ldf["x"])), axis=1))
-
-        # logger.info(f"newDF {newDF}")
         return newDF
     
     @compute(title="Right Radius", dependencies=["segment", "radius"])
@@ -88,9 +97,6 @@ class Segment:
 
         newDF = gpd.GeoSeries(df[["x", "y", "z"]].apply(lambda ldf: LineString(Point(ldf["x"][i], ldf["y"][i], ldf["z"][i]) 
                                                                             for i, val in enumerate(ldf["x"])), axis=1))
-
-        # newDF = gpd.GeoSeries(df[["x", "y"]].apply(lambda ldf: LineString(Point(ldf["x"][i], ldf["y"][i]) 
-        #                                                                        for i, val in enumerate(ldf["x"])), axis=1))
         return newDF
     
     @compute(title="distance", dependencies=["segment"])

@@ -142,9 +142,11 @@ class ImageLoader:
         metaData = self.metadata(t)
         return list(metaData.channelNames.keys())
 
+    # abb TODO depreciate
     def maxChannels(self) -> int:
         return self._analysisParams.getValue("maxChannels")
 
+    # abb TODO depreciate
     def setMaxChannels(self, maxChannels: int) -> bool:
         if self.maxChannels() == maxChannels:
             return False

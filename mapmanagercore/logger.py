@@ -88,3 +88,14 @@ f_handler.setFormatter(formatter)
 
 logger.addHandler(handler)
 logger.addHandler(f_handler)
+
+# add a mapmanger log level
+logging.mmlog = 15
+logging.addLevelName(logging.mmlog, "mmlog")
+
+# Add a method to the logger class
+def mmlog(self, message, *args, **kwargs):
+    if self.isEnabledFor(logging.mmlog):
+        self._log(logging.mmlog, message, args, **kwargs)
+
+logging.Logger.mmlog = mmlog

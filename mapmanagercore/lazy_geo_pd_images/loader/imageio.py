@@ -2,7 +2,7 @@ import numpy as np
 import tifffile
 
 from mapmanagercore.analysis_params import AnalysisParams
-from mapmanagercore.lazy_geo_pd_images.metadata import Metadata
+from mapmanagercore.lazy_geo_pd_images.metadata import Metadata, MetadataContrast
 from .base import ImageLoader
 from typing import Iterator, List, Union
 from mapmanagercore.utils import getAutoContrast
@@ -45,6 +45,7 @@ class MultiImageLoader(ImageLoader):
             # imgData = imread(path)
             imgData = tifffile.imread(path)
         else:
+            # abb assuming np.ndarry?
             imgData = path
             
         if time not in self._imagesSrc:
@@ -61,12 +62,10 @@ class MultiImageLoader(ImageLoader):
             _metaData.physicalSize.z = 1
 
             # contrast
-            _metaData.metadataContrast.color = 'TODO: fix this'
-            _metaData.metadataContrast.minInt = int(np.min(imgData))
-            _metaData.metadataContrast.maxInt = int(np.max(imgData))
-            minContrast, maxContrast = getAutoContrast(imgData)
-            _metaData.metadataContrast.minContrast = minContrast
-            _metaData.metadataContrast.maxContrast = maxContrast
+            # logger.info(f'channel:{channel} {type(channel)}')
+            metadataContrast = MetadataContrast()._initFromImgData(imgData)
+            _metaData.addColorChannel(metadataContrast)
+
             self._metadata[time] = _metaData
 
         if channel > self.maxChannels():

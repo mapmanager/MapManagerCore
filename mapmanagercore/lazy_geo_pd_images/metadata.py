@@ -1,13 +1,12 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 # JSON used by pyodide to transfer metadata to JS
-# from dataclasses_json import dataclass_json
-from typing import Dict, Literal, List
+from typing import Dict, Literal  # , List, Optional
 
 import numpy as np
 
+from mapmanagercore.utils import getAutoContrast
 from mapmanagercore.logger import logger
 
-# @dataclass_json
 @dataclass
 class VoxelMetadata:
     """
@@ -26,7 +25,6 @@ class VoxelMetadata:
     #     ret = f'x:{self.x} y:{self.y} z:{self.z}'
     #     return ret
 
-# @dataclass_json
 @dataclass
 class MetadataPhysicalSize:
     """
@@ -41,26 +39,89 @@ class MetadataPhysicalSize:
     y: float = 1
     unit: Literal["µm"] = "micrometer"  # abb from µm
 
-    # def __str__(self):
-    #     ret = f'x:{self.x} y:{self.y} unit:{self.unit}'
-    #     return ret
+@dataclass
+class _metadataBase:
+    """Abstract base class for all metadata dataclass.
+    """
+    def setValue(self, key, value):
+        try:
+            setattr(self, key, value)
+            return True
+        except (AttributeError) as e:
+            logger.warning(e)
+            
+    def getValue(self, key):
+        try:
+            return getattr(self, key)
+        except (AttributeError) as e:
+            logger.warning(e)
 
-# @dataclass_json
+    def asDict(self) -> dict:
+        """Might be usefull to travers metadata when we do not know the key:value(s) enclosed.
+        """
+        return asdict(self)
+    
+@dataclass
+class ExperimentMetadata(_metadataBase):
+    """For each image acquired, user can specify `Experiment` metadata.
+    
+    Notes
+    -----
+    This spans all color channels.
+    """
+    Species: str = ''
+    Sex: str = ''
+    Age: str = ''
+    Region: str = ''
+    CellType: str = ''
+    AcqDate: str = ''
+    AcqTime: str = ''
+    Condition1: str = ''
+    Condition2: str = ''
+    Timer1: str = ''
+    Timer2: str = ''
+
 @dataclass
 class MetadataContrast:
     """
+    Metadata for each color channel.
     """
+    name: str = 'Undefined'
+    """Name of the channel."""
     minInt: int = 1
     maxInt: int = 1
     minContrast: int = 1
     maxContrast: int = 1
-    color : str = "0x00FF00"  # map -> 'green'
-    
+    color : str = "x00FF00"  # map -> 'green'
+    """Color LUT for the image."""
+
+    def _initFromImgData(self, imgData : np.ndarray):
+        self.minInt = int(np.min(imgData))
+        self.maxInt = int(np.max(imgData))
+        minContrast, maxContrast = getAutoContrast(imgData)
+        self.minContrast = minContrast
+        self.maxContrast = maxContrast
+        
 @dataclass
-class Metadata:
+class Metadata(_metadataBase):
+    """What is this?
+    """
     name: str = ''
-    channelNames: Dict[int, str] = field(default_factory=lambda:{})
+    """Name of the session/timepoint/experiment."""
+
+    experimentMetadata : ExperimentMetadata = field(default_factory=lambda: ExperimentMetadata())
+
     voxel: VoxelMetadata = field(default_factory=lambda: VoxelMetadata())
     physicalSize: MetadataPhysicalSize = field(default_factory=lambda: MetadataPhysicalSize())
-    metadataContrast : MetadataContrast = field(default_factory=lambda: MetadataContrast())
 
+    # do not modify, is used in >20x places
+    channelNames: Dict[int, str] = field(default_factory=lambda:{})
+    
+    metadataContrast : list[MetadataContrast] = field(default_factory=lambda: [])
+    """List of metadata for each color channel."""
+
+    def addColorChannel(self, metadataContrast:MetadataContrast = MetadataContrast()):
+        self.metadataContrast.append(metadataContrast)
+
+    def asDict(self) -> dict:
+        return asdict(self)
