@@ -103,9 +103,7 @@ class MetadataContrast:
         self.maxContrast = maxContrast
         
 @dataclass
-class Metadata(_metadataBase):
-    """What is this?
-    """
+class Metadata():
     name: str = ''
     """Name of the session/timepoint/experiment."""
 

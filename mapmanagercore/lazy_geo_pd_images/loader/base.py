@@ -169,6 +169,8 @@ class ImageLoader:
         Args:
           store: The store to save the data to.
         """
+        
+        deleteGroups = set(group.keys())
         for t in self.timePoints():
             channels = self.channels(t)
             # abb
@@ -183,6 +185,7 @@ class ImageLoader:
             metaData = self.metadata(t)
             timePoint.attrs[f"metadata"] = asdict(metaData)
 
+            deleteChannels = set(timePoint.keys())
             for channel in channels:
                 strChannel = str(channel)
                 image = self._images(t, channel)

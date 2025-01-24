@@ -6,7 +6,6 @@ scikit-image  # is this needed?
 zarr
 async-lru
 asyncio
-imagecodecs  # required for compression
 platformdirs  # to get platform specific App paths
 plotly  # needed for colors
 dataclasses-json

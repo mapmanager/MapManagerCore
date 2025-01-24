@@ -100,7 +100,7 @@ def union(a: gpd.GeoSeries, b: gpd.GeoSeries, grid_size: int):
 
 def interpolate(lines: gpd.GeoSeries, distance: gpd.GeoSeries):
     """Union the shapes of corresponding row of two GeoSeries."""
-    return gpd.GeoSeries(shapely.line_interpolate_point(lines, distance), lines.index, lines.crs)
+    return gpd.GeoSeries(shapely.line_interpolate_point(lines, distance.values), lines.index, lines.crs)
 
 def covered_by(a: gpd.GeoSeries, b: gpd.GeoSeries):
     return pd.Series(shapely.covered_by(a, b), a.index)

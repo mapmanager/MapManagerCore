@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from enum import IntEnum
 import warnings
-from mapmanagercore.layers.symbols import cross, xCross
+from mapmanagercore.layers.symbols import xCross
 from mapmanagercore.utils import force_2d
 from ...layers.polygon import PolygonLayer
 from mapmanagercore.config import Colors, Config, SegmentId, SpineId
@@ -464,7 +464,7 @@ class AnnotationsLayers(AnnotationsInteractions):
             showLineSegmentsRadius = False
 
             def setSegmentOrigin(id, x, y, z, dragState=None):
-                return self.setSegmentOrigin(id, x, y, z, dragState!=None)
+                return self.setSegmentOrigin(id, x, y, z, dragState != None)
 
             segment = segment.onDrag(
                 setSegmentOrigin).onClick(setSegmentOrigin)

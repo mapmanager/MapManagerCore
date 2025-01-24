@@ -2,13 +2,9 @@ from typing import Union
 from shapely.geometry import LineString, Point
 from mapmanagercore.utils import interpolate
 import numpy as np
-import geopandas as gpd
-from mapmanagercore.logger import logger
-from mapmanagercore.layers.line import calculateSegmentOffset, getRunningDistance
+from mapmanagercore.layers.line import calculateSegmentOffset
 
 from ..lazy_geo_pandas import schema, compute, LazyGeoFrame
-# from ..lazy_geo_pandas import schema
-
 
 @schema(
     index=["segmentID", "t"],

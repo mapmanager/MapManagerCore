@@ -155,7 +155,7 @@ class ZarrLoader(ImageLoader):
         a = self._metadata[timePoint].channelNames.pop(channel, None)
         b = self._imagesSrcs[timePoint].pop(channel, None)
 
-        return a != None or b != None
+        return not (isinstance(a, type(None)) and isinstance(b, type(None)))
 
     def merge(self, loader: ImageLoader):
         times = sorted(loader.timePoints())

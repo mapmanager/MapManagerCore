@@ -6,6 +6,9 @@ _thisPath = os.path.abspath(os.path.dirname(__file__))
 with open(os.path.abspath(_thisPath+"/README.md")) as f:
     long_description = f.read()
 
+# Check for a configuration flag to disable optional dependencies
+pyodide = os.getenv('PYODIDE', '0') == '1'
+
 install_requires = [
     'numpy',
     'pandas',
@@ -15,10 +18,9 @@ install_requires = [
     'zarr',
     'async-lru',
     'asyncio',
-    'imagecodecs',  # required for compression
     'platformdirs',  # to get platform specific App paths
     'plotly',  # needed for colors
-    # "dataclasses-json",  # abb removed 20241206
+    "dataclasses-json",
     'brightest-path-lib',
     'pooch',  # to load data from MapManagerCore-Data repo
     'tifffile',
