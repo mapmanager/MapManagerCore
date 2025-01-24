@@ -1,6 +1,7 @@
 import json
 from dataclasses import fields, asdict
 from pprint import pprint
+from typing import List
 
 import numpy as np
 
@@ -88,15 +89,6 @@ def test_metadata():
 
         mdl.appendTimepoint(tmd)
     
-    # logger.info('mdl.metadataList[0]')
-    # pprint(mdl.getMetadataItem(0))
-    # pprint(mdl)
-    # logger.info(mdl.numItems)
-
-    # logger.info('asdict(mdl)')
-    # pprint(asdict(mdl))
-    # return
-
     mdl2 = mmMapMetadata(**asdict(mdl))
     logger.info(mdl2.numItems)
 
@@ -244,7 +236,7 @@ def test_mmmap_metadata():
     """
     mdl = mmMapMetadata()
     assert mdl.numTimepoints == 0
-    assert mdl.metadataList == []
+    assert mdl._metadataList == []
 
     # this is an error, we need to have a populated TimepointMetadata !!!
     # tpmd = TimepointMetadata()
@@ -323,23 +315,26 @@ def tryGeneric():
 
     @dataclasses.dataclass
     class _metadataList(Generic[T], _metadataBase):
-        metadataList : list[T] = dataclasses.field(default_factory=lambda: [])
+        # metadataList : list[T] = dataclasses.field(default_factory=lambda: [])
+        metadataList : List[T] = dataclasses.field(default_factory=list)
+        # metadataList : List[T]
 
     tryGen = _metadataList(str)
-    print(tryGen)
+    tryGen.metadataList.append(1)
+    pprint(asdict(tryGen))
 
 if __name__ == '__main__':
     logger.setLevel('DEBUG')
     
-    test_metadata()
+    # test_metadata()
 
-    test_TimepointMetadata()
+    # test_TimepointMetadata()
 
-    test_analysis_params()
+    # test_analysis_params()
 
-    test_timepoint_metadata()
+    # test_timepoint_metadata()
 
-    test_channel_metadata()
+    # test_channel_metadata()
 
     test_mmmap_metadata()
 

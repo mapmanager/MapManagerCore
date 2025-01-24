@@ -1,3 +1,26 @@
+"""Metadata stores information about images. It provides a single timepoint image with multiple color channels, and a list of single timepoint images.
+
+Classes:
+    mmMapMetadata: A list of `TimepointMetaData` representing a collection of single time point images.
+    TimepointMetadata: Metadata for a single timepoint with multiple channels.
+    ChannelMetadata: The metadata for one channel.
+
+Example:
+
+    # make some miage data
+    imgData = np.random.randint(low=0, high=2**11, size=(20,512,512), dtype=np.uint16)
+    
+    # creat a timepoint and append a channel of image data.
+    tpmd = TimepointMetadata()
+    tpmd.appendChannel(imgData)
+
+    # append the timepoint to a list of timepoints
+    mapmd = mmMapMetadata()
+    mapmd.appendTimepoint(tpmd)
+
+    print(mapmd.numTimepoint)  # -> 1
+"""
+
 import dataclasses
 from typing import Tuple, List, Optional, Literal
 
@@ -13,9 +36,8 @@ class _metadataBase:
     def setValue(self, key, value) -> bool:
         """Set a field value.
         
-        Returns
-        =======
-        True if field exists, otherwise False
+        Returns:
+            True if field exists, otherwise False
         """
         try:
             setattr(self, key, value)
@@ -27,13 +49,11 @@ class _metadataBase:
     def getValue(self, key) -> Optional[object]:
         """Set a field value.
         
-        Returns
-        =======
-        Field value if field exists, otherwise None
+        Returns:
+            Field value if field exists, otherwise None
 
-        Notes
-        =====
-        Returning python None can be misleading, make sure "none" of our fields have default value of None ???
+        Notes:
+            Returning python None can be misleading, make sure "none" of our fields have default value of None ???
         """
         if not isinstance(key, str):
             logger.mmLog(f'attr must be str, got {type(key)}')
@@ -58,13 +78,13 @@ class _metadataList(_metadataBase):
         - MetadataList that has a list of TimepointMetadata
     """
 
-    metadataList : list = dataclasses.field(default_factory=lambda: [])
-    # or? not sure which to use
-    # metadataList: List = field(default_factory=list)
+    # metadataList : list = dataclasses.field(default_factory=lambda: [])
+    # or this? not sure which to use
+    _metadataList: list = dataclasses.field(default_factory=list)
 
     @property
     def listIndices(self) -> List[int]:
-        """Get a list of indices from ourmetadataList.
+        """Get a list of indices from our _metadataList.
         """
         return list(range(self.numItems))
     
@@ -72,60 +92,54 @@ class _metadataList(_metadataBase):
     def numItems(self) -> int:
         """Get the number of items in the list.
         """
-        return len(self.metadataList)
+        return len(self._metadataList)
     
     def getMetadataItem(self, index : int) -> Optional[object]:
         """Get metadata for one item in the list.
         
-        Returns
-        =======
-        item if index exists, otherwise None
+        Returns:
+            item if index exists, otherwise None
 
-        See
-        ===
-        __getitem__(int)
+        See also:
+            __getitem__(int)
         """
         if index in self.listIndices:
-            return self.metadataList[index]
+            return self._metadataList[index]
         
     def appendMetadataItem(self, metadata : object) -> int:
         """Append to end of list.
         
-        Returns
-        =======
-        index of new item (0 based).
+        Returns:
+            index of new item (0 based).
         """
-        self.metadataList.append(metadata)
+        self._metadataList.append(metadata)
         return self.numItems - 1
     
     def deleteMetadataItem(self, index : int) -> Optional[object]:
         """Remove from index.
 
-        Returns
-        =======
-        The item removed, otherwise None
+        Returns:
+            The item removed, otherwise None
         """
         if index in self.listIndices:
-            item = self.metadataList.pop(index)
+            item = self._metadataList.pop(index)
             return item
     
     def insertMetadataItem(self, index : int, metadata : object) -> Optional[bool]:
         """Insert an item at given index.
         
         Returns
-        =======
-        True on success, otherwise None
+            True on success, otherwise None
         """
         if index in self.listIndices:
-            self.metadataList.insert(index, metadata)
+            self._metadataList.insert(index, metadata)
             return True
 
     def swapMetadataItems(self, srcIndex, dstIndex) -> bool:
         """Swap/move an item in the list.
         
         Returns
-        -------
-        True on success, otherwise False
+            True on success, otherwise False
         """
         if srcIndex not in self.listIndices:
             logger.mmlog(f'src {srcIndex} does not exist')
@@ -135,12 +149,9 @@ class _metadataList(_metadataBase):
             return False
         
         # the existing src/dst channels
-        srcMetadata = self.getMetadataItem(srcIndex)
-        dstMetadata = self.getMetadataItem(dstIndex)
-        
-        # simple swap !
-        self.metadataList[dstIndex] = srcMetadata
-        self.metadataList[srcIndex] = dstMetadata
+        _tmp = self.getMetadataItem(srcIndex)
+        self._metadataList[srcIndex] = self._metadataList[dstIndex]
+        self._metadataList[dstIndex] = _tmp
 
         return True
     
@@ -148,14 +159,14 @@ class _metadataList(_metadataBase):
         """Set one item (key/value) in list.
         """
         if index in self.listIndices:
-            return self.metadataList[index].setValue(key, value)
+            return self._metadataList[index].setValue(key, value)
         else:
             return False
         
     def __getitem__(self, index:int):
         """Prefer to use explicit function getMetadataItem(int)
         """
-        return self.metadataList[index]
+        return self._metadataList[index]
     
 @dataclasses.dataclass
 class AnalysisParams(_metadataBase):
@@ -248,11 +259,11 @@ class ChannelMetadata(_metadataBase):
     """
         
     minInt: int = 1
-    """Min intensity of image data, set on import then immutable."""
+    """Min intensity of image data, set on import (see _initFromImgData) then immutable."""
     maxInt: int = 1
     """Max intensity of image data, set on import then immutable."""
     dtype: str = 'Unknown'
-    """np """
+    """String representation of dtype"""
     #
     # the remaining fields can be set by the user.
     minContrast: int = 1
@@ -280,10 +291,10 @@ class ChannelMetadata(_metadataBase):
 class VoxelMetadata:
     """The metadata for the physical size of a voxel.
 
-    Attributes:
-        x (float): The x-coordinate's voxel size.
-        y (float): The y-coordinate's voxel size.
-        z (float): The z-coordinate's voxel size.
+    Args:
+        xVoxel: The x-coordinate's voxel size.
+        yVoxel: The y-coordinate's voxel size.
+        zVoxel: The z-coordinate's voxel size.
     """
     xVoxel: float = 1.0
     yVoxel: float = 1.0
@@ -330,15 +341,18 @@ class TimepointMetadata(_metadataList):
     
     In our single timepoint analysis, each timepoint is independent of all others.
 
+    Args:
+        name: User defined name of the timepoint.
+
     TODO:
         When we are in a multi-timepoint map (with segments and spine connect)
-            we need one global AnalysisParameters (At root of zarr file)
+        we need one global AnalysisParameters (At root of zarr file)
     """
 
     name: str = 'Untitled'
 
     shapeMetadata: ShapeMetadata = dataclasses.field(default_factory=lambda: ShapeMetadata())
-    """The shape of the raw data (once loaded with raw data, this is never changed)."""
+    """The shape of the raw image data (once loaded with raw data, this is never changed)."""
 
     voxelMetadata: VoxelMetadata = dataclasses.field(default_factory=lambda: VoxelMetadata())
     """The physical unit voxel size in each dimension."""
@@ -346,23 +360,21 @@ class TimepointMetadata(_metadataList):
     experimentMetadata : ExperimentMetadata = dataclasses.field(default_factory=lambda: ExperimentMetadata())
     """Experimental metadata corresponding to the conditions an image was aquired."""
 
-    # TODO convert AnalysisParameter to dataclass (keep the self documentation)
     analysisParameters: AnalysisParams = dataclasses.field(default_factory=lambda: AnalysisParams())
-    """The analysis parameters for this single timepoint (connected maps use a global)."""
+    """The analysis parameters for this single timepoint (connected maps use a global version of this)."""
 
     def appendChannel(self, imgData : np.ndarray) -> Optional[int]:
-        """Given img data, append a new color channel.
+        """Given img data, append a new color channel. Used when we are importing data.
         
-        Used when we are importing data.
-        
-        Returns
-        -------
-        Appended channel index on success, otherwise None
+        Parameters:
+            imgData: The image data to append.
 
-        Notes
-        -----
-        Will fail if appending channel index > 0 and
-            proposed channel shape from imgData does not match channel index 0 shape.
+        Returns:
+            Appended channel index on success, otherwise None.
+
+        Notes:
+            Will fail if appending channel index > 0 and
+            proposed channel imgData.shape does not match channel index 0 shape.
         """
         
         proposedShape = imgData.shape
@@ -387,6 +399,9 @@ class TimepointMetadata(_metadataList):
     
     def deleteChannel(self, channelIdx:int) -> Optional[ChannelMetadata]:
         """Delete a color channel.
+        
+        Returns:
+            On success, deleted ChannelMetadata, otherwise None
         """
         if channelIdx == 0:
             logger.mmlog('cannot delete channel 0')
@@ -395,7 +410,7 @@ class TimepointMetadata(_metadataList):
         metadataContrast = self.deleteMetadataItem(channelIdx)
         return metadataContrast
     
-    def swapChannels(self, srcChannelIdx, dstChannelIdx):
+    def swapChannels(self, srcChannelIdx, dstChannelIdx) -> bool:
         """Move/swap color channel.
         """
         ok = self.swapMetadataItems(srcChannelIdx, dstChannelIdx)
@@ -427,14 +442,14 @@ class TimepointMetadata(_metadataList):
         """
         if channelIdx not in self.listIndices:
             return
-        return self.metadataList[channelIdx].setValue(key, value)
+        return self._metadataList[channelIdx].setValue(key, value)
 
     def getChannelProperty(self, channelIdx, key):
         """Get channel property.
         """
         if channelIdx not in self.listIndices:
             return
-        return self.metadataList[channelIdx].getValue(key)
+        return self._metadataList[channelIdx].getValue(key)
     
 @dataclasses.dataclass
 class mmMapMetadata(_metadataList):
@@ -443,34 +458,50 @@ class mmMapMetadata(_metadataList):
     For single timepoint mmap/zarr, represents a list of independent imaging timepoints.
     """
 
-    def getTimepointMetadata(self, index) -> Optional[TimepointMetadata]:
+    def getTimepointMetadata(self, index : int) -> Optional[TimepointMetadata]:
         """Get metadata for a timepoint.
+        
+        Args:
+            index: Timepoint index to get.
+        
+        Returns:
+            Metadata for timepoint at index.
         """
         return self.getMetadataItem(index)
 
-    def insertTimepoint(self, index : int, metadata : TimepointMetadata):
-        """Append a new timepoint.
+    def insertTimepoint(self, index : int, metadata : TimepointMetadata) -> bool:
+        """Insert a new timepoint.
+
+        Args:
+            index: The index to insert into.
+            metadata: The TimepointMetadata to insert.
+
+        Returns:
+            True on success, otherwise False.
         """
         if index not in self.listIndices:
             logger.mmlog(f'src {index} does not exist, available indices are {self.listIndices}')
-            return
+            return False
         self.insertMetadataItem(index, metadata)
-
-    def appendTimepoint(self, metadata : TimepointMetadata):
+        return True
+    
+    def appendTimepoint(self, timepointMetadata : TimepointMetadata):
         """Append a new timepoint.
+
+        Args:
+            timepointMetadata: The timepoint to append.
         """
-        self.appendMetadataItem(metadata)
+        self.appendMetadataItem(timepointMetadata)
 
     def deleteTimepoint(self, index : int) -> Optional[TimepointMetadata]:
         if index in self.listIndices:
             return self.deleteMetadataItem(index)
 
-    def swapTimepoint(self, srcTimepoint, dstTimepoint) -> bool:
+    def swapTimepoint(self, srcTimepoint : int, dstTimepoint : int) -> bool:
         """Move/swap timepoints.
         
-        Returns
-        =======
-        True on success, otherwise False
+        Returns:
+            True on success, otherwise False
         """
         ok = self.swapMetadataItems(srcTimepoint, dstTimepoint)
         return ok
@@ -478,6 +509,9 @@ class mmMapMetadata(_metadataList):
     @property
     def numTimepoints(self) -> int:
         """The number of timepoints.
+        
+        Returns:
+            The number of timepoints.
         """
         return self.numItems
 
