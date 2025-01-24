@@ -1,0 +1,1 @@
+::: mapmanagercore.metadata3
