@@ -44,6 +44,6 @@ def test_load_multi_timepoint():
     assert map is not None
 
 if __name__ == '__main__':
-    # test_load_single_timepoint()
+    test_load_single_timepoint()
     # test_load_multi_timepoint()
-    test_load_url()
+    # test_load_url()

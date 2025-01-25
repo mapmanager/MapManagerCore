@@ -19,6 +19,10 @@ class MultiImageLoader(ImageLoader):
         self._metadata = {}
         self.paths = []  # for logging only
 
+        # abb md3
+        from mapmanagercore.metadata3 import mmMapMetadata
+        self._metadata3 = mmMapMetadata()
+
     def __str__(self):
         return f"Multi image Loader paths: {self.paths}"
     
@@ -34,22 +38,21 @@ class MultiImageLoader(ImageLoader):
           time (int): The time index.
           channel (int): The channel index.
         """
-        # TODO for tif files, do not use imageio, use tifffile
-        # note, imageio is silently installed when scikit-image is installed
-        # to update, see mapmanagercore.image_importers
-        # from imageio import imread
         if name is None:
             name = path
 
         if isinstance(path, str):
-            # imgData = imread(path)
             imgData = tifffile.imread(path)
         else:
             # abb assuming np.ndarry?
             imgData = path
             
         if time not in self._imagesSrc:
+            # appending first channel to new timepoint
+            
             self._imagesSrc[time] = {}
+            
+            # v1 meta
             _metaData = Metadata()
             # shape of imgData
             _metaData.voxel.x = imgData.shape[2]
@@ -62,11 +65,22 @@ class MultiImageLoader(ImageLoader):
             _metaData.physicalSize.z = 1
 
             # contrast
-            # logger.info(f'channel:{channel} {type(channel)}')
-            metadataContrast = MetadataContrast()._initFromImgData(imgData)
+            logger.info(f'abb MetadataContrast channel:{channel} {type(channel)} imgData:{imgData.shape}')
+            metadataContrast = MetadataContrast()
+            metadataContrast._initFromImgData(imgData)
             _metaData.addColorChannel(metadataContrast)
 
             self._metadata[time] = _metaData
+
+            # abb md3
+            from mapmanagercore.metadata3 import TimepointMetadata
+            timepointMetadata = TimepointMetadata()  # empty, no channels
+            timepointMetadata.appendChannel(imgData)
+            self._metadata3.appendTimepoint(timepointMetadata)
+        else:
+            # abb md3, appending a channel to existing timepoint
+            timepointMetadata = self._metadata3.getTimepointMetadata(time)
+            timepointMetadata.appendChannel(imgData)
 
         if channel > self.maxChannels():
             self.setMaxChannels(channel)
@@ -127,14 +141,14 @@ class MultiImageLoader(ImageLoader):
     def _images(self, t: int, channel: int) -> np.ndarray:
         return self._imagesSrc[t][channel]
 
+    # abj
     def readNewImages(self, path: Union[str, np.ndarray], time: int = 0, channel: int = 0):
-        """
-        Load an image from the given path and store it in the images array.
+        """Load an image from the given path and store it in the images array.
 
         Args:
-          path (str): Either the path to the image file or a np array.
-          time (int): The time index.
-          channel (int): The channel index.
+          path: Either the path to the image file or a np array.
+          time: The time index.
+          channel: The channel index.
         """
 
         currentImages = {} # reformatted current images
@@ -143,7 +157,6 @@ class MultiImageLoader(ImageLoader):
             currentImages[time] = []
 
         if isinstance(path, str):
-            # from imageio import imread
             imgData = tifffile.imread(path)
         else:
             imgData = path
@@ -167,7 +180,8 @@ class MultiImageLoader(ImageLoader):
                 currentImages[time].append([channelCount, channelImage])
 
                 # TODO: create new metaData
-        
+                logger.info(f'abb TODO create contrast metadata')
+
         # TODO: need to create functionality for when user wants to switch channel numbers
         # TODO: need to check to make sure new image channel has same size as previous  image channel
         # append new images (channel)

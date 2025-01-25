@@ -22,7 +22,7 @@ Example:
 """
 
 import dataclasses
-from typing import Tuple, List, Optional, Literal
+from typing import Tuple, List, Optional, Literal, Self
 
 import numpy as np
 
@@ -47,7 +47,7 @@ class _metadataBase:
             return False
         
     def getValue(self, key) -> Optional[object]:
-        """Set a field value.
+        """Get a field value.
         
         Returns:
             Field value if field exists, otherwise None
@@ -351,7 +351,8 @@ class TimepointMetadata(_metadataList):
 
     name: str = 'Untitled'
 
-    shapeMetadata: ShapeMetadata = dataclasses.field(default_factory=lambda: ShapeMetadata())
+    # shapeMetadata: ShapeMetadata = dataclasses.field(default_factory=lambda: ShapeMetadata())
+    shapeMetadata: ShapeMetadata = dataclasses.field(default_factory=ShapeMetadata)
     """The shape of the raw image data (once loaded with raw data, this is never changed)."""
 
     voxelMetadata: VoxelMetadata = dataclasses.field(default_factory=lambda: VoxelMetadata())
@@ -362,6 +363,11 @@ class TimepointMetadata(_metadataList):
 
     analysisParameters: AnalysisParams = dataclasses.field(default_factory=lambda: AnalysisParams())
     """The analysis parameters for this single timepoint (connected maps use a global version of this)."""
+
+    def fromImgData(imgData: np.ndarray) -> Self:
+        tpmd = TimepointMetadata()
+        tpmd.appendChannel(imgData)
+        return tpmd
 
     def appendChannel(self, imgData : np.ndarray) -> Optional[int]:
         """Given img data, append a new color channel. Used when we are importing data.
@@ -420,6 +426,9 @@ class TimepointMetadata(_metadataList):
         """Get metadata for a channel.
         """
         return self.getMetadataItem(channelIdx)
+
+    def __getitem__(self, index:int) -> ChannelMetadata:
+        return super().__getitem__(index)
     
     @property
     def numChannels(self) -> int:
@@ -451,6 +460,12 @@ class TimepointMetadata(_metadataList):
             return
         return self._metadataList[channelIdx].getValue(key)
     
+    @property
+    def channelIndices(self) -> List[int]:
+        """Get the list[int] of channel indices.
+        """
+        return self.listIndices
+
 @dataclasses.dataclass
 class mmMapMetadata(_metadataList):
     """A list of TimepointMetadata.
@@ -464,6 +479,9 @@ class mmMapMetadata(_metadataList):
         Args:
             index: Timepoint index to get.
         
+        See Also:
+            __getitem__
+            
         Returns:
             Metadata for timepoint at index.
         """
@@ -506,6 +524,41 @@ class mmMapMetadata(_metadataList):
         ok = self.swapMetadataItems(srcTimepoint, dstTimepoint)
         return ok
 
+    def moveChannel(self, srcTimepoint:int, srcChannelIdx:int,
+                    dstTimepoint:int, dstChannelIdx:int) -> bool:
+        """Move a channel from one timepoint to another.
+        
+        Args:
+            srcTimepoint: Source timepoint to move from.
+            srcChannelIdx: Source channel to move from.
+            dstTimepoint: Destination timepoint to move to.
+            dstChannelIdx: Destination channel to move to.
+
+        Returns:
+            True on success, otherwise false.
+        """
+
+        # check source timepoint and channel
+        if srcTimepoint not in self.timepointIndices:
+            return False
+        if srcChannelIdx not in self[srcTimepoint].channelIndices:
+            return False
+        # check dst timepoint and channel
+        if dstTimepoint not in self.timepointIndices:
+            return False
+        # hold off on dst channel check,
+        # if within range then insert, otherwise ignore and always append
+        # if dstChannel not in self[srcTimepoint].channelIndices:
+        #     return False
+        
+        # remove from source
+        _removedChannelMetadata = self[srcTimepoint].deleteChannel(srcChannelIdx)
+
+        # insert into destinations
+        _newIndex = self[dstTimepoint].appendMetadataItem(_removedChannelMetadata)  # to do write 
+
+        return True
+    
     @property
     def numTimepoints(self) -> int:
         """The number of timepoints.
@@ -515,5 +568,11 @@ class mmMapMetadata(_metadataList):
         """
         return self.numItems
 
-    def asDict(self) -> dict:
-        return dataclasses.asdict(self)
+    @property
+    def timepointIndices(self) -> List[int]:
+        """Get the list[int] of timepoint indices.
+        """
+        return self.listIndices
+
+    def __getitem__(self, index:int) -> TimepointMetadata:
+        return super().__getitem__(index)

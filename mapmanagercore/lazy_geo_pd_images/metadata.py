@@ -115,10 +115,11 @@ class Metadata():
     # do not modify, is used in >20x places
     channelNames: Dict[int, str] = field(default_factory=lambda:{})
     
-    metadataContrast : list[MetadataContrast] = field(default_factory=lambda: [])
+    metadataContrast : list[MetadataContrast] = field(default_factory=list)
     """List of metadata for each color channel."""
 
     def addColorChannel(self, metadataContrast:MetadataContrast = MetadataContrast()):
+        # logger.info(f'metadataContrast:{metadataContrast}')
         self.metadataContrast.append(metadataContrast)
 
     def asDict(self) -> dict:

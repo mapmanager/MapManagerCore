@@ -116,6 +116,11 @@ class Spine:
     roiExtend: float
     roiRadius: float = 4.0
 
+    # roiRadius: float = dataclasses.field(default=4.0, metadata={
+                                                                # "title": "ROI Radius",
+                                                                # "description": "Region of interest radius",
+    #                                                          })
+
     note: str = ""
     userType: int = 0
     accept: bool = True

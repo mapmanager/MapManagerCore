@@ -150,7 +150,7 @@ class ImageLoader:
     def setMaxChannels(self, maxChannels: int) -> bool:
         if self.maxChannels() == maxChannels:
             return False
-        self._analysisParams.setValue("maxChannels", maxChannels)
+        self._analysisParams.setValue("maxChannels", maxChannels)  # abb md3 depreciated
         return True
 
     def slices(self, t: int, channel: int = 0) -> int:

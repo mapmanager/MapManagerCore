@@ -41,5 +41,7 @@ plugins:
 
 nav:
     - Introducing MapManagerCore: index.md
+    - Getting Started: getting_started.md
+    - Interface: interface.md
     - API:
         - Metadata: api/metadata.md
