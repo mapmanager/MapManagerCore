@@ -227,10 +227,9 @@ class AnnotationsBase(LazyImagesGeoPandas):
     def save(self, path: str = None):
         """Save the mmap
 
-        PArameters
-        ----------
+        Parameters:
         path : str
-            Pat to save to, if a folder then save as zarr DirectoryStore, otherwise save as single file zip.
+            Path to save to, if a folder then save as zarr DirectoryStore, otherwise save as single file zip.
         """
         if path is None:
             path = self.path
@@ -249,10 +248,12 @@ class AnnotationsBase(LazyImagesGeoPandas):
             warnings.simplefilter("ignore")
 
             logger.info(f'saving to {path}')
-            if os.path.isdir(path):
+            # if os.path.isdir(path):
+            if path.endswith('.mmap'):
                 logger.info('   as a DirectoryStore')
                 fs = zarr.DirectoryStore(path)
-            else:
+            # else:
+            elif path.endswith('.mmap.zip'):
                 fs = zarr.ZipStore(path, mode="w", compression=zipfile.ZIP_STORED)
                 logger.info('   as a ZipStore')
 

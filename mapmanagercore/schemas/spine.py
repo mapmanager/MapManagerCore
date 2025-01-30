@@ -9,6 +9,8 @@ import geopandas as gp
 from shapely.geometry import LineString, MultiPolygon, Polygon, Point
 from ..lazy_geo_pd_images import aggregateROI
 
+from mapmanagercore.logger import logger
+
 @schema(
     index=["spineID", "t"],
     relationships={
@@ -166,6 +168,7 @@ class Spine:
         # Normalize the position of the anchor on the segment
         return shapely.line_locate_point(df["segment"], df["anchor"]) - df["pivotDistance"]
 
+    """abb what is the return type of spineSide function?"""
     @compute(title="Spine Side", dependencies=
              {
                 "Spine": ["segmentID", "point", "anchor"],
@@ -181,8 +184,10 @@ class Spine:
 
         # if both are True or both are False, then it is invalid
         valid = intersectsLeft ^ intersectsRight
-        return np.where(valid, np.where(intersectsLeft, "Left", "Right"), "Invalid")
-
+        _ret = np.where(valid, np.where(intersectsLeft, "Left", "Right"), "Invalid")
+        # logger.error(f'_ret:{_ret}')
+        return _ret
+    
     @compute(title="Anchor", dependencies=["anchor", "point"], plot=False)
     @timer
     def anchorLine(frame: LazyGeoFrame):

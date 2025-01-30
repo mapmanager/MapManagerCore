@@ -5,6 +5,7 @@ import numpy as np
 from mapmanagercore.layers.line import calculateSegmentOffset
 
 from ..lazy_geo_pandas import schema, compute, LazyGeoFrame
+from mapmanagercore.logger import logger
 
 @schema(
     index=["segmentID", "t"],
@@ -73,17 +74,31 @@ class Segment:
     # abj
     @compute(title="Left Radius", dependencies=["segment", "radius"])
     def leftRadius(frame: LazyGeoFrame):
+    
+        # abb wazs missing
+        # abb todo merge leftRadius and rightRadius (just pass in switch to do one or the other)
+        #  they are syymetric left/right
+        import geopandas as gpd
+
         df = frame[["segment", "radius"]]
         df["z"] = (df['segment'].apply(lambda geom: [coord[2] for coord in geom.coords]))  
         offsettedSegment = df.apply(lambda d: calculateSegmentOffset(d["segment"], d["radius"], isPositive=False), axis=1)
         df["x"] = (offsettedSegment.apply(lambda geom: [coord[0] for coord in geom.coords]))
         df["y"] = (offsettedSegment.apply(lambda geom: [coord[1] for coord in geom.coords]))
-        newDF = gpd.GeoSeries(df[["x", "y", "z"]].apply(lambda ldf: LineString(Point(ldf["x"][i], ldf["y"][i], ldf["z"][i]) 
-                                                                               for i, val in enumerate(ldf["x"])), axis=1))
+        newDF = gpd.GeoSeries(df[["x", "y", "z"]].apply(lambda ldf: LineString(Point(ldf["x"][i], ldf["y"][i], ldf["z"][i])
+                                                                            for i, val in enumerate(ldf["x"])), axis=1))
+
         return newDF
     
     @compute(title="Right Radius", dependencies=["segment", "radius"])
     def rightRadius(frame: LazyGeoFrame):
+        logger.warning('abb turned off')
+        # print(f'frame: {type(frame)}')  # lazy_geo_pandas.lazy.LazyGeoFrame
+        # print(frame)
+
+        # abb was missing
+        import geopandas as gpd
+
         df = frame[["segment", "radius"]]
         # logger.info(f" df[radius] {df['radius']}")
         df["z"] = (df['segment'].apply(lambda geom: [coord[2] for coord in geom.coords]))  
@@ -95,13 +110,14 @@ class Segment:
                                                                             for i, val in enumerate(ldf["x"])), axis=1))
         return newDF
     
-    @compute(title="distance", dependencies=["segment"])
-    def distance(frame: LazyGeoFrame): # distance of each point from beginning of the segment
-        df = frame["segment"]
-        distanceList = df.apply(lambda d: getRunningDistance(d))
-        # distanceList = df.apply(lambda d: getRunningDistance(d["segment"]))
-        # list of distances, same length as segment: linestring
-        return distanceList
+    # abb do we need this?
+    # @compute(title="distance", dependencies=["segment"])
+    # def distance(frame: LazyGeoFrame): # distance of each point from beginning of the segment
+    #     df = frame["segment"]
+    #     distanceList = df.apply(lambda d: getRunningDistance(d))
+    #     # distanceList = df.apply(lambda d: getRunningDistance(d["segment"]))
+    #     # list of distances, same length as segment: linestring
+    #     return distanceList
 
 
 

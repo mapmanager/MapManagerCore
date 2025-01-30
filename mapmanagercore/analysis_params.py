@@ -119,8 +119,10 @@ class AnalysisParams():
 
             # The distance
             'segmentTracingMaxDistance': {
-                'defaultValue': 90,  # abb was 20
-                'currentValue': 90,
+                # 'defaultValue': 90,  # abb was 20
+                # 'currentValue': 90,
+                'defaultValue': 1000,  # abb was 20
+                'currentValue': 1000,
                 'description': 'Max distance to trace a brightest path with relatively low performance cost.',
                 'type' : "int"
             },

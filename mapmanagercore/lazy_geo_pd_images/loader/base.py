@@ -183,6 +183,10 @@ class ImageLoader:
                 timePoint = group.create_group(str(t))
             
             metaData = self.metadata(t)
+            logger.error('xxx metadata to json')
+            from pprint import pprint
+            pprint(metaData)
+            
             timePoint.attrs[f"metadata"] = asdict(metaData)
 
             deleteChannels = set(timePoint.keys())

@@ -1,5 +1,6 @@
 import numpy as np
 import tifffile
+import nd2
 
 from mapmanagercore.analysis_params import AnalysisParams
 from mapmanagercore.lazy_geo_pd_images.metadata import Metadata, MetadataContrast
@@ -38,11 +39,20 @@ class MultiImageLoader(ImageLoader):
           time (int): The time index.
           channel (int): The channel index.
         """
+        
+        # abb if path is np.ndarray (WE NEED UNIT TESTS FOR THIS)
         if name is None:
-            name = path
+            # name = path
+            name = 'Untitled'
 
         if isinstance(path, str):
-            imgData = tifffile.imread(path)
+            if path.endswith('.tif'):
+                imgData = tifffile.imread(path)
+            elif path.endswith('.nd2'):
+                with nd2.ND2File(path) as myfile:
+                    voxel_size = myfile.voxel_size()
+                imgData = nd2.imread(path)
+                logger.info(f'{imgData.shape} voxel_size:{voxel_size}')
         else:
             # abb assuming np.ndarry?
             imgData = path
@@ -65,7 +75,7 @@ class MultiImageLoader(ImageLoader):
             _metaData.physicalSize.z = 1
 
             # contrast
-            logger.info(f'abb MetadataContrast channel:{channel} {type(channel)} imgData:{imgData.shape}')
+            # logger.info(f'abb MetadataContrast channel:{channel} {type(channel)} imgData:{imgData.shape}')
             metadataContrast = MetadataContrast()
             metadataContrast._initFromImgData(imgData)
             _metaData.addColorChannel(metadataContrast)

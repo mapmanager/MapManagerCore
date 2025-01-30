@@ -15,7 +15,7 @@ install_requires = [
     'shapely',
     'geopandas',
     'scikit-image',
-    'zarr',
+    'zarr==2.16',  # 3.0 has breaking changes
     'async-lru',
     'asyncio',
     'platformdirs',  # to get platform specific App paths
@@ -24,6 +24,8 @@ install_requires = [
     'brightest-path-lib',
     'pooch',  # to load data from MapManagerCore-Data repo
     'tifffile',
+    'nd2',
+    'imagecodecs',
     # 'bioio',  # TODO: use to load metadata and lazy load images
     # install bioio from main branch of github repo (not pypi package)
     # 'bioio @ git+ssh://git@github.com/bioio-devs/bioio.git',

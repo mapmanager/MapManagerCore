@@ -109,7 +109,7 @@ def _GuessConnectedSpines(map : MapAnnotations,
     _totalNumColumns = 8
 
     def makeNp(tp : SingleTimePointAnnotations, segmentID):
-        """What is this doing???
+        """abb What is this doing???
         """
         points = tp.points[:]
         

@@ -43,18 +43,23 @@ class AnnotationsInteractions(AnnotationsSegments):
                 If True then find the brightest anchor using image data.
 
         Returns:
-            Point: The nearest anchor point.
+            Point: The nearest anchor point (not required to be in original)
         """
         segment: LineString = self.segments[segmentID, "segment"]
 
         # find the closest point on the segment to the `point`
+        # logger.warning('=== PROJECTING')
+        # logger.warning(f'  segmentID:{segmentID}')
+        # logger.warning(f'  segment:{segment}')
+        # logger.warning(f'  point:{point}')
+
         minProjection = segment.project(point)
         
         # abb debug
         if np.isnan(minProjection):
             logger.error(f'=== UNEXPECTED minProjection:{minProjection}')
             logger.error(f'   segmentID:{segmentID}')
-            logger.error(f'   self.segments[:]:{self.segments[:]}')
+            # logger.error(f'   self.segments[:]:{self.segments[:]}')
             logger.error(f'   segment:{segment}')
             logger.error(f'   point:{point}')
             
@@ -64,7 +69,7 @@ class AnnotationsInteractions(AnnotationsSegments):
             logger.info("defaulting to closest point")
             anchor = segment.interpolate(minProjection)
             anchor = roundPoint(anchor, 1)
-            logger.info(f"anchor {anchor}")
+            logger.info(f"  anchor {anchor}")
 
             if returnIndex:
                 logger.info(f"entering return index")
@@ -531,7 +536,9 @@ class AnnotationsInteractions(AnnotationsSegments):
         self.updateSegmentWithLiveTracing(segmentId, roughTracing.coords, idx)
         return idx
 
-    def appendSegmentPoint(self, segmentId: SegmentId, x: int, y: int, z: int, speculate: bool = False) -> LineString:
+    def appendSegmentPoint(self, segmentId: SegmentId,
+                           x: int, y: int, z: int,
+                           speculate: bool = False) -> LineString:
         """Adds a point to a segment.
 
         Args:
@@ -578,7 +585,7 @@ class AnnotationsInteractions(AnnotationsSegments):
             "segmentTracingMaxDistance")
 
         if maxTracingDistance is not None and point.distance(snappedPoint) > maxTracingDistance:
-            # logger.warning(f'abb return None for maxTracingDistance:{maxTracingDistance}')
+            logger.warning(f'abb return None for maxTracingDistance:{maxTracingDistance}')
             return None
 
         if first:

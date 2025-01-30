@@ -13,6 +13,8 @@ from ..benchmark import timer
 import math
 from math import pi as PI
 
+from mapmanagercore.logger import logger
+
 class MultiLineLayer(Layer):
     @Layer.setProperty
     def offset(self, offset: Union[int, Callable[[int], int]]) -> Self:
@@ -243,15 +245,28 @@ def matchZToSegment(lineWithout: LineString, lineWithZ: LineString):
 
 # abj
 @timer
-def calculateSegmentOffset(segmentLine: gp.GeoSeries, radiusOffset: pd.Series, isPositive: bool):
+def calculateSegmentOffset(segmentLine: gp.GeoSeries,
+                           radiusOffset: pd.Series,
+                           isPositive: bool):
+    logger.error('abb error returning segmentLine')
+    return segmentLine
+    
+    logger.error('  abb ERROR BROKEN !!!!!!!!!')
+    logger.error(f'    segmentLine:{segmentLine}')
+    logger.error(f'    radiusOffset:{radiusOffset}')
     distance = radiusOffset if isPositive else -radiusOffset
-    offsetSegment: gp.GeoSeries = shapely.offset_curve(segmentLine, distance = distance.values, 
+    offsetSegment: gp.GeoSeries = shapely.offset_curve(segmentLine,
+                                            # abb removed value
+                                            distance.values, 
+                                            # distance = distance, 
                                             # quad_segs = 16,
                                             join_style = "mitre"
                                             # , mitre_limit = 15
                                             )
+    logger.warning(f'abb offsetSegment:{offsetSegment}')
     return gp.GeoSeries(offsetSegment.combine(segmentLine, matchZToSegment))
 
+# abb depreciate we do not need the distance of each point (For now)
 # abj
 def getRunningDistance(segmentLine: LineString):
     """
