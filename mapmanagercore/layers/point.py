@@ -1,6 +1,7 @@
 from typing import Callable, Self, Tuple, Union
 import numpy as np
 import geopandas as gp
+from shapely import Point
 from shapely.geometry import LineString
 from mapmanagercore.benchmark import timer
 from mapmanagercore.utils import force_2d

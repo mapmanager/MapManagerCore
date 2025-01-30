@@ -612,22 +612,23 @@ class AnnotationsInteractions(AnnotationsSegments):
         theRet = 0 if first else len(roughTracing) - 1
         # logger.info(f'theRet:{theRet}')
         return theRet
-    
-    def old_setPivotPoint(self, segmentId: SegmentId, clickedPoint: Point, speculate: bool = False) -> Point:
-        """ Sets pivotPoint of segment. 
 
-        Calculates pivot point by find closest brightest index point to the clicked Point
-        """
-        # pass
+    # Use setSegmentOrigin instead
+    # def old_setPivotPoint(self, segmentId: SegmentId, clickedPoint: Point, speculate: bool = False) -> Point:
+    #     """ Sets pivotPoint of segment. 
 
-        # auto set pivot point closest to click on line
+    #     Calculates pivot point by find closest brightest index point to the clicked Point
+    #     """
+    #     # pass
 
-        closestPivotPoint = self.nearestAnchor(segmentID=segmentId, point=clickedPoint, findBrightest=False)
-        logger.info(f"closestPivotPoint {closestPivotPoint}")
-        # set pivot point in backend
-        self.updateSegment(segmentId, Segment(
-            pivotPoint=closestPivotPoint
-        ))
+    #     # auto set pivot point closest to click on line
+
+    #     closestPivotPoint = self.nearestAnchor(segmentID=segmentId, point=clickedPoint, findBrightest=False)
+    #     logger.info(f"closestPivotPoint {closestPivotPoint}")
+    #     # set pivot point in backend
+    #     self.updateSegment(segmentId, Segment(
+    #         pivotPoint=closestPivotPoint
+    #     ))
 
         # used for verification
         return closestPivotPoint

@@ -25,7 +25,7 @@ def main():
     loader.read(getTiffChannel_2(), channel=1)
 
     # Create the annotation map
-    map = MapAnnotations(loader.build(),
+    map = MapAnnotations(loader,
                         # lineSegments="../data/rr30a_s0u/line_segments.csv",
                         # points="../data/rr30a_s0u/points.csv",
                         lineSegments=getLinesFile(),

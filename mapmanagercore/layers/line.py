@@ -1,5 +1,7 @@
+from enum import Enum
 from typing import Callable, Self, Tuple, Union
 import numpy as np
+import pandas as pd
 from mapmanagercore.utils import count_coordinates
 from ..layers.point import PointLayer
 from .layer import Layer
@@ -155,42 +157,26 @@ def getSpineSide(line: LineString, spine: Point, anchor:Point):
 
 
 @ timer
-def getSpineAngle(spineLine: LineString):
-    """ Return the angle of the spine Line by using the anchor point and the spine point
-    
-    Old Idea:
-        Return the angle between the two Lines
-        Line 1: The line formed between the spine head and the anchor point
-        Line 2: The line formed by two points on the segment tracing. 
-        Grab two points, one “up” and the other “down” the segment from the spine anchor point. 
-        I think the anchor point on the segment tracing is our new “position”.
-
+def pointAngle(p0: gp.GeoSeries, p1: gp.GeoSeries):
+    """ Calculate the angle between two points
     Args:
-        deprecated - segmentLine: segment in the for of a LineString
-        spineLine: Linestring of spine head to anchor point
+        p0: Point 1
+        p1: Point 2
+    
+    Returns:
+        Angle in degrees
     """
-    spineLineCoord0 = Point(spineLine.coords[0])
-    spineLineCoord1 = Point(spineLine.coords[1])
-    sl0x = spineLineCoord0.x
-    sl0y = spineLineCoord0.y
-    sl1x = spineLineCoord1.x
-    sl1y = spineLineCoord1.y
-
+    
     # abj: 6/24
-    dx = sl1x - sl0x
-    dy = sl1y - sl0y
+    dx = p1.x - p0.x
+    dy = p1.y - p0.y
 
     # Angle between p1 and p2 in radians
-    angle_rad = math.atan2(dy, dx)
+    angle_rad = np.arctan2(dy, dx)
     angle_deg = angle_rad*180/PI
 
-    # # Range: 0 - 360
-    # # Check for Negative angle and add 360 degrees to determine counter clockwise value
-    if angle_deg < 0:
-        angle_deg = angle_deg + 360
-
     # print("m1", m1, "m2", m2, "degree:", angle_deg)
-    return angle_deg
+    return angle_deg % 360
 
 def old_get_angle(line1, line2):
 
@@ -243,21 +229,28 @@ def old_getSpineAngle(segmentLine: LineString, spineLine: LineString):
 
     return angle
 
+def matchZToSegment(lineWithout: LineString, lineWithZ: LineString):
+    """Match the z-coordinate of the points in lineWithZ to the points in lineWithout"""
+    points = []
+
+    for (x, y) in lineWithout.coords:
+        projection = lineWithZ.project(Point(x, y), normalized=True)
+        z = lineWithZ.interpolate(projection).z
+        points.append((x, y, int(z)))
+
+    return LineString(points)
+    
+
 # abj
 @timer
-def calculateSegmentOffset(segmentLine: LineString, radiusOffset : int, isPositive: bool):
-    # radiusOffset = segmentRadius
-    if isPositive:
-        offsetSign = 1
-    else: 
-        offsetSign = -1
-    offsettedSegment = shapely.offset_curve(segmentLine, distance = radiusOffset * offsetSign, 
+def calculateSegmentOffset(segmentLine: gp.GeoSeries, radiusOffset: pd.Series, isPositive: bool):
+    distance = radiusOffset if isPositive else -radiusOffset
+    offsetSegment: gp.GeoSeries = shapely.offset_curve(segmentLine, distance = distance.values, 
                                             # quad_segs = 16,
                                             join_style = "mitre"
                                             # , mitre_limit = 15
                                             )
-          
-    return offsettedSegment
+    return gp.GeoSeries(offsetSegment.combine(segmentLine, matchZToSegment))
 
 # abj
 def getRunningDistance(segmentLine: LineString):

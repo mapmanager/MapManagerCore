@@ -142,13 +142,15 @@ class ImageLoader:
         metaData = self.metadata(t)
         return list(metaData.channelNames.keys())
 
+    # abb TODO depreciate
     def maxChannels(self) -> int:
         return self._analysisParams.getValue("maxChannels")
 
+    # abb TODO depreciate
     def setMaxChannels(self, maxChannels: int) -> bool:
         if self.maxChannels() == maxChannels:
             return False
-        self._analysisParams.setValue("maxChannels", maxChannels)
+        self._analysisParams.setValue("maxChannels", maxChannels)  # abb md3 depreciated
         return True
 
     def slices(self, t: int, channel: int = 0) -> int:
@@ -167,6 +169,8 @@ class ImageLoader:
         Args:
           store: The store to save the data to.
         """
+        
+        deleteGroups = set(group.keys())
         for t in self.timePoints():
             channels = self.channels(t)
             # abb
@@ -181,6 +185,7 @@ class ImageLoader:
             metaData = self.metadata(t)
             timePoint.attrs[f"metadata"] = asdict(metaData)
 
+            deleteChannels = set(timePoint.keys())
             for channel in channels:
                 strChannel = str(channel)
                 image = self._images(t, channel)

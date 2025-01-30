@@ -1,3 +1,4 @@
+from pprint import pprint
 import pandas as pd
 
 from mapmanagercore import MapAnnotations, MultiImageLoader
@@ -13,13 +14,23 @@ def test_create_map() -> MapAnnotations:
     loader = MultiImageLoader()
 
     tp = 0
-    loader.read(ch1_path, channel=0, time=tp)
-    loader.read(ch2_path, channel=1, time=tp)
+    loader.read(ch1_path, time=tp, channel=0)
+    loader.read(ch2_path, time=tp, channel=1)
+
+    # check metadata
+    md0 = loader.metadata(t=0)
+    logger.info('metadata for loader t=0 is:')
+    pprint(md0)
+
+    logger.info('load._metadata3 is:')
+    pprint(loader._metadata3)
+
+    # md1 = loader.metadata(t=1)
+    # logger.info('metadata for channel 1 is:')
+    # pprint(md1)
 
     # abb I would like this to accept None for lineSegments and points
     map = MapAnnotations(loader,
-                        #  lineSegments=gp.GeoDataFrame(),
-                        #  points = gp.GeoDataFrame())
                          lineSegments=pd.DataFrame(),
                          points = pd.DataFrame())
     return map
@@ -57,7 +68,8 @@ def test_add_segment():
     print(map)
 
 if __name__ == '__main__':
-    # map = test_create_map()
-    # print(map)
+    logger.setLevel('DEBUG')
+    mapAnnotations = test_create_map()
+    print(mapAnnotations)
 
-    test_add_segment()
+    # test_add_segment()

@@ -1,16 +1,13 @@
 from mapmanagercore.lazy_geo_pd_images.store import LazyImagesGeoPandas
 import numpy as np
-from mapmanagercore.logger import logger
 from mapmanagercore.benchmark import timer
 from mapmanagercore.utils import covered_by, union
-from ..layers.line import calcSubLine, extend, getSpineSide, getSpineAngle
+from ..layers.line import calcSubLine, extend, pointAngle
 import shapely
 from ..lazy_geo_pandas import schema, compute, LazyGeoFrame
 import geopandas as gp
 from shapely.geometry import LineString, MultiPolygon, Polygon, Point
 from ..lazy_geo_pd_images import aggregateROI
-
-from mapmanagercore.logger import logger
 
 @schema(
     index=["spineID", "t"],
@@ -119,6 +116,11 @@ class Spine:
     roiExtend: float
     roiRadius: float = 4.0
 
+    # roiRadius: float = dataclasses.field(default=4.0, metadata={
+                                                                # "title": "ROI Radius",
+                                                                # "description": "Region of interest radius",
+    #                                                          })
+
     note: str = ""
     userType: int = 0
     accept: bool = True
@@ -152,60 +154,45 @@ class Spine:
 
     @compute(title="Spine Position", dependencies={
         "Spine": ["segmentID", "anchor"],
-        "Segment": ["segment"]
-    }, description="Position (distance) of an achor on the segment", plot=False)
+        "Segment": ["segment", "pivotDistance"]
+    }, description="Position (distance) of an anchor on the segment", plot=False)
     def spinePosition(frame: LazyGeoFrame):
         # position of spine anchor along the segment
         segmentFrame = frame.getFrame("Segment")
 
         df = frame[["segmentID", "anchor"]].join(
-            segmentFrame[["segment"]], on=["segmentID", "t"])
-        return shapely.line_locate_point(df["segment"], df["anchor"])
+            segmentFrame[["segment", "pivotDistance"]], on=["segmentID", "t"])
 
-    # abj
+        # Normalize the position of the anchor on the segment
+        return shapely.line_locate_point(df["segment"], df["anchor"]) - df["pivotDistance"]
+
     @compute(title="Spine Side", dependencies=
              {
                 "Spine": ["segmentID", "point", "anchor"],
                 "Segment": ["segment"],
             }, description="Side of spine w.r.t. segment in ('left', 'right')", plot=False)
     def spineSide(frame: LazyGeoFrame):
-        # do this for all spines
-        logger.info("Spine Side calculating ")
         segmentFrame = frame.getFrame("Segment")
-        df = frame[["segmentID", "point", "anchor"]].join(
-            segmentFrame[["segment"]], on=["segmentID", "t"])
+        df = frame[["segmentID", "anchorLine"]].join(
+            segmentFrame[["leftRadius", "rightRadius"]], on=["segmentID", "t"])
 
-        try:
-            _ret = df.apply(lambda d: getSpineSide(d["segment"], d["point"], d["anchor"]), axis=1)
-        except(AttributeError) as e:
-            # fixed in getSpineSide when line segment is None
-            logger.error(e)
-            print('   segmentFrame is:')
-            print(segmentFrame)
-            print('   df is:')
-            print(df)
+        intersectsLeft = shapely.intersects(df["leftRadius"], df["anchorLine"])
+        intersectsRight = shapely.intersects(df["rightRadius"], df["anchorLine"])
 
-        return _ret
+        # if both are True or both are False, then it is invalid
+        valid = intersectsLeft ^ intersectsRight
+        return np.where(valid, np.where(intersectsLeft, "Left", "Right"), "Invalid")
 
     @compute(title="Anchor", dependencies=["anchor", "point"], plot=False)
     @timer
     def anchorLine(frame: LazyGeoFrame):
         return frame[["anchor", "point"]].apply(lambda x: LineString([x["anchor"], x["point"]]), axis=1)
 
-    @compute(title="Spine Angle", dependencies={
-        "Spine": ["segmentID", "point", "anchorLine"],
-        "Segment": ["segment"]
-    })
+    @compute(title="Spine Angle", dependencies=["anchor", "point"])
     def spineAngle(frame: LazyGeoFrame):
-        
-        # do this for all spines
-        segmentFrame = frame.getFrame("Segment")
-        df = frame[["segmentID", "point", "anchorLine"]].join(
-            segmentFrame[["segment"]], on=["segmentID", "t"])
+        return pointAngle(frame["anchor"], frame["point"])
 
-        # Create a dataframe of
-        # return df.apply(lambda d: getSpineAngle(d["segment"], d["anchorLine"]), axis=1)
-        return df.apply(lambda d: getSpineAngle(d["anchorLine"]), axis=1)
+    ## ROI ##
 
     @compute(tile="ROI Base", dependencies={
         "Spine": ["anchor"],
@@ -232,7 +219,6 @@ class Spine:
     @timer
     def roiHead(frame: LazyGeoFrame) -> gp.GeoSeries:
         def computeRoiHead(x):
-            print(x, x["roiExtend"])
             head = extend(LineString([x["anchor"], x["point"]]), origin=x["anchor"],
                         distance=x["roiExtend"]).buffer(x["roiRadius"], cap_style=2)
             head = head.difference(x["roiBase"])
@@ -288,7 +274,7 @@ class Spine:
         """
         return ~(frame["roiInBounds"] .astype(bool))
 
-    # Image based ROI computed stats
+    ## Image based ROI computed stats ##
 
     @aggregateROI(title="Roi", dependencies=["roi", "z"], aggregate=['sum', 'max'], group="ROI")
     @timer

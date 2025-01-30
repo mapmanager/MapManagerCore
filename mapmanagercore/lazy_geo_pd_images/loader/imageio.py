@@ -2,7 +2,7 @@ import numpy as np
 import tifffile
 
 from mapmanagercore.analysis_params import AnalysisParams
-from mapmanagercore.lazy_geo_pd_images.metadata import Metadata
+from mapmanagercore.lazy_geo_pd_images.metadata import Metadata, MetadataContrast
 from .base import ImageLoader
 from typing import Iterator, List, Union
 from mapmanagercore.utils import getAutoContrast
@@ -19,6 +19,10 @@ class MultiImageLoader(ImageLoader):
         self._metadata = {}
         self.paths = []  # for logging only
 
+        # abb md3
+        from mapmanagercore.metadata3 import mmMapMetadata
+        self._metadata3 = mmMapMetadata()
+
     def __str__(self):
         return f"Multi image Loader paths: {self.paths}"
     
@@ -34,21 +38,21 @@ class MultiImageLoader(ImageLoader):
           time (int): The time index.
           channel (int): The channel index.
         """
-        # TODO for tif files, do not use imageio, use tifffile
-        # note, imageio is silently installed when scikit-image is installed
-        # to update, see mapmanagercore.image_importers
-        # from imageio import imread
         if name is None:
             name = path
 
         if isinstance(path, str):
-            # imgData = imread(path)
             imgData = tifffile.imread(path)
         else:
+            # abb assuming np.ndarry?
             imgData = path
             
         if time not in self._imagesSrc:
+            # appending first channel to new timepoint
+            
             self._imagesSrc[time] = {}
+            
+            # v1 meta
             _metaData = Metadata()
             # shape of imgData
             _metaData.voxel.x = imgData.shape[2]
@@ -61,13 +65,22 @@ class MultiImageLoader(ImageLoader):
             _metaData.physicalSize.z = 1
 
             # contrast
-            _metaData.metadataContrast.color = 'TODO: fix this'
-            _metaData.metadataContrast.minInt = int(np.min(imgData))
-            _metaData.metadataContrast.maxInt = int(np.max(imgData))
-            minContrast, maxContrast = getAutoContrast(imgData)
-            _metaData.metadataContrast.minContrast = minContrast
-            _metaData.metadataContrast.maxContrast = maxContrast
+            logger.info(f'abb MetadataContrast channel:{channel} {type(channel)} imgData:{imgData.shape}')
+            metadataContrast = MetadataContrast()
+            metadataContrast._initFromImgData(imgData)
+            _metaData.addColorChannel(metadataContrast)
+
             self._metadata[time] = _metaData
+
+            # abb md3
+            from mapmanagercore.metadata3 import TimepointMetadata
+            timepointMetadata = TimepointMetadata()  # empty, no channels
+            timepointMetadata.appendChannel(imgData)
+            self._metadata3.appendTimepoint(timepointMetadata)
+        else:
+            # abb md3, appending a channel to existing timepoint
+            timepointMetadata = self._metadata3.getTimepointMetadata(time)
+            timepointMetadata.appendChannel(imgData)
 
         if channel > self.maxChannels():
             self.setMaxChannels(channel)
