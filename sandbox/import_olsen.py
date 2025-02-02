@@ -10,6 +10,9 @@ import roifile
 
 import matplotlib.pyplot as plt
 
+import pandas as pd
+from mapmanagercore import MapAnnotations, MultiImageLoader
+
 from mapmanagercore.logger import logger
 
 """ having trouble after install of either nd2 or roifile?
@@ -62,6 +65,8 @@ class OlsenRaw:
     linePoints: np.ndarray
     spinePoints: np.ndarray
     spineOrder: str
+
+    # mmMap : int  # : MapAnnotations
 
 def LoadOlsen(nd2Path) -> OlsenRaw:
     """
@@ -136,12 +141,65 @@ def plotOlsen(olsenRaw : OlsenRaw):
 
     plt.show()
 
+def getTimepoint(olsenRaw : OlsenRaw):
+    """Make single timepoint with an image."""
+    
+    loader = MultiImageLoader()
+    loader.read(olsenRaw.imgData, channel=0, time=0)
+    # loader.read(path=tiffPath, time=0, channel=0)
+
+    # pprint(loader._metadata[0])
+    # return
+
+    # Create the annotation map
+    map = MapAnnotations(loader,
+                         lineSegments=pd.DataFrame(),
+                         points = pd.DataFrame())
+
+    olsenRaw.mmMap = map
+
+    return map
+
+def makeSegments(olsenRaw : OlsenRaw):
+    linePoints = olsenRaw.linePoints   # (x,y,z) of line points (one segment)
+    mmMap = olsenRaw.mmMap
+
+    tp = mmMap.getTimePoint(time=0)
+    
+    # add segment and segmwent points
+    newSegmentID = tp.newSegment()
+    for row in linePoints:
+        x = row[0]
+        y = row[1]
+        z = row[2]
+        logger.info(f'   appending newSegmentID:{newSegmentID} x:{x} y:{y} z:{z}')
+        tp.appendSegmentPoint(newSegmentID, x, y, z)
+
+    logger.info('after appendSegmentPoint appendSegmentPoint')
+    print(tp)
+
+    # tp = map.getTimePoint(time=0)
+    tp.segments[:]
+
+    return newSegmentID
+
+def addSpines(olsenRaw : OlsenRaw, newSegmentID):
+    spinePoints = olsenRaw.spinePoints
+    tp = olsenRaw.mmMap.getTimePoint(time=0)
+
+    for row in spinePoints:
+        x = row[0]
+        y = row[1]
+        z = row[2]
+        # logger.info(f'   addSpine newSegmentID:{newSegmentID} x:{x} y:{y} z:{z}')
+        tp.addSpine(newSegmentID, x=x, y=y, z=z)
+
+    logger.info('after addSpine(s)')
+    print(tp)
+
 def makeMap(olsenRaw : OlsenRaw):
     linePoints = olsenRaw.linePoints   # (x,y,z) of line points (one segment)
     spinePoints = olsenRaw.spinePoints
-
-    import pandas as pd
-    from mapmanagercore import MapAnnotations, MultiImageLoader
     
     # import mapmanagercore.data
     # tiffPath = mapmanagercore.data.getTiffChannel_1()
@@ -197,13 +255,34 @@ def makeMap(olsenRaw : OlsenRaw):
     print(f'savePath:{savePath}')
     map.save(savePath)
 
+def loadOlsen():
+    from mapmanagercore import MapAnnotations
+    savePath = '/Users/cudmore/Desktop/olsen_example.mmap'
+    map = MapAnnotations.load(savePath)
+    print(map)
+
+    print(map.points[:])
+    points = map.points[:]
+    print(points.columns)
+
 if __name__ == '__main__':
     # tryROi()
 
     nd2Path = '/Users/cudmore/Dropbox/data/olson/IKA_A_102 Thy1_Spines_5MeO/Isak_Spines_8_26_23/Animal 145/Animal_145_Slice_1_Left.nd2'
     nd2Path = '/Users/cudmore/Dropbox/data/olson/IKA_A_102 Thy1_Spines_5MeO/Isak_Spines_8_26_23/Animal 145/Animal_145_Slice_1_Right.nd2'
     olsenRaw = LoadOlsen(nd2Path)
+    # #plotOlsen(olsenRaw)
+    # makeMap(olsenRaw)
 
-    #plotOlsen(olsenRaw)
+    # loadOlsen()
 
-    makeMap(olsenRaw)
+    mmMap = getTimepoint(olsenRaw)
+    segmentID = makeSegments(olsenRaw=olsenRaw)
+    
+    addSpines(olsenRaw=olsenRaw, newSegmentID=segmentID)
+
+    print(olsenRaw.mmMap)
+
+    print(olsenRaw.mmMap.points[:])
+
+

@@ -129,8 +129,6 @@ def getSide(a: Point, b: Point, c: Point):
         return "On the Line"
 
 # abj
-
-
 @ timer
 def getSpineSide(line: LineString, spine: Point, anchor:Point):
     """ Return a string representing the side at which the spine point is relative to its segment
@@ -255,10 +253,11 @@ def calculateSegmentOffset(segmentLine: gp.GeoSeries,
     logger.error(f'    segmentLine:{segmentLine}')
     logger.error(f'    radiusOffset:{radiusOffset}')
     distance = radiusOffset if isPositive else -radiusOffset
+    logger.info(f'distance:{distance}')
     offsetSegment: gp.GeoSeries = shapely.offset_curve(segmentLine,
                                             # abb removed value
-                                            distance.values, 
-                                            # distance = distance, 
+                                            # distance.values, 
+                                            distance = distance, 
                                             # quad_segs = 16,
                                             join_style = "mitre"
                                             # , mitre_limit = 15

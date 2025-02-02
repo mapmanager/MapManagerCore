@@ -75,7 +75,7 @@ class Segment:
     @compute(title="Left Radius", dependencies=["segment", "radius"])
     def leftRadius(frame: LazyGeoFrame):
     
-        # abb wazs missing
+        # abb was missing
         # abb todo merge leftRadius and rightRadius (just pass in switch to do one or the other)
         #  they are syymetric left/right
         import geopandas as gpd
@@ -87,7 +87,6 @@ class Segment:
         df["y"] = (offsettedSegment.apply(lambda geom: [coord[1] for coord in geom.coords]))
         newDF = gpd.GeoSeries(df[["x", "y", "z"]].apply(lambda ldf: LineString(Point(ldf["x"][i], ldf["y"][i], ldf["z"][i])
                                                                             for i, val in enumerate(ldf["x"])), axis=1))
-
         return newDF
     
     @compute(title="Right Radius", dependencies=["segment", "radius"])
