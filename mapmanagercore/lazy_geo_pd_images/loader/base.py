@@ -136,8 +136,21 @@ class ImageLoader:
                 return (0, 0, 0)
 
             channel = channels[0]
-        return self._images(t, channel).shape
-
+        # abb handle 2d
+        _shape = self._images(t, channel).shape
+        _numDims = len(_shape)
+        logger.info(f'_numDims:{_numDims} _shape:{_shape}')
+        if _numDims == 2:
+            _ret = (0,) + _shape
+        elif _numDims == 3:
+            _ret = _shape
+        else:
+            logger.error(f'expecting num dims of 2 or 3, got {_numDims}')
+            return None
+        
+        # return self._images(t, channel).shape
+        return _ret
+    
     def channels(self, t: int) -> List[int]:
         metaData = self.metadata(t)
         return list(metaData.channelNames.keys())
@@ -241,15 +254,14 @@ class ImageLoader:
           np.ndarray: The fetched slices.
         """
 
-        # abb fetchSlices() is getting called multiple times when editing one spine?
-        # logger.info(f'=== time:{time} channel:{channel} sliceRange:{sliceRange}')
-
-        # logger.warning(f'xxx {self._images(time)[channel].shape}')
-
+        # abb handle 2d images
         z, _x, _y = self.shape(time, channel)
         sliceRange = (max(0, sliceRange[0]), min(z, sliceRange[1]))
+        logger.info(f'sliceRange:{sliceRange}')
 
-        if sliceRange[0] == sliceRange[1] - 1:
+        # abb handle 2d images
+        # if sliceRange[0] == sliceRange[1] - 1:
+        if (sliceRange[0] == sliceRange[1] - 1) or (sliceRange[0] == sliceRange[1]):
             return self.loadSlice(time, channel, sliceRange[0])
 
         return np.max(self._images(time, channel)[sliceRange[0]:sliceRange[1]], axis=0)

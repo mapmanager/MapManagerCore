@@ -551,8 +551,8 @@ class AnnotationsInteractions(AnnotationsSegments):
         Returns:
             LineString: The updated rough tracing.
         """
-
-        if not (segmentId in self.segments.index):
+        
+        if segmentId not in self.segments.index:
             # Create a new segment if it doesn't exist
             self.updateSegment(segmentId, Segment.withDefaults(
                 segment=LineString([]),
@@ -576,19 +576,34 @@ class AnnotationsInteractions(AnnotationsSegments):
             logger.error(self.segments.index)
 
         point = Point(x, y, z)
+        
+        # abb what is first? It seems to always be true?
         first = len(roughTracing.coords) < 2 or point.distance(
             Point(roughTracing.coords[0])) < point.distance(Point(roughTracing.coords[-1]))
+        
         snappedPoint = point if len(roughTracing.coords) == 0 else Point(
             roughTracing.coords[0 if first else -1])
 
         maxTracingDistance = self.analysisParams.getValue(
             "segmentTracingMaxDistance")
 
+        logger.warning(f'abb')
+        logger.info(F'   roughTracing;{roughTracing}')
+        logger.info(F'   roughTracing;{roughTracing.coords}')
+        logger.info(f'   point:{point}')
+        logger.info(f'   first:{first}')
+        if len(roughTracing.coords) > 0:
+            logger.info(f'      {point.distance(Point(roughTracing.coords[0]))}')
+            logger.info(f'      {point.distance(Point(roughTracing.coords[-1]))}')
+        logger.info(f'   snappedPoint:{snappedPoint}')
+        logger.info(f'   maxTracingDistance:{maxTracingDistance}')
+
         if maxTracingDistance is not None and point.distance(snappedPoint) > maxTracingDistance:
             logger.warning(f'abb return None for maxTracingDistance:{maxTracingDistance}')
             return None
 
         if first:
+            # abb always true?
             if speculate:
                 return self.optimizeSegment(LineString([
                     point.coords[0],
@@ -608,6 +623,10 @@ class AnnotationsInteractions(AnnotationsSegments):
                     point.coords[0],
                 ]), live=True)
 
+            logger.warning(f'abb point;{point}')
+            logger.warning(f'  point.coords:{point.coords}')
+            
+            # Append the point to the rough tracing
             roughTracing = [*roughTracing.coords, point.coords[0]]
             idx = len(roughTracing) - 1
 

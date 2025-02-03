@@ -168,11 +168,11 @@ def makeSegments(olsenRaw : OlsenRaw):
     
     # add segment and segmwent points
     newSegmentID = tp.newSegment()
-    for row in linePoints:
+    for idx, row in enumerate(linePoints):
         x = row[0]
         y = row[1]
         z = row[2]
-        logger.info(f'   appending newSegmentID:{newSegmentID} x:{x} y:{y} z:{z}')
+        logger.info(f'   {idx} appendSegmentPoint segment:{newSegmentID} x:{x} y:{y} z:{z}')
         tp.appendSegmentPoint(newSegmentID, x, y, z)
 
     logger.info('after appendSegmentPoint appendSegmentPoint')
@@ -265,6 +265,41 @@ def loadOlsen():
     points = map.points[:]
     print(points.columns)
 
+def plotPlotly(olsenRaw):
+    import plotly.graph_objects as go    
+
+    print(olsenRaw.imgData.shape)  # (29, 1568, 1060)
+    yMaxPixel = olsenRaw.imgData.shape[1]
+    xMaxPixel = olsenRaw.imgData.shape[2]
+
+    # get xyz of segment points
+    plotDf = olsenRaw.mmMap.segments['segment'].get_coordinates(include_z=True)    
+    plotDf = plotDf.reset_index()
+    plotDf = plotDf.reset_index()
+
+    print(plotDf)
+    
+    import plotly.express as px
+    fig = px.scatter(plotDf,
+                     x="x",
+                     y="y",
+                    #  color="species",
+                    #  size='petal_length',
+                     hover_data='index')
+
+    # scatter = go.Scatter(x=plotDf['x'],
+    #                      y=plotDf['y'],
+    #                     hover_data=['index'],
+    #                     mode='markers+lines')
+
+    # fig = go.Figure(data=scatter)
+
+    fig.update_layout(yaxis_range=[0, yMaxPixel],
+                      xaxis_range=[0, xMaxPixel],
+                      )
+
+    fig.show()
+
 if __name__ == '__main__':
     # tryROi()
 
@@ -279,10 +314,11 @@ if __name__ == '__main__':
     mmMap = getTimepoint(olsenRaw)
     segmentID = makeSegments(olsenRaw=olsenRaw)
     
-    addSpines(olsenRaw=olsenRaw, newSegmentID=segmentID)
+    plotPlotly(olsenRaw=olsenRaw)
 
-    print(olsenRaw.mmMap)
+    # addSpines(olsenRaw=olsenRaw, newSegmentID=segmentID)
 
-    print(olsenRaw.mmMap.points[:])
+    # print(olsenRaw.mmMap)
+    # print(olsenRaw.mmMap.points[:])
 
 

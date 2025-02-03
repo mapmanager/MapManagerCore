@@ -65,14 +65,23 @@ class MultiImageLoader(ImageLoader):
             # v1 meta
             _metaData = Metadata()
             # shape of imgData
-            _metaData.voxel.x = imgData.shape[2]
-            _metaData.voxel.y = imgData.shape[1]
-            _metaData.voxel.z = imgData.shape[0]
+            _numDims = len(imgData.shape)
+            
+            # abb we need to handle 2d images
+            if _numDims == 3:
+                _metaData.voxel.x = imgData.shape[2]
+                _metaData.voxel.y = imgData.shape[1]
+                _metaData.voxel.z = imgData.shape[0]
+            elif _numDims == 2:
+                _metaData.voxel.x = imgData.shape[1]
+                _metaData.voxel.y = imgData.shape[0]
+                # _metaData.voxel.z = imgData.shape[0]
 
             # physicaal units (um)
             _metaData.physicalSize.x = 0.15
             _metaData.physicalSize.y = 0.15
-            _metaData.physicalSize.z = 1
+            if _numDims == 3:
+                _metaData.physicalSize.z = 1
 
             # contrast
             # logger.info(f'abb MetadataContrast channel:{channel} {type(channel)} imgData:{imgData.shape}')
