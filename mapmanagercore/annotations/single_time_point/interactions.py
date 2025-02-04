@@ -587,16 +587,16 @@ class AnnotationsInteractions(AnnotationsSegments):
         maxTracingDistance = self.analysisParams.getValue(
             "segmentTracingMaxDistance")
 
-        logger.warning(f'abb')
-        logger.info(F'   roughTracing;{roughTracing}')
-        logger.info(F'   roughTracing;{roughTracing.coords}')
-        logger.info(f'   point:{point}')
-        logger.info(f'   first:{first}')
-        if len(roughTracing.coords) > 0:
-            logger.info(f'      {point.distance(Point(roughTracing.coords[0]))}')
-            logger.info(f'      {point.distance(Point(roughTracing.coords[-1]))}')
-        logger.info(f'   snappedPoint:{snappedPoint}')
-        logger.info(f'   maxTracingDistance:{maxTracingDistance}')
+        # logger.warning(f'abb')
+        # logger.info(F'   roughTracing;{roughTracing}')
+        # logger.info(F'   roughTracing;{roughTracing.coords}')
+        # logger.info(f'   point:{point}')
+        # logger.info(f'   first:{first}')
+        # if len(roughTracing.coords) > 0:
+        #     logger.info(f'      {point.distance(Point(roughTracing.coords[0]))}')
+        #     logger.info(f'      {point.distance(Point(roughTracing.coords[-1]))}')
+        # logger.info(f'   snappedPoint:{snappedPoint}')
+        # logger.info(f'   maxTracingDistance:{maxTracingDistance}')
 
         if maxTracingDistance is not None and point.distance(snappedPoint) > maxTracingDistance:
             logger.warning(f'abb return None for maxTracingDistance:{maxTracingDistance}')

@@ -54,6 +54,7 @@ ImagejRoi(
 """
 @dataclasses.dataclass
 class OlsenRaw:
+    rawPath : str  # path to raw (nd2) we opened
     imgData: np.ndarray
     imgDataMax: np.ndarray
     channelOrder: Tuple[str]
@@ -116,6 +117,7 @@ def LoadOlsen(nd2Path) -> OlsenRaw:
     spineOrder = ['XYZ']
 
     olsenRaw = OlsenRaw(
+        rawPath=nd2Path,
         imgData=imgData,
         imgDataMax=imgDataMax,
         voxelSize=voxelSize,
@@ -198,6 +200,8 @@ def addSpines(olsenRaw : OlsenRaw, newSegmentID):
     print(tp)
 
 def makeMap(olsenRaw : OlsenRaw):
+    """Make an mmap from raw Olsen data.
+    """
     linePoints = olsenRaw.linePoints   # (x,y,z) of line points (one segment)
     spinePoints = olsenRaw.spinePoints
     
@@ -229,16 +233,13 @@ def makeMap(olsenRaw : OlsenRaw):
         logger.info(f'   appending newSegmentID:{newSegmentID} x:{x} y:{y} z:{z}')
         tp.appendSegmentPoint(newSegmentID, x, y, z)
 
-    logger.info('after appendSegmentPoint appendSegmentPoint')
-    print(tp)
+    # logger.info('after appendSegmentPoint appendSegmentPoint')
+    # print(tp)
 
     # tp = map.getTimePoint(time=0)
     tp.segments[:]
 
-    # logger.info('=== tp segments')
-    # print(tp.segments)
-
-    logger.info(f'addSpine(s) shape:{spinePoints.shape}')
+    logger.info(f'addSpine(s) shape:{spinePoints.shape} ...')
 
     for row in spinePoints:
         x = row[0]
@@ -251,9 +252,16 @@ def makeMap(olsenRaw : OlsenRaw):
     print(tp)
 
     # save
-    savePath = '/Users/cudmore/Desktop/olsen_example.mmap'
+    # savePath = '/Users/cudmore/Desktop/olsen_example.mmap'
+    _folder, _file = os.path.split(olsenRaw.rawPath)
+    fileBase, _ = os.path.splitext(_file)  # nd2 path
+    savePath = os.path.join('/Users/cudmore/Desktop', fileBase + '.mmap')
     print(f'savePath:{savePath}')
-    map.save(savePath)
+    map.save(savePath)  # save mmap folder
+
+    # save .mmap.zip
+    zipSavePath = savePath + '.zip'
+    map.save(zipSavePath)  # save mmap folder
 
 def loadOlsen():
     from mapmanagercore import MapAnnotations
@@ -278,7 +286,7 @@ def plotPlotly(olsenRaw):
     plotDf = plotDf.reset_index()
 
     print(plotDf)
-    
+
     import plotly.express as px
     fig = px.scatter(plotDf,
                      x="x",
@@ -303,18 +311,22 @@ def plotPlotly(olsenRaw):
 if __name__ == '__main__':
     # tryROi()
 
-    nd2Path = '/Users/cudmore/Dropbox/data/olson/IKA_A_102 Thy1_Spines_5MeO/Isak_Spines_8_26_23/Animal 145/Animal_145_Slice_1_Left.nd2'
+    # nd2Path = '/Users/cudmore/Dropbox/data/olson/IKA_A_102 Thy1_Spines_5MeO/Isak_Spines_8_26_23/Animal 145/Animal_145_Slice_1_Left.nd2'
     nd2Path = '/Users/cudmore/Dropbox/data/olson/IKA_A_102 Thy1_Spines_5MeO/Isak_Spines_8_26_23/Animal 145/Animal_145_Slice_1_Right.nd2'
+    
+    # from mapmanagercore.data import getNd2Channel_1
+    # path = getNd2Channel_1()
+
     olsenRaw = LoadOlsen(nd2Path)
     # #plotOlsen(olsenRaw)
-    # makeMap(olsenRaw)
+    makeMap(olsenRaw)
 
     # loadOlsen()
 
-    mmMap = getTimepoint(olsenRaw)
-    segmentID = makeSegments(olsenRaw=olsenRaw)
+    # mmMap = getTimepoint(olsenRaw)
+    # segmentID = makeSegments(olsenRaw=olsenRaw)
     
-    plotPlotly(olsenRaw=olsenRaw)
+    # plotPlotly(olsenRaw=olsenRaw)
 
     # addSpines(olsenRaw=olsenRaw, newSegmentID=segmentID)
 

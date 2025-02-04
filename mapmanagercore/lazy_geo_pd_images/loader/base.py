@@ -139,9 +139,10 @@ class ImageLoader:
         # abb handle 2d
         _shape = self._images(t, channel).shape
         _numDims = len(_shape)
-        logger.info(f'_numDims:{_numDims} _shape:{_shape}')
+        # logger.info(f'_numDims:{_numDims} _shape:{_shape}')
         if _numDims == 2:
-            _ret = (0,) + _shape
+            # 2d images haze z=1
+            _ret = (1,) + _shape
         elif _numDims == 3:
             _ret = _shape
         else:
@@ -196,9 +197,9 @@ class ImageLoader:
                 timePoint = group.create_group(str(t))
             
             metaData = self.metadata(t)
-            logger.error('xxx metadata to json')
-            from pprint import pprint
-            pprint(metaData)
+            # logger.error('xxx metadata to json')
+            # from pprint import pprint
+            # pprint(metaData)
             
             timePoint.attrs[f"metadata"] = asdict(metaData)
 
@@ -257,11 +258,13 @@ class ImageLoader:
         # abb handle 2d images
         z, _x, _y = self.shape(time, channel)
         sliceRange = (max(0, sliceRange[0]), min(z, sliceRange[1]))
-        logger.info(f'sliceRange:{sliceRange}')
+
+        # logger.warning(f'abb 2d sliceRange:{sliceRange}')
 
         # abb handle 2d images
         # if sliceRange[0] == sliceRange[1] - 1:
         if (sliceRange[0] == sliceRange[1] - 1) or (sliceRange[0] == sliceRange[1]):
+            # logger.warning(f'abb 2d calling loadSlices with sliceRange[0]:{sliceRange[0]}')
             return self.loadSlice(time, channel, sliceRange[0])
 
         return np.max(self._images(time, channel)[sliceRange[0]:sliceRange[1]], axis=0)
@@ -377,6 +380,8 @@ class ImageLoader:
         for (t, z), group in shape.groupby(by=["t", "z"]):
             image = self.fetchSlices(
                 t, channel, (z - zSpread, z + zSpread + 1))
+
+            # logger.warning(f'abb 2d image:{image.shape}')
 
             for idx, row in group.iterrows():
                 xLim, yLim = image.shape

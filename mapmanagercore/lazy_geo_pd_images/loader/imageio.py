@@ -54,9 +54,15 @@ class MultiImageLoader(ImageLoader):
                 imgData = nd2.imread(path)
                 logger.info(f'{imgData.shape} voxel_size:{voxel_size}')
         else:
-            # abb assuming np.ndarry?
+            # abb assuming np.ndarray?
             imgData = path
-            
+
+        if len(imgData.shape) == 2:
+            # abb handle 2d, convert 2d image to 3d with one slice
+            logger.warning(f'abb reshaping 2d image shape:{imgData.shape}')
+            imgData = imgData.reshape((1, imgData.shape[1], imgData.shape[0]))
+            logger.warning(f'  newshape is:{imgData.shape}')
+
         if time not in self._imagesSrc:
             # appending first channel to new timepoint
             

@@ -46,3 +46,21 @@ def getMultiTimepointMap() -> str:
         known_hash=None,
     )
     return mapPath
+
+# abb 20250204
+def getNd2Channel_1() -> str:
+    urlCh1 = 'https://github.com/mapmanager/MapManagerCore-Data/raw/main/data/olsen/Animal_145_Slice_1_Right.nd2'
+    ch1Path = pooch.retrieve(
+        url=urlCh1,
+        known_hash=None
+    )
+    return ch1Path
+
+# abb 20250204
+def getSingleTimepointMap_nd2() -> str:
+    urlCh1 = 'https://github.com/mapmanager/MapManagerCore-Data/raw/main/data/olsen/Animal_145_Slice_1_Right.mmap.zip'
+    ch1Path = pooch.retrieve(
+        url=urlCh1,
+        known_hash=None
+    )
+    return ch1Path

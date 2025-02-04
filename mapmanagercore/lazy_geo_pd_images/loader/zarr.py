@@ -43,6 +43,8 @@ class ZarrLoader(ImageLoader):
                 self._store = zarr.DirectoryStore(path)
             else:
                 self._store = zarr.ZipStore(path, mode="r")
+            
+            logger.info(f'abb self._store:{self._store}')
             self.group = zarr.group(store=self._store)
 
             # abb analysisparams, each timepoint has its own analysisparameters (see metadata3)
