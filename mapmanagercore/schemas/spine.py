@@ -1,5 +1,6 @@
-from mapmanagercore.lazy_geo_pd_images.store import LazyImagesGeoPandas
+from enum import StrEnum
 import numpy as np
+from mapmanagercore.lazy_geo_pd_images.store import LazyImagesGeoPandas
 from mapmanagercore.benchmark import timer
 from mapmanagercore.utils import covered_by, union
 from ..layers.line import calcSubLine, extend, pointAngle
@@ -10,6 +11,14 @@ from shapely.geometry import LineString, MultiPolygon, Polygon, Point
 from ..lazy_geo_pd_images import aggregateROI
 
 from mapmanagercore.logger import logger
+
+# abb add this to core and don't use 'LEft' 'Right' as string, use this type
+# but when we write to a file, use, SpineSide.Left.value -> str
+# spioneSideAsStr = SpineSide.Left.value
+class SpineSide(StrEnum):
+    Left = "Left"
+    Right = "Right"
+    Undefined = "Undefined"
 
 @schema(
     index=["spineID", "t"],
@@ -169,6 +178,7 @@ class Spine:
         return shapely.line_locate_point(df["segment"], df["anchor"]) - df["pivotDistance"]
 
     """abb what is the return type of spineSide function?"""
+    # abb use SpineSide enumerated type
     @compute(title="Spine Side", dependencies=
              {
                 "Spine": ["segmentID", "point", "anchor"],

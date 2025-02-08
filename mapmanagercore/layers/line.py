@@ -229,6 +229,7 @@ def old_getSpineAngle(segmentLine: LineString, spineLine: LineString):
 
     return angle
 
+# abb who wrote this?
 def matchZToSegment(lineWithout: LineString, lineWithZ: LineString):
     """Match the z-coordinate of the points in lineWithZ to the points in lineWithout"""
     points = []
@@ -244,16 +245,17 @@ def matchZToSegment(lineWithout: LineString, lineWithZ: LineString):
 # abj
 @timer
 def calculateSegmentOffset(segmentLine: gp.GeoSeries,
-                           radiusOffset: pd.Series,
+                        #    radiusOffset: pd.Series,
+                           radiusOffset: float,
                            isPositive: bool):
-    logger.error('abb error returning segmentLine')
-    return segmentLine
+    # logger.error('abb error returning segmentLine')
+    # return segmentLine
     
-    logger.error('  abb ERROR BROKEN !!!!!!!!!')
-    logger.error(f'    segmentLine:{segmentLine}')
-    logger.error(f'    radiusOffset:{radiusOffset}')
+    # logger.error('  abb ERROR BROKEN !!!!!!!!!')
+    # logger.error(f'    segmentLine:{segmentLine}')
+    # logger.error(f'    radiusOffset:{radiusOffset} {type(radiusOffset)}')
     distance = radiusOffset if isPositive else -radiusOffset
-    logger.info(f'distance:{distance}')
+    # logger.info(f'distance:{distance}')
     offsetSegment: gp.GeoSeries = shapely.offset_curve(segmentLine,
                                             # abb removed value
                                             # distance.values, 
@@ -262,8 +264,10 @@ def calculateSegmentOffset(segmentLine: gp.GeoSeries,
                                             join_style = "mitre"
                                             # , mitre_limit = 15
                                             )
-    logger.warning(f'abb offsetSegment:{offsetSegment}')
-    return gp.GeoSeries(offsetSegment.combine(segmentLine, matchZToSegment))
+    # logger.warning(f'abb offsetSegment:{offsetSegment}')
+    logger.warning('turned off matchZToSegment ???')
+    # return gp.GeoSeries(offsetSegment.combine(segmentLine, matchZToSegment))
+    return offsetSegment
 
 # abb depreciate we do not need the distance of each point (For now)
 # abj

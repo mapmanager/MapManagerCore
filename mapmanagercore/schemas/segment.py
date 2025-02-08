@@ -1,7 +1,10 @@
 from typing import Union
+
 from shapely.geometry import LineString, Point
-from mapmanagercore.utils import interpolate
+import geopandas as gpd
 import numpy as np
+
+from mapmanagercore.utils import interpolate
 from mapmanagercore.layers.line import calculateSegmentOffset
 
 from ..lazy_geo_pandas import schema, compute, LazyGeoFrame
@@ -73,12 +76,15 @@ class Segment:
 
     # abj
     @compute(title="Left Radius", dependencies=["segment", "radius"])
-    def leftRadius(frame: LazyGeoFrame):
-    
+    def leftRadius(frame: LazyGeoFrame) -> gpd.GeoSeries:
+        """
+        Returns:
+            Geoseries of ['x', 'y', 'z'] which is the segment after offset from centerline.
+        """
         # abb was missing
         # abb todo merge leftRadius and rightRadius (just pass in switch to do one or the other)
         #  they are syymetric left/right
-        import geopandas as gpd
+        # import geopandas as gpd
 
         df = frame[["segment", "radius"]]
         df["z"] = (df['segment'].apply(lambda geom: [coord[2] for coord in geom.coords]))  

@@ -24,7 +24,7 @@ install_requires = [
     'brightest-path-lib',
     'pooch',  # to load data from MapManagerCore-Data repo
     'tifffile',
-    'nd2',
+    'nd2',  # to import Nikon images
     'imagecodecs',
     # 'bioio',  # TODO: use to load metadata and lazy load images
     # install bioio from main branch of github repo (not pypi package)
