@@ -115,6 +115,18 @@ class Segment:
                                                                             for i, val in enumerate(ldf["x"])), axis=1))
         return newDF
     
+    @compute(title="Segment Length", dependencies=["segment", "segmentID"])
+    def length(frame: LazyGeoFrame) -> float: 
+        """ Calculate the length of the segment for plotting segment in dendrogram widget
+
+        Return:
+            len of segment in float form
+        """
+        segment = frame['segment'] 
+        logger.info(f" segment.length { segment.length}")
+        return segment.length
+        
+
     # abb do we need this?
     # @compute(title="distance", dependencies=["segment"])
     # def distance(frame: LazyGeoFrame): # distance of each point from beginning of the segment
