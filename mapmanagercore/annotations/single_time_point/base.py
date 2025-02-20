@@ -14,7 +14,7 @@ from ...config import SegmentId, SpineId
 from ...schemas import Segment, Spine
 from ...lazy_geo_pd_images.image_slices import ImageSlice
 from ...lazy_geo_pandas.attributes import ColumnAttributes
-from ...lazy_geo_pandas.lazy import LazyGeoFrame
+from ...lazy_geo_pandas.lazy import LazyGeoFrame, LazyGeoSeries
 from ...lazy_geo_pandas.schema import Schema
 from .. import Annotations
 from typing import Any, Callable, Hashable, List, Self, Tuple, Union
@@ -57,27 +57,12 @@ class SingleTimePointFrame(LazyGeoFrame):
         # else:
         #     self._root = frame
 
-        self._currentVersion = -1
+        self._root.setBaseFilter(lambda df: pd.Index([]) if t not in df.index.get_level_values(1) else df.xs(
+            t, level=1, drop_level=False).index)
         self._t = t
-        self._refreshIndex()
-
-    @timer
-    def _refreshIndex(self):
-        if self._root._state.version == self._currentVersion:
-            return
-
-        self._currentVersion = self._root._state.version
-
-        if self._t not in self._root._rootDf.index.get_level_values(1):
-            self._root._setFilterIndex(pd.Index([]))
-            return
-
-        self._root._setFilterIndex(self._root._rootDf.xs(
-            self._t, level=1, drop_level=False).index)
 
     @timer
     def __getitem__(self, items: Any) -> Any:
-        self._refreshIndex()
 
         result = self._root[items]
         isDataFrame = isinstance(result, pd.DataFrame) or isinstance(result, gp.GeoDataFrame)
@@ -118,7 +103,6 @@ class SingleTimePointFrame(LazyGeoFrame):
         # print('')
         # logger.info(f'=== abj version SingleTimePointFrame base.py items: {items}')
         
-        self._refreshIndex()
 
         result = self._root[items]
 
@@ -186,7 +170,6 @@ class SingleTimePointFrame(LazyGeoFrame):
     
     @property
     def index(self):
-        self._refreshIndex()
         return self._root.index.droplevel(1)
 
     def loadData(self, data: gp.GeoDataFrame):
@@ -216,7 +199,6 @@ class SingleTimePointFrame(LazyGeoFrame):
 
     @property
     def shape(self):
-        self._refreshIndex()
         return self._root.shape
 
     def __len__(self):
@@ -286,8 +268,8 @@ class _SingleTimePointAnnotationsBase:
         return self._segments
 
     @property
-    def analysisParams(self) -> AnalysisParams:
-        return self._annotations._analysisParams
+    def analysisParams(self) -> LazyGeoSeries:
+        return self._annotations._analysisParameters
 
     # abb not used
     @property

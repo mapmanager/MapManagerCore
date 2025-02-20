@@ -68,11 +68,10 @@ class ImageLoader:
     Base class for image loaders.
     """
     _metadata: List[Metadata]
-    _analysisParams: AnalysisParams
+    _maxChannels = 2
 
     def __init__(self):
         self._metadata = []
-        self._analysisParams = AnalysisParams()
 
     def __str__(self):
         return f"ImageLoader: time points: {self.timePoints()}"
@@ -80,9 +79,6 @@ class ImageLoader:
     def merge(self, loader: Self):
         ("implemented by subclass", loader)
         pass
-
-    def analysisParams(self):
-        return self._analysisParams
 
     def metadata(self, t: int) -> Metadata:
         return self._metadata[t] if t < len(self._metadata) else Metadata()
@@ -141,12 +137,12 @@ class ImageLoader:
         return list(metaData.channelNames.keys())
 
     def maxChannels(self) -> int:
-        return self._analysisParams.getValue("maxChannels")
+        return self._maxChannels
 
     def setMaxChannels(self, maxChannels: int) -> bool:
         if self.maxChannels() == maxChannels:
             return False
-        self._analysisParams.setValue("maxChannels", maxChannels)
+        self._maxChannels = maxChannels
         return True
 
     def slices(self, t: int, channel: int = 0) -> int:
@@ -398,7 +394,7 @@ class ImageLoader:
                 }))
 
             tree.append(DataTreeNode({
-                "name": metadata.name if metadata.name != "" else f"Unnamed Time Point",
+                "name": metadata.name if metadata.name != "" else f"Unnamed",
                 "channels": channels
             }))
 

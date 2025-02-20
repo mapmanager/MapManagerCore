@@ -1,7 +1,8 @@
-from typing import Any, Callable, Dict, List, Optional, Self, TypedDict, Union
+from typing import Any, Callable, Dict, List, Optional, Self, TypeVar, TypedDict, Union
 import pandas as pd
 from ..config import Color, Symbol
 from typing import List, Dict, Any, Union
+
 
 class ColumnAttributes(TypedDict):
     """
@@ -16,6 +17,12 @@ class ColumnAttributes(TypedDict):
         colors (Union[List[Color], Dict[Any, Color]]): The colors associated with the column.
         symbols (Union[List[Symbol], Dict[Any, Symbol]]): The symbols associated with the column.
         plot (bool): Indicates whether the column should be plotted or not.
+        version(int): The version of the computed column.
+        type (str): The type of the column.
+    
+    Notes:
+        When there is a new version of the column, the version number should be incremented.
+        This will cause the column to be recomputed if it is a computed using a prior version.
     """
 
     title: str
@@ -27,6 +34,7 @@ class ColumnAttributes(TypedDict):
     symbols: Union[List[Symbol], Dict[Any, Symbol]]
     plot: bool
     version: int
+    type: str
 
     def default():
         """
@@ -50,7 +58,7 @@ class _ColumnAttributes(ColumnAttributes):
     _dependencies: dict[str, list[str]]
     """The column name."""
     key: str
-        
+
     def normalize(attributes: ColumnAttributes, schemaKey: str) -> Self:
         """
         Normalizes the attributes of a column, and sets default values for missing attributes.

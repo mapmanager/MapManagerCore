@@ -1,4 +1,5 @@
-from dataclasses import dataclass
+from copy import copy
+import types
 import pandas as pd
 from typing import Any, Callable, List, Self, TypeVar, Union, Unpack
 import numpy as np
@@ -8,10 +9,15 @@ from .attributes import ColumnAttributes, _ColumnAttributes
 
 from mapmanagercore.logger import logger
 
-class MISSING_VALUE:
+
+class MISSING_VALUE_CLASS:
     """
     Represents a missing/unset value.
     """
+    _default = None
+
+    def __init__(self, default=None):
+        self._default = default
 
     def __repr__(self):
         return "unassigned"
@@ -20,7 +26,7 @@ class MISSING_VALUE:
         return "unassigned"
 
 
-MISSING_VALUE = MISSING_VALUE()
+MISSING_VALUE = MISSING_VALUE_CLASS()
 
 
 class Schema:
@@ -30,19 +36,22 @@ class Schema:
         cls._key = cls.__name__
         cls._index: Union[list[Any], Any] = []
 
-        cls._defaults = {}
         cls._relationships: dict[str, list[str]] = {}
         return super().__init_subclass__()
 
-    @classmethod
-    def withDefaults(cls, **kwargs):
+    def __init__(self):
+        pass
+
+    def defaults(self) -> Self:
         """
-        Creates an instance of the schema using default values when values are unset.
+        Returns a copy of the schema with default values set for missing values.
         """
-        for key, value in cls._defaults.items():
-            if not key in kwargs:
-                kwargs[key] = value
-        return cls(**kwargs)
+        clone = copy(self)
+        for key in clone.__annotations__.keys():
+            item = getattr(clone, key)
+            if isinstance(item, MISSING_VALUE_CLASS):
+                setattr(clone, key, item._default)
+        return clone
 
     @classmethod
     def _addAttribute(cls, column: str, attribute: _ColumnAttributes):
@@ -100,7 +109,7 @@ class Schema:
         """
         Sets the column types of the dataframe to the types defined by the schema class.
         """
-        defaults = cls._defaults
+        defaults = cls().defaults()
         types = cls._annotations
         df = gp.GeoDataFrame(df)
         for key, valueType in types.items():
@@ -137,8 +146,10 @@ class Schema:
                 df[key] = df[key].astype(
                     valueType) if key in df.columns else pd.Series(dtype=valueType)
 
-            if key in defaults:
-                df.loc[:, key] = df.loc[:, key].fillna(defaults[key])
+            if hasattr(defaults, key):
+                default = getattr(defaults, key)
+                if not isinstance(default, MISSING_VALUE_CLASS):
+                    df.loc[:, key] = df.loc[:, key].fillna(default)
 
         if df.index.nlevels != len(cls._index):
             if len(cls._index) != 0:
@@ -161,6 +172,10 @@ class Schema:
         Returns:
             bool: True if the value is of the type defined in the schema's index, False otherwise.
         """
+        if not cls._index:
+            # no index was set (Series schema)
+            return False
+
         expectedType = cls._annotations[cls._index[level]]
         return isInstanceExtended(value, expectedType)
 
@@ -206,55 +221,42 @@ def isInstanceExtended(value, expectedType):
     return isinstance(value, expectedType)
 
 
-def schema(index: Union[list[Any], Any], relationships: dict[Schema, dict[str, list[str]]] = {}, properties: dict[str, ColumnAttributes] = {}):
+def schema(index: Union[list[Any], Any] = [], relationships: dict[Schema, dict[str, list[str]]] = {}):
     """
     A decorator to define a schema class.
 
     Args:
-        index (Union[list[Any], Any]): The index of the schema.
-        relationships (dict[Schema, dict[str, list[str]]]): The relationships between this schema and other schemas.
-        properties (dict[str, ColumnAttributes]): The properties of the fields defined by the schema.
+        index (Union[list[Any], Any]): The index of the schema rows. Multi index can be used by passing a list of column names. If no index is provided the schema will be treated as a series schema.
+        relationships (dict[Schema, dict[str, list[str]]]): The relationships between this schema and other schemas. This allows the schema to track changes across schemas for computed columns with dependencies.
     """
-    T = TypeVar('T')
+    # TODO: Automatically infer relationships from the name and indexes of schemas
+    # For example if schema A  has an index of ['t', 'segmentId'] and schema B has an index of ['t', 'spineId'] and a column "segmentId". Then we can infer the relationship automatically {"Segment": ["segmentID", "t"]}
+    # We can also infer dependencies by dry running computed columns post all schema initializations
+    # In essence we can pass in empty subclasses of a frame that collects all the columns that are accesses along with the cross dependencies in the schema.
+    # To detect dependencies across schemas we can override all active frames temporarily to collect columns across different schemas.
+    # Note this must be done on boot up caution must be taken to avoid multi threading issues.
+    T = TypeVar('T', bound=Schema)
 
-    def classWrapper(cls: T):
+    def classWrapper(cls: T) -> T:
+        field_attributes = {}
 
-        defaults = {
-            key: getattr(cls, key) for key in cls.__annotations__.keys() if hasattr(cls, key)
-        }
+        # Extract field_attributes from fields
+        for key, fieldType in cls.__annotations__.items():
+            if hasattr(cls, key):
+                field = getattr(cls, key)
+                if isinstance(field, Field):
+                    if not "type" in field.attributes:
+                        fieldType = fieldType if fieldType else field._default.__class__
+                        field.attributes["type"] = fieldType.__name__
+                    field_attributes[key] = field.attributes
 
-        # default to None to detect missing values
-        for key in cls.__annotations__.keys():
-            setattr(cls, key, MISSING_VALUE)
-
-        cls = dataclass(cls)
-        cls2 = type(cls.__name__, (Schema, cls, ), {})
-
-        cls2._annotations = cls.__annotations__
-        cls2._index = index if isinstance(index, list) else [index]
+        cls2: Schema = cls
         cls2._relationships = {
             key if isinstance(key, str) else key.__name__: val for key, val in relationships.items()}
+        cls2._annotations = cls.__annotations__
+        cls2._index = index if isinstance(index, list) else [index]
 
-        cls2._defaults = defaults
-#         keys = []
-#         for value, vType in cls2._annotations.items():
-#             if value in defaults:
-#                 keys.append(f"{value}: {vType.__name__} = d{value}")
-#                 continue
-#             keys.insert(0, f"{value}: {vType.__name__}")
-#         funcDef = f"""
-# def withDefaults(cls, {str.join(", ", keys)}):
-#     return cls({str.join(", ", [f"{value}={value}"for value in cls2._annotations.keys()])})
-#         """
-#         globalsV = {vType.__name__: vType for value,
-#                     vType in cls2._annotations.items()}
-#         for key, value in defaults.items():
-#             globalsV[f"d{key}"] = value
-#         localsV = {}
-#         exec(funcDef, globalsV, localsV)
-#         cls2.withDefaults = classmethod(localsV["withDefaults"])
-
-        for key, val in properties.items():
+        for key, val in field_attributes.items():
             cls2._addAttribute(key, _ColumnAttributes.normalize({
                 **val,
                 "key": key,
@@ -280,25 +282,57 @@ def schema(index: Union[list[Any], Any], relationships: dict[Schema, dict[str, l
     return classWrapper
 
 
-def seriesSchema(relationships: dict[Schema, dict[str, list[str]]] = {}, properties: dict[str, ColumnAttributes] = {}):
-    """
-    A decorator to define a schema class for a series.
-    Differs from schema in that it defines a schema for a series instead of a frame.
-    
-    Args:
-        relationships (dict[Schema, dict[str, list[str]]]): The relationships between this schema and other schemas.
-        properties (dict[str, ColumnAttributes]): The properties of the fields defined by the schema.
-    """
-    return schema([], relationships, properties)
+class Field(MISSING_VALUE_CLASS):
+    def __init__(self, default: Any, attributes: Unpack[ColumnAttributes]):
+        super().__init__(default)
+        self.attributes = attributes
 
+    __class_getitem__ = classmethod(types.GenericAlias)
+
+
+U = TypeVar('U')
+
+
+def field(default: U = MISSING_VALUE, **attributes: Unpack[ColumnAttributes]) -> U:
+    """
+    A decorator to define a field in a schema class.
+
+    Args:
+        default (Any): The default value of the field.
+        title (str): The title of the column.
+        categorical (bool): Indicates whether the column is categorical or not.
+        divergent (bool): Indicates whether the column is divergent or not.
+        description (str): The description of the column.
+        group (str): The group to which the column belongs.
+        colors (Union[List[Color], Dict[Any, Color]]): The colors associated with the column.
+        symbols (Union[List[Symbol], Dict[Any, Symbol]]): The symbols associated with the column.
+        plot (bool): Indicates whether the column should be plotted or not.
+        type (str): The type of the column.
+    """
+    return Field(default, attributes)
 
 def compute(dependencies: Union[List[str], dict[str, list[str]]] = {}, **attributes: Unpack[ColumnAttributes]):
     """
     A decorator to define a method that computes a column in the schema.
-    
+
     Args:
-        dependencies (Union[List[str], dict[str, list[str]]]): The dependencies of the method.
-        attributes (Unpack[ColumnAttributes]): The attributes of the computed column.
+        dependencies (Union[List[str], dict[str, list[str]]]): 
+            The dependencies of the computed column. 
+            Use a dictionary to specify dependencies across multiple schemas with the schema name being the key and an array of dependency columns being the column.
+            An array to specify dependencies within the same schema.
+            The dependencies for the computed column. Defaults to {}.
+            The dictionary can be used to specify dependencies across different schemas.
+            {"schemaName": ["column1", "column2"], "schemaName2": ["column3", "column4"]}
+        title (str): The title of the column.
+        categorical (bool): Indicates whether the column is categorical or not.
+        divergent (bool): Indicates whether the column is divergent or not.
+        description (str): The description of the column.
+        group (str): The group to which the column belongs.
+        colors (Union[List[Color], Dict[Any, Color]]): The colors associated with the column.
+        symbols (Union[List[Symbol], Dict[Any, Symbol]]): The symbols associated with the column.
+        plot (bool): Indicates whether the column should be plotted or not.
+        version(int): The version of the computed column. When a computed column is updated, the version should be incremented so that the older versions of the columns are automatically invalidated and are recomputed.
+        type (str): The type of the column.
     """
     def wrapper(func: Callable[[], Union[pd.Series, pd.DataFrame]]):
         func._attributes = {

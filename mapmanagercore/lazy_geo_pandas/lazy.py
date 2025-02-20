@@ -1,7 +1,7 @@
 from copy import copy
 import datetime
 import io
-from typing import Callable, Dict, Generic, Hashable, Iterator, List, Self, Set, TypeVar, Union
+from typing import Any, Callable, Dict, Generic, Hashable, Iterator, List, Self, Set, TypeVar, Union
 import weakref
 import numpy as np
 import pandas as pd
@@ -9,7 +9,7 @@ from mapmanagercore.logger import logger
 from mapmanagercore.benchmark import timer
 from .attributes import _ColumnAttributes, ColumnAttributes
 from .utils import updateDataFrame
-from .schema import MISSING_VALUE, Schema
+from .schema import MISSING_VALUE_CLASS, Schema
 from .log import Op, RecordLog
 import geopandas as gp
 from collections.abc import Sequence
@@ -171,7 +171,7 @@ class LazyGeoPandas:
             raise ValueError("Invalid value type", type(value))
 
         value = {key: val for key, val in vars(
-            value).items() if val is not MISSING_VALUE}
+            value).items() if not isinstance(val, MISSING_VALUE_CLASS)}
 
         store._schema.validateColumns(value, dropIndex=False)
 
@@ -296,8 +296,11 @@ class LazyGeoFrame(Generic[T]):
     _store: weakref.ReferenceType[T]
     _columns: list[str]
     _computingColumns: list[list[str]]
+    # Context is passed as the first argument to the computed function
+    _context: Any
+    _baseFilter: Callable[[gp.GeoDataFrame], pd.Index]
 
-    def __init__(self, schema: Schema = None, data: gp.GeoDataFrame = None, store: weakref.ReferenceType[T] = None):
+    def __init__(self, schema: Schema = None, data: gp.GeoDataFrame = None, store: weakref.ReferenceType[T] = None, context: Any = None):
         self._schema = schema
         if data is None:
             data = gp.GeoDataFrame()
@@ -311,7 +314,8 @@ class LazyGeoFrame(Generic[T]):
         self._updateColumns()
         self._rootDf = schema.setColumnTypes(data)
         self._store().addSchema(self)
-
+        self._context = context
+        self._baseFilter = None
 
     def invalidateColumns(self, columns: Iterator[str] = None, ids: pd.Index = None):
         """
@@ -321,7 +325,7 @@ class LazyGeoFrame(Generic[T]):
         self.getStore().invalidateCachedColumns(ids, key, columns)
 
     def __str__(self):
-        _ret = str(self._rootDf)
+        _ret = str(self.index)
         return _ret
     
     def _updateColumns(self):
@@ -338,8 +342,17 @@ class LazyGeoFrame(Generic[T]):
         """
         return self._store()
 
+    def setBaseFilter(self, filter: Callable[[gp.GeoDataFrame], pd.Index]):
+        """
+        Sets the base filter of the frame.
+        The base filter is used to create a filtered version of the frame where
+        the filter is recomputed when the base dataframe is changed
+        """
+        self._baseFilter = filter
+        self._setFilterIndex(self._filterIdx, keepBaseFilter=True)
+
     @timer
-    def _setFilterIndex(self, index: pd.Index):
+    def _setFilterIndex(self, index: pd.Index, keepBaseFilter=False):
         """
         Sets the index of the frame's filter.
         Allows the user to create filtered copies of the frame while maintaining
@@ -347,25 +360,36 @@ class LazyGeoFrame(Generic[T]):
         """
         self._currentVersion = self._state.version
 
-        if index is None:
-            self._filterIdx = None
-            self._filterMask = None
-            return
-
         self._filterIdx = index
+
+        if self._baseFilter is not None:
+            index2 = self._baseFilter(self._rootDf)
+            index = index.intersection(index2) if index is not None else index2
+
+        if index is None:
+            self._filterMask = None
+
         self._filterMask = self._rootDf.index.isin(index)
+
         if np.all(self._filterMask):
             self._filterMask = None
+        
+        # remove the base filter if the user explicitly replaced it
+        if not keepBaseFilter:
+            self._baseFilter = None
 
     @property
     def _df(self):
         """The filtered data frame. The mask is cached for performance."""
         # TODO: consider using a pre-filled copy of the dataframe and pushing changes to all copies if performance is an issue.
-        if self._filterMask is None:
+        if self._baseFilter is None and self._filterMask is None:
             return self._rootDf
-
+        
         if self._state.version != self._currentVersion:
             self._setFilterIndex(self._filterIdx)
+
+        if self._filterMask is None:
+            return self._rootDf
 
         return self._rootDf[self._filterMask]
 
@@ -387,6 +411,7 @@ class LazyGeoFrame(Generic[T]):
         self._rootDf = self._schema.setColumnTypes(data)
 
     def addComputed(self, column: str, attribute: ColumnAttributes, func: Callable[[], Union[gp.GeoSeries, gp.GeoDataFrame]], dependencies: Union[List[str], dict[str, list[str]]] = {}, skipUpdate=False):
+        
         """Adds a computed column to the frame."""
         attributes = _ColumnAttributes.normalize({
             "_dependencies": dependencies,
@@ -620,7 +645,11 @@ class LazyGeoFrame(Generic[T]):
                 # logger.debug(
                     # f'Computing column "{column}" for num invalid: {len(invalidClone)}')
                 
-                results = attribute["_func"](invalidClone)
+                func = attribute["_func"]
+                if func.__code__.co_argcount == 1:
+                    results = func(invalidClone)
+                else:
+                    results = func(invalidClone, self._context)
 
                 missingIndex = invalidClone._df.index
                 if isinstance(results, pd.DataFrame):
@@ -671,11 +700,10 @@ class LazyGeoFrame(Generic[T]):
         return toBytes(self._rootDf)
 
 class LazyGeoSeries(LazyGeoFrame[T]):
-    def __init__(self, schema: Schema, data: gp.GeoSeries = None, store: T = None):
-        self._store = SOURCE if store == None else weakref.ref(store)
+    def __init__(self, schema: Schema, data: gp.GeoSeries = None, store: weakref.ReferenceType[T] = None, context: Any = None):
         if not data is None:
             data = data.to_frame(name=0).T
-        super().__init__(schema, data, store)
+        super().__init__(schema, data, store, context)
         self._fillMissing()
 
     def _fillMissing(self):
@@ -686,16 +714,17 @@ class LazyGeoSeries(LazyGeoFrame[T]):
         current = self._rootDf.loc[0, :].to_dict()
         if "modified" in current:
             del current["modified"]
-        self.update(self._schema.withDefaults(**current), skipLog=True)
+        self.update(self._schema(**current).defaults(), skipLog=True)
 
     def __getitem__(self, items):
         """Modeled after the __getitem__ method of a pandas Series."""
         series = super().__getitem__((0, items))
+        
         return series.loc[0]
-
+    
     def drop(self, skipLog=False):
         """Drops the series by clearing the data and using the defaults."""
-        self.update(self._schema.withDefaults(), skipLog=skipLog)
+        self.update(self._schema().defaults(), skipLog=skipLog)
 
     def update(self, value: Schema, replaceLog=False, skipLog=False):
         """Updates the series with the specified value."""

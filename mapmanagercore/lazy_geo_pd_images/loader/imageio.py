@@ -97,20 +97,6 @@ class MultiImageLoader(ImageLoader):
 
         self._metadata[time] = metadata
 
-    def readAnalysisParams(self, analysisParams: Union[AnalysisParams, str]):
-        """
-        Set the analysisParams for the given time index.
-
-        Args:
-          analysisParams (AnalysisParams): The analysisParams.
-        """
-
-        if isinstance(analysisParams, str):
-            with open(analysisParams, "r") as analysisParamsFile:
-                analysisParams = AnalysisParams(loadJson=analysisParamsFile)
-
-        self._analysisParams = analysisParams
-
     def timePoints(self) -> Iterator[int]:
         """
         Returns an iterator over the time points of the images.

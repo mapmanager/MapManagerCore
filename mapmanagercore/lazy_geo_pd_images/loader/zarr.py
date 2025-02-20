@@ -28,15 +28,13 @@ class ZarrLoader(ImageLoader):
             # if os.path.isdir(path):
             self._store = zarr.DirectoryStore(path)
             # else:
-                # self._store = zarr.ZipStore(path, mode="r")
+            # self._store = zarr.ZipStore(path, mode="r")
             self.group = zarr.group(store=self._store)
-
-            # abb analysisparams
-            self._analysisParams = AnalysisParams()
-            self._analysisParams.setDict(self.group.attrs['analysisParams'])
 
         self._imagesSrcs: List[Dict[int, np.ndarray]] = []
         self._metadata = []
+        self._maxChannels = self.group.attrs["maxChannels"] if "maxChannels" in self.group.attrs else 2
+
         imagesGroup = self.group["images"]
         for t, group in imagesGroup.groups():
             t = int(t)
@@ -54,9 +52,6 @@ class ZarrLoader(ImageLoader):
 
         self.path = path
 
-    def analysisParams(self):
-        return self._analysisParams
-
     def __str__(self):
         return f"Zarr Loader: path: {self.path}"
 
@@ -64,48 +59,48 @@ class ZarrLoader(ImageLoader):
         return list(self._imagesSrcs[t].keys())
 
     def createTimePoint(self) -> bool:
-        self._metadata.append(Metadata(name="Unnamed Time Point"))
+        self._metadata.append(Metadata(name="Unnamed"))
         self._imagesSrcs.append({})
         return True
 
     def appendChannelToTimePoint(self, srcTimePoint: int, srcChannel: int, destTimePoint: int) -> bool:
         if srcTimePoint == destTimePoint:
             return False
-        
+
         if srcTimePoint >= len(self._imagesSrcs) or destTimePoint >= len(self._imagesSrcs):
             return False
-        
+
         if srcChannel not in self._imagesSrcs[srcTimePoint]:
             return False
-        
+
         dest = sorted(self._imagesSrcs[destTimePoint].keys())
-        destChannel = len(dest) 
+        destChannel = len(dest)
         for channel, index in enumerate(dest):
             if channel != index:
                 destChannel = index
                 break
-            
-        
+
         return self.moveChannel(srcTimePoint, srcChannel, destTimePoint, destChannel)
-        
 
     def moveChannel(self, srcTimePoint: int, srcChannel: int, destTimePoint: int, destChannel: int) -> bool:
         if srcTimePoint == destTimePoint and srcChannel == destChannel:
             return False
-        
+
         if srcTimePoint >= len(self._imagesSrcs) or destTimePoint >= len(self._imagesSrcs):
             return False
-        
+
         if srcChannel not in self._imagesSrcs[srcTimePoint]:
             return False
-    
+
         channel = self._imagesSrcs[srcTimePoint].pop(srcChannel)
         name = self._metadata[srcTimePoint].channelNames.pop(srcChannel, None)
 
-        if destChannel in self._imagesSrcs[destTimePoint]:    
-            self._imagesSrcs[srcTimePoint][srcChannel] = self._imagesSrcs[destTimePoint].pop(destChannel)
+        if destChannel in self._imagesSrcs[destTimePoint]:
+            self._imagesSrcs[srcTimePoint][srcChannel] = self._imagesSrcs[destTimePoint].pop(
+                destChannel)
             if destChannel in self._metadata[destTimePoint].channelNames:
-                self._metadata[srcTimePoint].channelNames[srcChannel] = self._metadata[destTimePoint].channelNames.pop(destChannel)
+                self._metadata[srcTimePoint].channelNames[srcChannel] = self._metadata[destTimePoint].channelNames.pop(
+                    destChannel)
 
         self._imagesSrcs[destTimePoint][destChannel] = channel
         if name is not None:

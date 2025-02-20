@@ -66,6 +66,8 @@ class LazyImagesGeoPandas(LazyGeoPandas):
         if overrideDefault:
             LazyGeoPandas.setDefaultStore(self)
 
+    # TODO: optimize by lazily aggregating the pixels for the requested columns (aggregate, channel)
+    # TODO: Insure that ^ optimization also doesn't recompute the same pixels multiple times
     def _genWrappedFunc(self, method, attributes, frame: LazyGeoFrame[Self]):
         """Generate a wrapped function for the computed column."""
 
@@ -117,8 +119,7 @@ class LazyImagesGeoPandas(LazyGeoPandas):
         """Add a schema frame to the store. Essentially, this adds a new data frame to the store."""
 
         # Inject computed columns that use the image to calculate roi stats
-        cls = frame._schema.__bases__[1]
-        for method in cls.__dict__.values():
+        for method in frame._schema.__dict__.values():
             if not hasattr(method, "_imageComputed"):
                 continue
 
@@ -199,20 +200,36 @@ class LazyImagesGeoPandas(LazyGeoPandas):
         return self._images.getShapePixels(shapes, channel=channel, zSpread=zSpread, time=time, z=z)
 
 
-def aggregateROI(dependencies: Union[List[str], dict[str, list[str]]] = {}, aggregate: list[str] = [], **attributes: Unpack[ImageColumnAttributes]):
+def computeAggregateImage(dependencies: Union[List[str], dict[str, list[str]]] = {}, aggregate: list[str] = [], **attributes: Unpack[ImageColumnAttributes]):
     """A decorator that adds image based computed column to the schema.
 
     Args:
         dependencies (Union[List[str], dict[str, list[str]], optional):
+            The dependencies of the computed column. 
+            Use a dictionary to specify dependencies across multiple schemas with the schema name being the key and an array of dependency columns being the column.
+            An array to specify dependencies within the same schema.
             The dependencies for the computed column. Defaults to {}.
             The dictionary can be used to specify dependencies across different schemas.
             {"schemaName": ["column1", "column2"], "schemaName2": ["column3", "column4"]}
         aggregate (list[str], optional): The aggregates to compute. Defaults to [].
-        **attributes (Unpack[ImageColumnAttributes]): The attributes for the computed column.
+            Aggregates must be numpy functions.
+            For example, ["mean", "std", "min", "max"]
+        title (str): The title of the column.
+        categorical (bool): Indicates whether the column is categorical or not.
+        divergent (bool): Indicates whether the column is divergent or not.
+        description (str): The description of the column.
+        group (str): The group to which the column belongs.
+        colors (Union[List[Color], Dict[Any, Color]]): The colors associated with the column.
+        symbols (Union[List[Symbol], Dict[Any, Symbol]]): The symbols associated with the column.
+        plot (bool): Indicates whether the column should be plotted or not.
+        version(int): The version of the computed column. When a computed column is updated, the version should be incremented so that the older versions of the columns are automatically invalidated and are recomputed.
+        type (str): The type of the column.
+
 
     Returns:
-        A function that returns a geo pandas data frame with a shape column and a z column.
+        A function that returns a geo pandas data frame with a shape column with any name along with a z column.
     """
+    # TODO: extend aggregates to allow user defined functions as well. Use the function name as the name of the aggregate
     def wrapper(func: Callable[[], Union[pd.Series, pd.DataFrame]]):
         func._imageComputed = {
             "key": func.__name__,
