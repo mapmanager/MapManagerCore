@@ -267,7 +267,14 @@ class ImageLoader:
             # logger.warning(f'abb 2d calling loadSlices with sliceRange[0]:{sliceRange[0]}')
             return self.loadSlice(time, channel, sliceRange[0])
 
+        # logger.info(f"sliceRange[0] {sliceRange[0]} and sliceRange[1] {sliceRange[1]}")
+        # logger.info(f"whaat is this {self._images(time, channel)[sliceRange[0]:sliceRange[1]]}")
+        # temp = np.max(self._images(time, channel)[sliceRange[0]:sliceRange[1]], axis=0)
+        # logger.info(f"max {temp}")
+        # temp = np.sum(self._images(time, channel)[sliceRange[0]:sliceRange[1]], axis=0)
+        # logger.info(f"sum {temp}")
         return np.max(self._images(time, channel)[sliceRange[0]:sliceRange[1]], axis=0)
+        # return np.sum(self._images(time, channel)[sliceRange[0]:sliceRange[1]], axis=0)
 
     def cached(self, maxsize=15) -> Self:
         """
@@ -333,6 +340,7 @@ class ImageLoader:
         """
         results = []
         indexes = []
+
         if isinstance(shape, list):
             shape = gp.GeoDataFrame(shape, columns=["shape"], geometry="shape")
 
@@ -340,11 +348,12 @@ class ImageLoader:
             shape = shape.to_frame("shape")
 
         if "t" in shape.index.names:
+            logger.info(f"t in shape.index.names")
             if not "t" in shape.columns:
                 shape.reset_index("t", inplace=True)
             else:
                 shape.drop("t", axis=1, inplace=True)
-
+                
         if time is not None:
             shape["t"] = time
 
@@ -360,7 +369,10 @@ class ImageLoader:
         if isinstance(channel, list):
             for (t, z), group in shape.groupby(by=["t", "z"]):
                 images = [self.fetchSlices(
-                    t, c, (z - zSpread, z + zSpread + 1)) for c in channel]
+                    # t, c, (z - zSpread, z + zSpread + 1)) for c in channel]
+                      t, c, (z - zSpread, z + zSpread)) for c in channel]
+                
+                # images = np.flipud(images)  # Flip upside down
 
                 for idx, row in group.iterrows():
                     xLim, yLim = images[0].shape
@@ -373,13 +385,16 @@ class ImageLoader:
 
                     # inject the nan values where the shape is out of bounds.
                     results.append(
-                        [np.where(inBounds, image[xs, ys], np.nan) for image in images])
+                        # [np.where(inBounds, image[xs, ys], np.nan) for image in images])
+                        [np.where(inBounds, image[ys, xs], np.nan) for image in images])
                     indexes.append(idx)
             return pd.DataFrame(results, indexes, columns=channel)
 
+        # logger.info(f"shape {shape}")
         for (t, z), group in shape.groupby(by=["t", "z"]):
             image = self.fetchSlices(
-                t, channel, (z - zSpread, z + zSpread + 1))
+                # t, channel, (z - zSpread, z + zSpread + 1))
+                 t, channel, (z - zSpread, z + zSpread))
 
             # logger.warning(f'abb 2d image:{image.shape}')
 
@@ -392,7 +407,8 @@ class ImageLoader:
                 ys = np.clip(ys, 0, yLim - 1)
 
                 # inject the nan values where the shape is out of bounds.
-                results.append(np.where(inBounds, image[xs, ys], np.nan))
+                # results.append(np.where(inBounds, image[xs, ys], np.nan))
+                results.append(np.where(inBounds, image[ys, xs], np.nan))
                 indexes.append(idx)
 
         return pd.Series(results, indexes, name=channel)

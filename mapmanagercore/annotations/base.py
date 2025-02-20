@@ -425,7 +425,7 @@ class AnnotationsBase(LazyImagesGeoPandas):
     #     self._images.readNewImages(path = path, channel = channel)
         # self._images.appendChannelToTimePoint()
 
-    def getDendrogramReplot(self, newSegmentID, spineAngleChecked, spineLengthChecked, spineLengthConstant):
+    def getDendrogramReplot(self, newSegmentID: int, spineAngleChecked: bool, spineLengthChecked: bool, spineLengthConstant: int):
         """ calculate necessary values to replot dendrogram widget
 
         Args:

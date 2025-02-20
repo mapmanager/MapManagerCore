@@ -148,7 +148,6 @@ class AnnotationsInteractions(AnnotationsSegments):
     def snapBackgroundOffset(self, spineId: SpineId,
                              channel: int = None,
                              zSpread: int = None):
-
         # abb analysisparams
         if channel is None:
             channel = self.analysisParams.getValue('channel')
@@ -158,11 +157,12 @@ class AnnotationsInteractions(AnnotationsSegments):
         # abb 20241221 after s-dev merge -->> ERROR
         roi = self.points[spineId, "roi"]
         
-        # logger.error(f'spineId:{spineId} roi is:')
+        # logger.info(f'spineId:{spineId} roi is:')
         # print(type(roi))
         # print(roi)
 
         z = self.points[spineId, "z"]
+        # logger.info(f"z is {z}")
 
         # create a grid of points to search for the best offset
         points = self.analysisParams.getValue('backgroundRoiGridPoints')
@@ -170,15 +170,18 @@ class AnnotationsInteractions(AnnotationsSegments):
 
         try:
             grid = shapeGrid(roi, points=points, overlap=overlap) # abj
+            # logger.info(f"grid is {grid}")
             # grid = shapeGrid(roi, points=3, overlap=0.1)
         except (ValueError) as e:
             logger.error(f'   {e}')
             logger.error(f'   spineId:{spineId}')
             logger.error(f'   roi:{roi}')
-            print('   self.points[:]')
-            print(self.points[:])
+            # print('   self.points[:]')
+            # print(self.points[:])
             return
-        
+        # logger.info(f"grid {grid}")
+        # logger.info(f"snapBackgroundOffset 2")
+
         # translate the roi by the grid points
         candidates = gp.GeoSeries(grid.apply(
             lambda x: shapely.affinity.translate(roi, x["x"], x["y"]), axis=1))
@@ -186,8 +189,6 @@ class AnnotationsInteractions(AnnotationsSegments):
         # get the pixel values for each candidate
         pixels = self.getShapePixels(
             candidates, channel=channel, zSpread=zSpread, z=z)
-
-        # TODO: exclude out of bounds candidates
 
         # find the candidate with the lowest sum of pixel values
         offset = grid.iloc[pixels.apply(np.sum).idxmin()]
@@ -533,7 +534,7 @@ class AnnotationsInteractions(AnnotationsSegments):
         if roughTracing is None:
             return None
 
-        self.updateSegmentWithLiveTracing(segmentId, roughTracing.coords, idx)
+        self.updateSegmentWithLiveTracing(segmentId, roughTracing.coords, idx, z)
         return idx
 
     def appendSegmentPoint(self, segmentId: SegmentId,
@@ -601,6 +602,8 @@ class AnnotationsInteractions(AnnotationsSegments):
         if maxTracingDistance is not None and point.distance(snappedPoint) > maxTracingDistance:
             logger.warning(f'abb return None for maxTracingDistance:{maxTracingDistance}')
             return None
+        
+        # abj
 
         if first:
             # abb always true?
@@ -609,7 +612,7 @@ class AnnotationsInteractions(AnnotationsSegments):
                     point.coords[0],
                     roughTracing.coords[0] if len(
                         roughTracing.coords) > 0 else point.coords[0]
-                ]), live=True)
+                ]), live=True, z=z)
 
             # Prepend the point to the rough tracing
             roughTracing = [point.coords[0], *roughTracing.coords]
@@ -621,7 +624,7 @@ class AnnotationsInteractions(AnnotationsSegments):
                     roughTracing.coords[-1] if len(
                         roughTracing.coords) > 0 else point.coords[0],
                     point.coords[0],
-                ]), live=True)
+                ]), live=True, z=z)
 
             logger.warning(f'abb point;{point}')
             logger.warning(f'  point.coords:{point.coords}')
@@ -724,7 +727,8 @@ class AnnotationsInteractions(AnnotationsSegments):
 
         return index - 1 if index > 0 else 0
 
-    def updateSegmentWithLiveTracing(self, segmentId: SegmentId, roughTracing, updatedIdx, replaceLog: bool = False):
+    def updateSegmentWithLiveTracing(self, segmentId: SegmentId, roughTracing, updatedIdx, replaceLog: bool = False
+                                     , z: int = None):
         """
         Updates a segment with live tracing.
 
@@ -744,7 +748,7 @@ class AnnotationsInteractions(AnnotationsSegments):
         segment = segment if segment is not None and len(
             segment.coords) > 0 else None
         segment = self.optimizeSegment(roughTracing, segment, int(
-            updatedIdx), live=True)
+            updatedIdx), live=True, z=z)
         update = Segment(roughTracing=roughTracing)
 
         if segment is not None:
