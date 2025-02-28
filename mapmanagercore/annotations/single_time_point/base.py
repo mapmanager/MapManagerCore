@@ -311,7 +311,8 @@ class SingleTimePointAnnotationsBase(_SingleTimePointAnnotationsBase):
                 
         return f't:{numTimepoints}, points:{numPnts} segments:{numSegments} images:{self.shape}'
         
-    def getPixels(self, channel: int, zRange: Tuple[int, int] = None, z: int = None, zSpread: int = 0) -> ImageSlice:
+    def getPixels(self, channel: int, zRange: Tuple[int, int] = None, z: int = None, zSpread: int = 0,
+                  threeD: bool = False) -> ImageSlice:
         """
         Loads the image data for a slice.
 
@@ -320,11 +321,12 @@ class SingleTimePointAnnotationsBase(_SingleTimePointAnnotationsBase):
           zRange (Tuple[int, int]): The visible z slice range.
           z (int): The z slice index.
           zSpread (int): The amount to offset z +/-.
+          threeD (bool): Get full 3D np.array when true
 
         Returns:
           ImageSlice: The image slice.
         """
-        return self._annotations.getPixels(self._t, channel, zRange, z, zSpread)
+        return self._annotations.getPixels(self._t, channel, zRange, z, zSpread, threeD)
 
     # abb depreciated
     def getAutoContrast_qt(self, channel: int) -> Tuple[int, int]:

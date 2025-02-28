@@ -165,7 +165,8 @@ class LazyImagesGeoPandas(LazyGeoPandas):
         """
         return self._images.getAutoContrast_qt(time, channel)
 
-    def getPixels(self, time: int, channel: int, zRange: Tuple[int, int] = None, z: int = None, zSpread: int = 0) -> ImageSlice:
+    def getPixels(self, time: int, channel: int, zRange: Tuple[int, int] = None, z: int = None, zSpread: int = 0,
+                  threeD: bool = False) -> ImageSlice:
         """
         Loads the image data for a slice.
 
@@ -175,6 +176,7 @@ class LazyImagesGeoPandas(LazyGeoPandas):
           zRange (Tuple[int, int]): The visible z slice range.
           z (int): The z slice index.
           zSpread (int): The amount to offset z +/-.
+          threeD (bool): Get full 3D np.array when true
 
         Returns:
           ImageSlice: The image slice.
@@ -186,7 +188,7 @@ class LazyImagesGeoPandas(LazyGeoPandas):
             else:
                 raise ValueError("zRange or z must be provided")
 
-        return ImageSlice(self._images.fetchSlices(time, channel, (zRange[0], zRange[1] + 1)))
+        return ImageSlice(self._images.fetchSlices(time, channel, (zRange[0], zRange[1] + 1), threeD))
 
     def getShapePixels(self, shapes: gp.GeoDataFrame, channel: Union[int, List[int]] = 0, zSpread: int = 0, time=None, z: int = None) -> Union[pd.Series, pd.DataFrame]:
         """ Get the pixels that are in the shapes.

@@ -242,7 +242,7 @@ class ImageLoader:
 
         return theMin, theMax, globalMin, globalMax
     
-    def fetchSlices(self, time: int, channel: int, sliceRange: Tuple[int, int]) -> np.ndarray:
+    def fetchSlices(self, time: int, channel: int, sliceRange: Tuple[int, int], threeD: bool = False) -> np.ndarray:
         """
         Fetches a range of slices for the given time, channel, and slice range.
 
@@ -250,6 +250,7 @@ class ImageLoader:
           time (int): The time index.
           channel (int): The channel index.
           sliceRange (tuple): The range of slice indices.
+          threeD (bool): get full 3D slice when true - abj
 
         Returns:
           np.ndarray: The fetched slices.
@@ -259,7 +260,7 @@ class ImageLoader:
         z, _x, _y = self.shape(time, channel)
         sliceRange = (max(0, sliceRange[0]), min(z, sliceRange[1]))
 
-        # logger.warning(f'abb 2d sliceRange:{sliceRange}')
+        logger.warning(f'abb 2d sliceRange:{sliceRange}')
 
         # abb handle 2d images
         # if sliceRange[0] == sliceRange[1] - 1:
@@ -267,14 +268,11 @@ class ImageLoader:
             # logger.warning(f'abb 2d calling loadSlices with sliceRange[0]:{sliceRange[0]}')
             return self.loadSlice(time, channel, sliceRange[0])
 
-        # logger.info(f"sliceRange[0] {sliceRange[0]} and sliceRange[1] {sliceRange[1]}")
-        # logger.info(f"whaat is this {self._images(time, channel)[sliceRange[0]:sliceRange[1]]}")
-        # temp = np.max(self._images(time, channel)[sliceRange[0]:sliceRange[1]], axis=0)
-        # logger.info(f"max {temp}")
-        # temp = np.sum(self._images(time, channel)[sliceRange[0]:sliceRange[1]], axis=0)
-        # logger.info(f"sum {temp}")
+        if threeD:
+            temp = self._images(time, channel)[sliceRange[0]:sliceRange[1]]
+            return temp
+
         return np.max(self._images(time, channel)[sliceRange[0]:sliceRange[1]], axis=0)
-        # return np.sum(self._images(time, channel)[sliceRange[0]:sliceRange[1]], axis=0)
 
     def cached(self, maxsize=15) -> Self:
         """
@@ -369,10 +367,7 @@ class ImageLoader:
         if isinstance(channel, list):
             for (t, z), group in shape.groupby(by=["t", "z"]):
                 images = [self.fetchSlices(
-                    # t, c, (z - zSpread, z + zSpread + 1)) for c in channel]
-                      t, c, (z - zSpread, z + zSpread)) for c in channel]
-                
-                # images = np.flipud(images)  # Flip upside down
+                      t, c, (z - zSpread, z + zSpread + 1)) for c in channel]
 
                 for idx, row in group.iterrows():
                     xLim, yLim = images[0].shape
@@ -386,15 +381,15 @@ class ImageLoader:
                     # inject the nan values where the shape is out of bounds.
                     results.append(
                         # [np.where(inBounds, image[xs, ys], np.nan) for image in images])
-                        [np.where(inBounds, image[ys, xs], np.nan) for image in images])
+                        # abj: accounting for pixels being inverted when plotting by switching ys and xs
+                        [np.where(inBounds, image[ys, xs], np.nan) for image in images]) 
                     indexes.append(idx)
             return pd.DataFrame(results, indexes, columns=channel)
 
         # logger.info(f"shape {shape}")
         for (t, z), group in shape.groupby(by=["t", "z"]):
             image = self.fetchSlices(
-                # t, channel, (z - zSpread, z + zSpread + 1))
-                 t, channel, (z - zSpread, z + zSpread))
+                t, channel, (z - zSpread, z + zSpread + 1))
 
             # logger.warning(f'abb 2d image:{image.shape}')
 
@@ -408,7 +403,9 @@ class ImageLoader:
 
                 # inject the nan values where the shape is out of bounds.
                 # results.append(np.where(inBounds, image[xs, ys], np.nan))
-                results.append(np.where(inBounds, image[ys, xs], np.nan))
+
+                # abj: accounting for pixels being inverted when plotting by switching ys and xs
+                results.append(np.where(inBounds, image[ys, xs], np.nan)) 
                 indexes.append(idx)
 
         return pd.Series(results, indexes, name=channel)

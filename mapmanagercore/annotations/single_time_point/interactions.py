@@ -603,8 +603,6 @@ class AnnotationsInteractions(AnnotationsSegments):
             logger.warning(f'abb return None for maxTracingDistance:{maxTracingDistance}')
             return None
         
-        # abj
-
         if first:
             # abb always true?
             if speculate:
@@ -636,7 +634,7 @@ class AnnotationsInteractions(AnnotationsSegments):
         # logger.info(f'idx:{idx} roughTracing:{roughTracing}')
         
         self.updateSegmentWithLiveTracing(
-            segmentId, roughTracing, idx)
+            segmentId, roughTracing, idx, z=z)
         
         theRet = 0 if first else len(roughTracing) - 1
         # logger.info(f'theRet:{theRet}')
@@ -737,6 +735,14 @@ class AnnotationsInteractions(AnnotationsSegments):
         """
 
         if len(roughTracing) == 1:
+            self.updateSegment(segmentId, Segment(
+                roughTracing=Point(roughTracing[0]),
+                segment=LineString([])
+            ), replaceLog)
+            return
+
+        # abj: edge case for same initial point added twice
+        if len(roughTracing) == 2 and roughTracing[0] == roughTracing[1]:
             self.updateSegment(segmentId, Segment(
                 roughTracing=Point(roughTracing[0]),
                 segment=LineString([])

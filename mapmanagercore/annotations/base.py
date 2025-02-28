@@ -154,7 +154,8 @@ class AnnotationsBase(LazyImagesGeoPandas):
         from .single_time_point import SingleTimePointAnnotations
         return SingleTimePointAnnotations(self, time)
 
-    def getPixels(self, time: int, channel: int, zRange: Tuple[int, int] = None, z: int = None, zSpread: int = 0) -> ImageSlice:
+    def getPixels(self, time: int, channel: int, zRange: Tuple[int, int] = None, z: int = None, zSpread: int = 0,
+                  threeD: bool = False) -> ImageSlice:
         """
         Loads the image data for a slice.
 
@@ -164,6 +165,7 @@ class AnnotationsBase(LazyImagesGeoPandas):
           zRange (Tuple[int, int]): The visible z slice range.
           z (int): The z slice index.
           zSpread (int): The amount to offset z +/-.
+          threeD (bool): Get full 3D np.array when true
 
         Returns:
           ImageSlice: The image slice.
@@ -176,8 +178,7 @@ class AnnotationsBase(LazyImagesGeoPandas):
                 zRangeDf = self.points["z"]
                 zRange = (int(zRangeDf.min()),
                           int(zRangeDf.max()))
-
-        return super().getPixels(time, channel, zRange)
+        return super().getPixels(time, channel, zRange, threeD=threeD)
 
     # Serialization
 
