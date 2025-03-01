@@ -77,12 +77,11 @@ class AnnotationsSegments(SingleTimePointAnnotationsBase):
 
         # 3D
         image = self.getPixels(channel=channel, z=z, zSpread=zSpread, threeD = True).data(flattened=False) # returning in ndarray form
-        # logger.info(f"image {image}")
 
         x1,y1,z1 = roughSegment.coords[0]
         x2,y2,z2 = roughSegment.coords[1]
-        logger.info(f"roughSegment.coords[0] {roughSegment.coords[0]}")
-        logger.info(f"roughSegment.coords[1] {roughSegment.coords[1]}")
+        # logger.info(f"roughSegment.coords[0] {roughSegment.coords[0]}")
+        # logger.info(f"roughSegment.coords[1] {roughSegment.coords[1]}")
         
         # For 3D:
         # get a median index since image does not retain original segment row indexes
@@ -90,16 +89,17 @@ class AnnotationsSegments(SingleTimePointAnnotationsBase):
         reIndexZ = math.floor(imageZ/2)
         logger.info(f"reIndexZ {reIndexZ}")
 
-        # # Testing Restriction of image to a bounding box
-        boundingBoxRange = 0
-        x_min, x_max = int(min(x1,x2) - boundingBoxRange), int(max(x1,x2) + boundingBoxRange) # X-axis
-        y_min, y_max = int(min(y1,y2) - boundingBoxRange), int(max(y1,y2) + boundingBoxRange) # Y-axis
+        # Testing Restriction of image to a bounding box
+        # boundingBoxRange = 0
+        # x_min, x_max = int(min(x1,x2) - boundingBoxRange), int(max(x1,x2) + boundingBoxRange) # X-axis
+        # y_min, y_max = int(min(y1,y2) - boundingBoxRange), int(max(y1,y2) + boundingBoxRange) # Y-axis
 
-        # Restrict image to a bounding box of rough Segment
-        image = image[:, y_min:y_max+1, x_min:x_max+1]
-        height, width = image.shape[1], image.shape[2]  # Get Y (height) and X (width)
-        top_left = (0, 0)  # Always starts at (Y=0, X=0)
-        newImageSize = (height - 1, width - 1)  # Last Y and X index
+        # # Restrict image to a bounding box of rough Segment
+        # # TODO: account for when x and y max arent the same point
+        # image = image[:, y_min:y_max+1, x_min:x_max+1]
+        # height, width = image.shape[1], image.shape[2]  # Get Y (height) and X (width)
+        # top_left = (0, 0)  # Always starts at (Y=0, X=0)
+        # newImageSize = (height - 1, width - 1)  # Last Y and X index
   
         # logger.info(f"new Image {image}")
         if live:
@@ -109,19 +109,39 @@ class AnnotationsSegments(SingleTimePointAnnotationsBase):
             # start_point should always be the last point added (appended)
             # Note: roughSegment[0] is the last point added
             # accounting for the two cases:
-            if roughSegment.coords[0] > roughSegment.coords[1]: 
-                astar = brightest_path_lib.algorithm.AStarSearch(image, 
-                        start_point = np.array([reIndexZ,newImageSize[0],newImageSize[1]]), 
-                        goal_point = np.array([reIndexZ,0,0]))
-            else: # handles case: roughSegment.coords[0] < roughSegment.coords[1] and ==
-                astar = brightest_path_lib.algorithm.AStarSearch(image, start_point = np.array([reIndexZ,0,0]), 
-                    goal_point = np.array([reIndexZ,newImageSize[0],newImageSize[1]]))
+            logger.info(f"roughSegment.coords[0] {roughSegment.coords[0]}")
+            logger.info(f"roughSegment.coords[1] {roughSegment.coords[1]}")
 
+            # For bounding box image: (WIP)
+            # Currently failing edge case where X1 > X2 but Y1 < Y2
+            # if roughSegment.coords[0] > roughSegment.coords[1]: 
+            #     logger.info(f"case 1")
+            #     astar = brightest_path_lib.algorithm.AStarSearch(image, 
+            #             start_point = np.array([reIndexZ,newImageSize[0],newImageSize[1]]), 
+            #             goal_point = np.array([reIndexZ,0,0]))
+                
+            # else: # handles case: roughSegment.coords[0] < roughSegment.coords[1] and ==
+            #     logger.info(f"case 2")
+            #     astar = brightest_path_lib.algorithm.AStarSearch(image, 
+            #             start_point = np.array([reIndexZ,0,0]), 
+            #             goal_point = np.array([reIndexZ,newImageSize[0],newImageSize[1]]))
+            
+            # Standard Search with full image
+            astar = brightest_path_lib.algorithm.AStarSearch(image, start_point = np.array([reIndexZ,y1,x1]), 
+                                                goal_point = np.array([reIndexZ,y2,x2]))
+            
             path = astar.search()
-            # z being the z value passed in, imageZ is the index of the image (that was resetted), reIndexZ is the median of the new indexes
-            # translate this back into our original image shape
-            path = np.array([[y + x_min, x + y_min, z + imageZ - reIndexZ] for imageZ, x, y in LineString(path).coords]) # 3D
 
+            # # z being the z value passed in, imageZ is the index of the image (that was resetted), reIndexZ is the median of the new indexes
+            # # translate this back into our original image shape
+            # For: Bounding Box 3D
+            # path = np.array([[x + x_min, y + y_min, z + imageZ - reIndexZ] for imageZ, y, x in LineString(path).coords]) 
+
+            # Standard Reformatting of Coordinates
+            # Note: AStar Path Coords are (z,y,x), while our Linestrings are (x,y,z)
+            path = np.array([[x, y, z + imageZ - reIndexZ] for imageZ, y, x in LineString(path).coords]) # 3D
+
+            # Using B-Spine Interpolation for smoothing
             x, y, z = path[:, 0], path[:, 1], path[:, 2]
             tck, u = splprep([x, y, z], s=3)  # Adjust s for smoothing
             # For Improvement: could set num to be a ratio of pixels (distance between points) and a constant
@@ -135,7 +155,7 @@ class AnnotationsSegments(SingleTimePointAnnotationsBase):
 
             smoothedData = list(zip(x_smooth, y_smooth, z_smooth))
             lineStr = LineString(smoothedData)
-
+        
             logger.info(f"lineStr {lineStr}")
 
             return lineStr
