@@ -25,12 +25,14 @@ import geopandas as gp
 from mapmanagercore.analysis_params import AnalysisParams
 from mapmanagercore.logger import logger
 
+# abb imageImporter converting from pickle to parquet
+from ..lazy_geo_pandas.lazy import toBytes
 
 class AnnotationsBase(LazyImagesGeoPandas):
-    _images: MultiImageLoader
+    _images: MultiImageLoader  # abb this is either MultiImageLoader | ZarrLoader !!!
 
     def __init__(self,
-                 loader: MultiImageLoader,
+                 loader: MultiImageLoader,  # abb this is either MultiImageLoader | ZarrLoader !!!
                  lineSegments: Union[str, pd.DataFrame] = pd.DataFrame(),
                  points: Union[str, pd.DataFrame] = pd.DataFrame(),
                  analysisParams: AnalysisParams = AnalysisParams(),
@@ -186,19 +188,24 @@ class AnnotationsBase(LazyImagesGeoPandas):
 
     @classmethod
     def load(cls, path: Union[str, None], lazy=False):
+        logger.warning(f'abb creating ZarrLoader from path:{path}')
+        logger.warning(f'  cls:{cls}')
+
         loader = ZarrLoader(path, lazy=lazy)
 
         # abb read_pickle() is failing if we have an older version of numpy
         # when building for pyinstaller, we end up with numpy==1.26.4
         if "points" in loader.group:
-            points = pd.read_pickle(
+            # points = pd.read_pickle(
+            points = gp.read_parquet(
                 BytesIO(loader.group["points"][:].tobytes()))
             points = gp.GeoDataFrame(points, geometry="point")
         else:
             points = gp.GeoDataFrame()
 
         if "lineSegments" in loader.group:
-            lineSegments = pd.read_pickle(
+            # lineSegments = pd.read_pickle(
+            lineSegments = gp.read_parquet(
                 BytesIO(loader.group["lineSegments"][:].tobytes()))
             lineSegments = gp.GeoDataFrame(lineSegments, geometry="segment")
         else:
@@ -212,7 +219,10 @@ class AnnotationsBase(LazyImagesGeoPandas):
         # except:
         #     lastSaveTime = ""
 
-        return cls(loader, lineSegments, points, analysisParams, path, lastSaveTime)
+        _ret = cls(loader, lineSegments, points, analysisParams, path, lastSaveTime)
+        logger.warning(f'  returning {type(_ret)}')
+
+        return _ret
 
     # abb TODO put in one place (this function is repeated elsewhere)
     def _group_exists(self, store, group_path) -> bool:
@@ -270,13 +280,46 @@ class AnnotationsBase(LazyImagesGeoPandas):
                     images = zarr.group(store=store)['images']
                 self._images.saveTo(images)
                 
-                # abb added overwrite=True, need to implement dirty flag for points and segment
+                # abb added overwrite=True, need to implement dirty flag for points and segments
                 # zarr.errors.ContainsArrayError: path 'points' contains an array
+                logger.warning('abb imageImporter saving points/segments as text')
+                # v1
+                # group.create_dataset(
+                #     "points", data=self.points.toBytes(), dtype=np.uint8, overwrite=True)
+                # group.create_dataset(
+                #     "lineSegments", data=self.segments.toBytes(), dtype=np.uint8, overwrite=True)
+                # group.attrs["version"] = 1
+                
+                # v1.1
+                _points = self.points[:].set_geometry('point')  # _points is GeoPandas, NOT our lazy
                 group.create_dataset(
-                    "points", data=self.points.toBytes(), dtype=np.uint8, overwrite=True)
+                    "points",
+                    data=toBytes(_points),
+                    # dtype=np.uint8,
+                    overwrite=True)
+                _segments = self.segments[:].set_geometry('segment')  # _segments is GeoPandas, NOT our lazy
                 group.create_dataset(
-                    "lineSegments", data=self.segments.toBytes(), dtype=np.uint8, overwrite=True)
-                group.attrs["version"] = 1
+                    "lineSegments",
+                    data=toBytes(_segments),
+                    # dtype=np.uint8,
+                    overwrite=True)
+                group.attrs["version"] = 1.1
+
+                # # v1.2
+                # _rootDf = self.points[:]  #self.points._rootDf  # or use self.points[:]
+                # # _rootDf = _rootDf.set_geometry('point')
+                # logger.warning(f'_rootDf is: {type(_rootDf)}')
+                # print(_rootDf.columns)
+                # print(_rootDf)
+                # # logger.warning(f'   _rootDf.geometry.name:{_rootDf.geometry.name}')
+                # _pointJson = _rootDf.to_json()
+                # logger.warning('_pointJson is:')
+                # print(_pointJson)
+                # group.create_dataset(
+                #     "points", data=self.points.toBytes(), dtype=np.uint8, overwrite=True)
+                # group.create_dataset(
+                #     "lineSegments", data=self.segments.toBytes(), dtype=np.uint8, overwrite=True)
+                # group.attrs["version"] = 1.2
 
                 # abb analysisparams
                 group.attrs['analysisParams'] = self._analysisParams.getDict()

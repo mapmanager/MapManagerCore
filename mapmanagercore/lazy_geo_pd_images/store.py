@@ -63,6 +63,7 @@ class LazyImagesGeoPandas(LazyGeoPandas):
 
     def __init__(self, images: ImageLoader, overrideDefault=True):
         super().__init__()
+        logger.info(f'abb creating LazyImagesGeoPandas() with images:{type(images)}')
         self._images = images
 
         if overrideDefault:

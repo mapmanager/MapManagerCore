@@ -5,8 +5,12 @@ from .lazy_geo_pd_images.loader import MultiImageLoader
 
 # abb 20250116
 
-# when importnig in gui or scripts
-IMPORT_FILE_EXTENSIONS = ['.tif']
+# when importing in gui or scripts
+# abb depreciate, use ImageImpoter
+IMPORT_FILE_EXTENSIONS = ['.tif',
+                          '.tiff',
+                          '.nd2',
+                          '.czi']
 
 # on load
 LOAD_SAVE_EXTENSIONS = ['.mmap', '.zip']

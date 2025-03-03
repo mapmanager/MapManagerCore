@@ -1,6 +1,6 @@
 import os
 # import json
-from typing import Any, Dict, Iterator, List, Union
+from typing import Any, Dict, Iterator, List, Union, Optional
 import numpy as np
 import zarr
 import tifffile
@@ -8,7 +8,9 @@ import tifffile
 from mapmanagercore.analysis_params import AnalysisParams
 from mapmanagercore.lazy_geo_pd_images.metadata import Metadata
 from .base import ImageLoader, Position
+
 from mapmanagercore.metadata3 import mmMapMetadata, TimepointMetadata
+from mapmanagercore.imageImporter import getImageImporter
 
 from mapmanagercore.logger import logger
 
@@ -20,7 +22,7 @@ class ZarrLoader(ImageLoader):
         Initializes a ZarrLoader object.
 
         Args:
-            path (str): The path to the Zarr file.
+            path (str): The path to the .mmap Zarr file.
             lazy (bool, optional): If True, the images will be loaded lazily.
                 If False, the images will be loaded eagerly. Defaults to False.
         """
@@ -28,8 +30,6 @@ class ZarrLoader(ImageLoader):
 
         # abb md3
         self._metadata3 = mmMapMetadata()
-
-        logger.info(f'path:{path}')
         
         if path is None:
             self._store = None
@@ -90,6 +90,7 @@ class ZarrLoader(ImageLoader):
     def analysisParams(self):
         return self._analysisParams
 
+    # abb todo print a tree of timepoints and channels per timepoint (basically metadata3.
     def __str__(self):
         return f"Zarr Loader: path: {self.path}"
 
@@ -140,7 +141,7 @@ class ZarrLoader(ImageLoader):
         #   I guess this is always move a channel between different src/dt timepoints!!!
         _moved = self._metadata3.moveChannel(srcTimePoint, srcChannel, destTimePoint, destChannel)
 
-        channel = self._imagesSrcs[srcTimePoint].pop(srcChannel)
+        channel = self._imagesSrcs[srcTimePoint].pop(srcChannel)  # dict(int: np.ndarray)
         name = self._metadata[srcTimePoint].channelNames.pop(srcChannel, None)
 
         if destChannel in self._imagesSrcs[destTimePoint]:    
@@ -194,6 +195,103 @@ class ZarrLoader(ImageLoader):
 
         return not (isinstance(a, type(None)) and isinstance(b, type(None)))
 
+    # abb imageImporter
+    def appendTimepoint_ii(self, path, verbose=False) -> Optional[bool]:
+        """Append a new timepoint from file (can be multiple channels).
+        """
+        ii = getImageImporter(path, loadImgData=True)
+        if ii is None:
+            return
+        
+        if verbose:
+            logger.info(f'ii is:{ii}')
+
+        # empty timepoint metadata
+        newTimepointMetadata = TimepointMetadata()
+
+        for channelIdx in range(ii.numChannels):
+            imgData = ii.getChannelData(channelIdx)
+            channelName = ii.channelNames[channelIdx]
+
+            # metadata
+            newTimepointMetadata.appendChannel(imgData, name=channelName)
+            
+            # image data 
+            oneChannelDict = {}
+            oneChannelDict[channelIdx] = imgData
+            self._imagesSrcs.append(oneChannelDict)
+
+        self._metadata3.appendTimepoint(newTimepointMetadata)
+
+        return True
+    
+    # abb imageImporter
+    def appendChannels_ii(self, path:str, timepoint:int) -> Optional[bool]:
+        """Open a file and append channels to an existing timepoint.
+        """
+        # check that timepoint exists
+        if not self._timepoint_exists_ii(timepoint):
+            logger.error(f'timepoint "{timepoint}" does not exist, expecting one of {range(self.numTimepoints_ii)}')
+            return
+
+        # get image importer from path
+        ii = getImageImporter(path, loadImgData=False)  # remember to load pixels with loadData()
+        if ii is None:
+            return
+        
+        # check incoming channel shape matches our shape (at timepoint t)
+        _incomingShape = ii.channelShape
+        _existingShape = self.shape(timepoint)  # abb this should use metadata ???
+        if _incomingShape != _existingShape:
+            logger.error(f' img shape mismatch, expecting:{_existingShape} but got {_incomingShape}')
+            return
+        
+        # load actual pixels
+        ii.loadData()
+
+        # append all incoming channels to timepoint
+        timepointMetadata = self._metadata3.getTimepointMetadata(timepoint)
+        
+        for _incomingChannelIdx in range(ii.numChannels):
+            # fet incoming raw data
+            imgData = ii.getChannelData(_incomingChannelIdx)
+            channelName = ii.channelNames[_incomingChannelIdx]
+
+            # set metadata
+            timepointMetadata.appendChannel(imgData, name=channelName)
+            
+            # set image data (adding a new key)
+            _newChannelKey = self._getNewChannelKey_ii(timepoint)
+            logger.info(f'timepoint:{timepoint} _newChannelKey:{_newChannelKey}')
+            self._imagesSrcs[timepoint][_newChannelKey] = imgData  # adding a new key
+
+        return True
+    
+    def _getNewChannelKey_ii(self, timepoint:int) -> Optional[int]:
+        """Get next available channel key."""
+        if not self._timepoint_exists_ii(timepoint):
+            return
+        _keyList = list(self._imagesSrcs[timepoint].keys())
+        _maxKey = max(_keyList)
+        _newKey = _maxKey + 1
+        return _newKey
+    
+    @property
+    def numTimepoints_ii(self) -> int:
+        """Get the number of timepoints (imaging sessions).
+        """
+        return len(self._imagesSrcs)
+    
+    def numChannels_ii(self, t:int) -> Optional[int]:
+        """Get the number of channels in a timepoint (imaging session).
+        """
+        if not self._timepoint_exists_ii(t):
+            return
+        return len(self._imagesSrcs[t].keys())
+    
+    def _timepoint_exists_ii(self, t:int):
+        return t < self.numTimepoints_ii
+    
     def merge(self, loader: ImageLoader):
         times = sorted(loader.timePoints())
         for time in times:
@@ -231,7 +329,7 @@ class ZarrLoader(ImageLoader):
         from mapmanagercore import MultiImageLoader
         loader = MultiImageLoader()
         loader.read(path, time=0, channel=0)
-        metadata = metadata = loader.metadata(0)
+        metadata = loader.metadata(0)
         self._metadata.append(metadata)
         
         # imgData

@@ -10,12 +10,15 @@ with open(os.path.abspath(_thisPath+"/README.md")) as f:
 pyodide = os.getenv('PYODIDE', '0') == '1'
 
 install_requires = [
+    # 'numpy==2.0.0',  # required to use bioio, does this break mapmanagercore?
+    # 'numpy>=1.21.0,<2.0.0',
     'numpy',
     'pandas',
     'shapely',
     'geopandas',
+    'pyarrow',  # to save/load with parquet
     'scikit-image',
-    'zarr==2.16',  # 3.0 has breaking changes
+    'zarr>=2.6,<2.16.0',  # 3.0 has breaking changes
     'async-lru',
     'asyncio',
     'platformdirs',  # to get platform specific App paths
@@ -23,13 +26,23 @@ install_requires = [
     "dataclasses-json",
     'brightest-path-lib',
     'pooch',  # to load data from MapManagerCore-Data repo
-    'tifffile',
-    'nd2',  # to import Nikon images
     'imagecodecs',
-    # 'bioio',  # TODO: use to load metadata and lazy load images
-    # install bioio from main branch of github repo (not pypi package)
-    # 'bioio @ git+ssh://git@github.com/bioio-devs/bioio.git',
-    # 'bioio-ome-zarr @ git+ssh://git@github.com/bioio-devs/bioio-ome-zarr.git',
+    'tifffile',
+
+    # install mofified bioio
+    'bioio @ git+ssh://git@github.com/mapmanager/bioio.git',
+
+    # image import with bioio
+    # 'bioio>=1.2.0',  # this is bleading edge and leads to version problems (worth it)
+    'bioio-tifffile',
+    'bioio-czi',
+    'bioio-nd2',
+    'bioio-ome-tiff',
+    # # 'bioio-imageio',  # PNG , GIF , & other similar formats seen here
+    # # 'bioio-bioformats',  # for oir requires maven/java
+]
+
+bioioRequirements = [
 ]
 
 testRequirements = [
@@ -45,6 +58,12 @@ devRequirements = [
     'jupyter',
     'ipykernel',  # sometimes required by vs code to run jupyter notebooks
     'matplotlib',
+]
+
+docsRequirements = [
+    'mkdocs',
+    'mkdocs-material',
+    'mkdocstrings-python',
 ]
 
 foundPackages = find_packages(include=['mapmanagercore', 'mapmanagercore.*'])
@@ -77,7 +96,7 @@ setup(
         'Topic :: Software Development :: Libraries :: Application Frameworks',
     ],
 
-    # this is criptic and not well documented
+    # this is cryptic and not well documented
     # but critical to automatically import all sub-modules (folders)
     # package_dir={"" : "mapmanagercore"},
 
@@ -93,6 +112,7 @@ setup(
     extras_require={
         'dev': devRequirements,
         'tests': testRequirements,
+        'docs': docsRequirements,
     },
 
     python_requires=">=3.11",

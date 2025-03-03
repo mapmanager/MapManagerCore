@@ -11,7 +11,13 @@ As a github workflow:
     /home/runner/.cache/pooch
 """
 
+import os
+from typing import Optional
+import requests
+
 import pooch
+
+from mapmanagercore.logger import logger
 
 def getTiffChannel_1() -> str:
     urlCh1 = 'https://github.com/mapmanager/MapManagerCore-Data/raw/main/data/rr30a_s0u/t0/rr30a_s0_ch1.tif'
@@ -48,15 +54,6 @@ def getMultiTimepointMap() -> str:
     return mapPath
 
 # abb 20250204
-def getNd2Channel_1() -> str:
-    urlCh1 = 'https://github.com/mapmanager/MapManagerCore-Data/raw/main/data/olsen/Animal_145_Slice_1_Right.nd2'
-    ch1Path = pooch.retrieve(
-        url=urlCh1,
-        known_hash=None
-    )
-    return ch1Path
-
-# abb 20250204
 def getSingleTimepointMap_nd2() -> str:
     urlCh1 = 'https://github.com/mapmanager/MapManagerCore-Data/raw/main/data/olsen/Animal_145_Slice_1_Right.mmap.zip'
     ch1Path = pooch.retrieve(
@@ -64,3 +61,44 @@ def getSingleTimepointMap_nd2() -> str:
         known_hash=None
     )
     return ch1Path
+
+# abb depreciate
+def getNd2Channel_1() -> str:
+    rootDir = 'https://github.com/mapmanager/MapManagerCore-Data/raw/main/data/samples'
+    url = os.path.join(rootDir, 'nd2/Animal_145_Slice_1_Right.nd2')
+    path = pooch.retrieve(
+        url=url,
+        known_hash=None
+    )
+    return path
+
+# abb 20250204
+def getSampleData(item : str) -> Optional[str]:
+    rootDir = 'https://github.com/mapmanager/MapManagerCore-Data/raw/main/data/samples'
+    
+    try:
+        if item == 'czi':
+            url = os.path.join(rootDir, 'czi/P8_Slice1(moreanterior)LS_NAc1.czi')
+        elif item == 'nd2':
+            url = os.path.join(rootDir, 'nd2/Animal_145_Slice_1_Right.nd2')
+        elif item == 'oir':
+            url = os.path.join(rootDir, 'oir/20190320_b_.oir')
+        elif item == 'ome-tif':
+            url = os.path.join(rootDir, 'ome-tif/example.ome.tif')
+        elif item == 'max-scale-tif':
+            url = os.path.join(rootDir, 'tiff/MAX_rr30a_s0_ch2_imagej_scale.tif')
+        elif item == 'scale-tif':
+            url = os.path.join(rootDir, 'tiff/rr30a_s0_ch2_imagej_scale.tif')
+        else:
+            logger.error(f'did not understand sample data key: "{item}"')
+            return
+    except (requests.exceptions.HTTPError) as e:
+        logger.error(e)
+        return
+
+    path = pooch.retrieve(
+        url=url,
+        known_hash=None
+    )
+    return path
+

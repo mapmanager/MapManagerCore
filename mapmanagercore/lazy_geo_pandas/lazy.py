@@ -722,5 +722,7 @@ def mergeDeps(a: dict[str, set[str]],  b: dict[str, set[str]]) -> bool:
 def toBytes(df: gp.GeoDataFrame):
     """Converts a GeoPandas DataFrame to bytes."""
     buffer = io.BytesIO()
-    df.to_pickle(buffer)
+    logger.warning('abb swapping from pickle to parquet')
+    # df.to_pickle(buffer)
+    df.to_parquet(buffer)
     return np.frombuffer(buffer.getvalue(), dtype=np.uint8)

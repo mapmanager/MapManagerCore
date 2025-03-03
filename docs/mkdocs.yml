@@ -45,3 +45,4 @@ nav:
     - Interface: interface.md
     - API:
         - Metadata: api/metadata.md
+        - ImageImporter: api/image_importer.md

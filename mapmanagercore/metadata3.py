@@ -1,16 +1,23 @@
-"""Metadata stores information about images. It provides a single timepoint image with multiple color channels, and a list of single timepoint images.
+"""Metadata stores information about images.
+
+This includes:
+
+ - A list of single timepoint images
+ - Each single timepoint image can have multiple (color) channels
+
+ Each `single timepoint image` can be thought of as an `imaging session`. The user sits down at the scope and takes an image, we call this a timepoint. Alternatively, this could be called an `imaging session`.
 
 Classes:
     mmMapMetadata: A list of `TimepointMetaData` representing a collection of single time point images.
-    TimepointMetadata: Metadata for a single timepoint with multiple channels.
-    ChannelMetadata: The metadata for one channel.
+    TimepointMetadata: Metadata for a single timepoint with (potentially) multiple color channels.
+    ChannelMetadata: The metadata for one color channel.
 
 Example:
 
-    # make some miage data
+    # make some image data
     imgData = np.random.randint(low=0, high=2**11, size=(20,512,512), dtype=np.uint16)
     
-    # creat a timepoint and append a channel of image data.
+    # create a timepoint and append a channel of image data.
     tpmd = TimepointMetadata()
     tpmd.appendChannel(imgData)
 
@@ -369,11 +376,17 @@ class TimepointMetadata(_metadataList):
         tpmd.appendChannel(imgData)
         return tpmd
 
-    def appendChannel(self, imgData : np.ndarray) -> Optional[int]:
+    def setVoxelMetadata(self, voxelMetadata: VoxelMetadata):
+        self.voxelMetadata = voxelMetadata
+    
+    def appendChannel(self,
+                      imgData : np.ndarray,
+                      name: Optional[str] = 'Untitled') -> Optional[int]:
         """Given img data, append a new color channel. Used when we are importing data.
         
         Parameters:
-            imgData: The image data to append.
+            imgData: The channel image data to append.
+            name: The name of the channel. Default is 'Untitled'.
 
         Returns:
             Appended channel index on success, otherwise None.
@@ -396,7 +409,7 @@ class TimepointMetadata(_metadataList):
                     logger.mmlog(f'expecting shape {self.shape} but got {proposedShape}')
                     return
                 
-        metadataContrast = ChannelMetadata()
+        metadataContrast = ChannelMetadata(name=name)
         metadataContrast._initFromImgData(imgData)
         
         # do the append

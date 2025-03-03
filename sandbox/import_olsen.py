@@ -265,11 +265,21 @@ def makeMap(olsenRaw : OlsenRaw):
 
 def loadOlsen():
     from mapmanagercore import MapAnnotations
+    
     savePath = '/Users/cudmore/Desktop/olsen_example.mmap'
+    savePath = '/Users/cudmore/Desktop/Animal_145_Slice_1_Right.mmap.zip'
+
+    logger.info(f'loading: {savePath}')
+
     map = MapAnnotations.load(savePath)
     print(map)
 
-    print(map.points[:])
+    logger.info(f'map.points is: {type(map.points[:])}')
+    print(map.points[:])  # geopandas.geodataframe.GeoDataFrame
+
+    # dfJson = map.points[:].to_json()
+    # print(dfJson)
+
     points = map.points[:]
     print(points.columns)
 
@@ -308,20 +318,24 @@ def plotPlotly(olsenRaw):
 
     fig.show()
 
-if __name__ == '__main__':
+def run():
     # tryROi()
 
-    # nd2Path = '/Users/cudmore/Dropbox/data/olson/IKA_A_102 Thy1_Spines_5MeO/Isak_Spines_8_26_23/Animal 145/Animal_145_Slice_1_Left.nd2'
-    nd2Path = '/Users/cudmore/Dropbox/data/olson/IKA_A_102 Thy1_Spines_5MeO/Isak_Spines_8_26_23/Animal 145/Animal_145_Slice_1_Right.nd2'
+    # path specifies an nd2 file with 2x other files for points and segments
+
+    # path = '/Users/cudmore/Dropbox/data/olson/IKA_A_102 Thy1_Spines_5MeO/Isak_Spines_8_26_23/Animal 145/Animal_145_Slice_1_Left.nd2'
+    path = '/Users/cudmore/Dropbox/data/olson/IKA_A_102 Thy1_Spines_5MeO/Isak_Spines_8_26_23/Animal 145/Animal_145_Slice_1_Right.nd2'
     
     # from mapmanagercore.data import getNd2Channel_1
     # path = getNd2Channel_1()
 
-    olsenRaw = LoadOlsen(nd2Path)
-    # #plotOlsen(olsenRaw)
-    makeMap(olsenRaw)
+    makeIt = False
+    if makeIt:
+        olsenRaw = LoadOlsen(path)
+        #plotOlsen(olsenRaw)
+        makeMap(olsenRaw)
 
-    # loadOlsen()
+    loadOlsen()
 
     # mmMap = getTimepoint(olsenRaw)
     # segmentID = makeSegments(olsenRaw=olsenRaw)
@@ -333,4 +347,6 @@ if __name__ == '__main__':
     # print(olsenRaw.mmMap)
     # print(olsenRaw.mmMap.points[:])
 
+if __name__ == '__main__':
+    run()
 

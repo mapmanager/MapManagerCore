@@ -14,7 +14,9 @@ import zarr
 from shapely.geometry import GeometryCollection, LineString, MultiPolygon, Polygon
 import shapely
 import skimage.draw
-from PIL import Image
+
+# abb depreciate PIL, use bioio
+# from PIL import Image
 
 class Position(IntEnum):
     OVER = 0
@@ -136,31 +138,18 @@ class ImageLoader:
                 return (0, 0, 0)
 
             channel = channels[0]
-        # abb handle 2d
         _shape = self._images(t, channel).shape
-        _numDims = len(_shape)
-        # logger.info(f'_numDims:{_numDims} _shape:{_shape}')
-        if _numDims == 2:
-            # 2d images haze z=1
-            _ret = (1,) + _shape
-        elif _numDims == 3:
-            _ret = _shape
-        else:
-            logger.error(f'expecting num dims of 2 or 3, got {_numDims}')
-            return None
-        
-        # return self._images(t, channel).shape
-        return _ret
+        return _shape
     
     def channels(self, t: int) -> List[int]:
         metaData = self.metadata(t)
         return list(metaData.channelNames.keys())
 
-    # abb TODO depreciate
+    # abb depreciate
     def maxChannels(self) -> int:
         return self._analysisParams.getValue("maxChannels")
 
-    # abb TODO depreciate
+    # abb depreciate
     def setMaxChannels(self, maxChannels: int) -> bool:
         if self.maxChannels() == maxChannels:
             return False
@@ -457,6 +446,11 @@ class ImageLoader:
         # logger.info(f"deleting channel in mmc")
         return False
 
+    # abb importImage
+    def appendChannels(self, path:str, time:int) -> bool:
+        ("implemented by subclass", time)
+        return False
+
     def updateChannel(self, timePoint: int, channel: int, updates: dict) -> bool:
         metadata = self.metadata(timePoint)
         if "name" in updates:
@@ -488,6 +482,7 @@ class ImageLoader:
 
         return True
     
+    # abb depreciate and use imageImporter 
     def validateImageSize(self, newTifPath, timePoint):
         """ Check if image size of new image is the same as previous images
 
@@ -500,10 +495,11 @@ class ImageLoader:
         
         """
             
+        from PIL import Image
         with Image.open(newTifPath) as img:
             newImgWidth, newImgHeight = img.size
-            print("Width:", newImgWidth)
-            print("Height:", newImgHeight)
+            logger.info(f'Width: {newImgWidth}')
+            logger.info(f'Height: {newImgHeight}')
             newImgSlices = img.n_frames  # z dimension
             logger.info(f"z slices: {newImgSlices}")
 
