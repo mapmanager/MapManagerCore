@@ -32,13 +32,13 @@ def test_zarr_loader():
     # append a new timepoint
     _ok = zl.appendTimepoint_ii(path1, verbose=True)
     assert _ok is True
-    assert zl._numTimepoints_ii == 1
+    assert zl.numTimepoints_ii == 1
     assert zl._metadata3.numTimepoints == 1
 
     # append a new timepoint
     _ok = zl.appendTimepoint_ii(path1, verbose=True)
     assert _ok is True
-    assert zl._numTimepoints_ii == 2
+    assert zl.numTimepoints_ii == 2
     assert zl._metadata3.numTimepoints == 2
 
     # logger.info('zl._metadata3 is:')
@@ -48,20 +48,20 @@ def test_zarr_loader():
     timepoint = 1
     _ok = zl.appendChannels_ii(path2, timepoint=timepoint)
     assert _ok is True
-    assert zl._numChannels_ii(timepoint) == 2
+    assert zl.numChannels_ii(timepoint) == 2
 
     # append channel to timpoint 1
     timepoint = 0
     _ok = zl.appendChannels_ii(path2, timepoint=timepoint)
     assert _ok is True
-    assert zl._numChannels_ii(timepoint) == 2
+    assert zl.numChannels_ii(timepoint) == 2
 
     # bad channel shape
     nd2Path = getNd2Channel_1()
     timepoint = 1
     _ok = zl.appendChannels_ii(nd2Path, timepoint=timepoint)
     assert _ok is not True
-    assert zl._numChannels_ii(timepoint) == 2  # still 2, append channel failed
+    assert zl.numChannels_ii(timepoint) == 2  # still 2, append channel failed
 
 if __name__ == '__main__':
     test_zarr_loader()

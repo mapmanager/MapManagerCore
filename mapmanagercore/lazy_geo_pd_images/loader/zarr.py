@@ -32,6 +32,7 @@ class ZarrLoader(ImageLoader):
         self._metadata3 = mmMapMetadata()
         
         if path is None:
+            # initialize zarrloader as "empty".
             self._store = None
             self.group = zarr.group()
             self.group.create_group("images")
@@ -82,6 +83,7 @@ class ZarrLoader(ImageLoader):
 
 
         if path is None:
+            # abb todo depreciate
             # create a default single time point
             self.createTimePoint()
 
