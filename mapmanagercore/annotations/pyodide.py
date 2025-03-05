@@ -1,5 +1,6 @@
 import json
-from typing import List, Tuple, Union
+from typing import Tuple
+from mapmanagercore.schemas import AnalysisParameters
 from mapmanagercore.lazy_geo_pd_images.loader.base import Position
 from mapmanagercore.lazy_geo_pd_images.loader.imageio import MultiImageLoader
 from mapmanagercore.lazy_geo_pd_images.loader.zarr import ZarrLoader
@@ -13,10 +14,16 @@ from ..utils import filterMask
 from . import Annotations
 from pyodide.ffi import to_js
 from .single_time_point import SingleTimePointAnnotations
-from enum import Enum
 
-
-type ChangeOrError = Union[bool, str]
+class JsonEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        if isinstance(obj, np.floating):
+            return float(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return super(JsonEncoder, self).default(obj)
 
 
 class PyodideSingleTimePoint(SingleTimePointAnnotations):
@@ -98,7 +105,7 @@ class PyodideAnnotations(Annotations):
 
     def timePoint_js(self, time: int):
         return PyodideSingleTimePoint(self, time)
-    
+
     def metadata_json(self, time: int):
         """Returns the metadata as a JSON string."""
         return self.loader.metadata(time).to_json()
@@ -149,67 +156,54 @@ class PyodideAnnotations(Annotations):
 
     def columnsAttributes_json(self):
         """Returns the columnsAttributes as a JSON string."""
-        return json.dumps(self.points.columnsAttributes, skipkeys=True)
+        return json.dumps(self.points.columnsAttributes, skipkeys=True, cls=JsonEncoder)
 
     def dataTree(self):
-        return json.dumps(self.loader.dataTree(), skipkeys=True)
+        return json.dumps(self.loader.dataTree(), skipkeys=True, cls=JsonEncoder)
 
-    def createTimePoint(self) -> ChangeOrError:
-        try:
-            return self.loader.createTimePoint()
-        except Exception as e:
-            return str(e)
+    def createTimePoint(self) -> bool:
+        return self.loader.createTimePoint()
 
-    def appendChannelToTimePoint(self, srcTimePoint: int, srcChannel: int, destTimePoint: int) -> ChangeOrError:
-        try:
-            return self.loader.appendChannelToTimePoint(srcTimePoint, srcChannel, destTimePoint)
-        except Exception as e:
-            return str(e)
+    def appendChannelToTimePoint(self, srcTimePoint: int, srcChannel: int, destTimePoint: int) -> bool:
+        return self.loader.appendChannelToTimePoint(srcTimePoint, srcChannel, destTimePoint)
 
-    def moveChannel(self, srcTimePoint: int, srcChannel: int, destTimePoint: int, destChannel: int) -> ChangeOrError:
-        try:
-            return self.loader.moveChannel(srcTimePoint, srcChannel, destTimePoint, destChannel)
-        except Exception as e:
-            return str(e)
+    def moveChannel(self, srcTimePoint: int, srcChannel: int, destTimePoint: int, destChannel: int) -> bool:
+        return self.loader.moveChannel(srcTimePoint, srcChannel, destTimePoint, destChannel)
 
-    def moveTimePoint(self, srcTimePoint: int, destTimePoint: int, position: Position = Position.OVER) -> ChangeOrError:
-        try:
-            return self.loader.moveTimePoint(srcTimePoint, destTimePoint, int(position))
-        except Exception as e:
-            return str(e)
+    def moveTimePoint(self, srcTimePoint: int, destTimePoint: int, position: Position = Position.OVER) -> bool:
+        return self.loader.moveTimePoint(srcTimePoint, destTimePoint, int(position))
 
-    def deleteTimePoint(self, timePoint: int) -> ChangeOrError:
-        try:
-            return self.loader.deleteTimePoint(timePoint)
-        except Exception as e:
-            return str(e)
+    def deleteTimePoint(self, timePoint: int) -> bool:
+        return self.loader.deleteTimePoint(timePoint)
 
-    def deleteChannel(self, timePoint: int, channel: int) -> ChangeOrError:
-        try:
-            return self.loader.deleteChannel(timePoint, channel)
-        except Exception as e:
-            return str(e)
+    def deleteChannel(self, timePoint: int, channel: int) -> bool:
+        return self.loader.deleteChannel(timePoint, channel)
 
-    def updateChannel(self, timePoint: int, channel: int, updates: dict) -> ChangeOrError:
-        try:
-            return self.loader.updateChannel(timePoint, channel, updates.to_py())
-        except Exception as e:
-            return str(e)
+    def updateChannel(self, timePoint: int, channel: int, updates: dict) -> bool:
+        return self.loader.updateChannel(timePoint, channel, updates.to_py())
 
-    def updateTimePoint(self, timePoint: int, updates: dict) -> ChangeOrError:
-        try:
-            return self.loader.updateTimePoint(timePoint, updates.to_py())
-        except Exception as e:
-            return str(e)
+    def updateTimePoint(self, timePoint: int, updates: dict) -> bool:
+        return self.loader.updateTimePoint(timePoint, updates.to_py())
 
     def maxChannels(self) -> int:
         return self.loader.maxChannels()
-    
+
     def timePoints_js(self):
         return to_js(list(self.loader.timePoints()))
 
     def setMaxChannels(self, maxChannels: int):
-        try:
-            return self.loader.setMaxChannels(maxChannels)
-        except Exception as e:
-            return str(e)
+        return self.loader.setMaxChannels(maxChannels)
+
+    def analysisParams(self):
+        params = self._analysisParameters.columnsAttributes.copy()
+        for key in params:
+            params[key]["value"] = self._analysisParameters[key]
+
+        return json.dumps(params, cls=JsonEncoder)
+
+    def setAnalysisParams(self, key: str, value: any):
+        value = json.loads(value)
+        analysisParameters = AnalysisParameters()
+        setattr(analysisParameters, key, value)
+        self._analysisParameters.update(analysisParameters)
+        return True

@@ -1,3 +1,4 @@
+import dataclasses
 from typing import Union
 
 from shapely.geometry import LineString, Point
@@ -6,8 +7,7 @@ import numpy as np
 
 from mapmanagercore.utils import interpolate
 from mapmanagercore.layers.line import calculateSegmentOffset
-
-from ..lazy_geo_pandas import schema, compute, LazyGeoFrame
+from ..lazy_geo_pandas import schema, field, compute, LazyGeoFrame, Schema
 from mapmanagercore.logger import logger
 
 @schema(
@@ -55,20 +55,43 @@ from mapmanagercore.logger import logger
 )
 class Segment:
     """A schema representing a segment"""
-    
-    segmentID: int
-    t: int
 
-    segment: LineString
-    roughTracing: Union[LineString, Point]
+    segmentID: int = field(
+        title="Segment ID",
+        description="Unique identifier for each segment",
+        categorical=True
+    )
+    t: int = field(
+        title="Time",
+        description="Time of the segment"
+    )
 
-    radius: float
-    modified: np.datetime64
+    segment: LineString = field(
+        title="Segment",
+        description="Segment of the spine",
+        plot=False
+    )
+    roughTracing: Union[LineString, Point] = field(
+        title="Rough Tracing",
+        description="Rough tracing of the spine",
+        plot=False
+    )
 
-    pivotDistance: float = 0.0
+    radius: float = field(
+        title="Radius",
+        description="Radius of the segment (points)"
+    )
+    modified: np.datetime64 = field(
+        title="Modified",
+        description="Time of last modification",
+        plot=False
+    )
 
-    color: str = '#FF00FF'
-    """Color of segment."""
+    pivotDistance: float = field(
+        default=0.0,
+        title="Pivot Distance",
+        description="Distance from the pivot point"
+    )
 
     @compute(title="Pivot Point", dependencies=["segment", "pivotDistance"])
     def pivotPoint(frame: LazyGeoFrame):

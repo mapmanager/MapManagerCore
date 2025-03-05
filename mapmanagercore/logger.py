@@ -14,6 +14,7 @@ import os
 import sys
 
 from logging.handlers import RotatingFileHandler
+from typing import Concatenate, Union
 
 def setLogLevel(newLogLevel : str = 'DEBUG'):
     """Set the global logging level.
@@ -68,9 +69,30 @@ def getLoggerFilePath():
 
 setLogLevel()
 
-# Create a custom logger with the name as the module name
-logger = logging.getLogger(__name__)
+class AlertLogger(logging.Logger):
+    """A logger that can alert the user."""
 
+    def alert(self, message: str):
+        """ Log a message with level ALERT on this logger.
+        In pyodide this will pop up an alert box.
+        
+        Args:
+            message (str): The message to log or show the user in the alert box.
+        """
+        pass
+
+# Create a custom logger with the name as the module name
+logger: AlertLogger = logging.getLogger(__name__)
+ALERT = logging.ERROR + 1
+
+# Monkey patch the alert method
+logging.addLevelName(ALERT, 'ALERT')
+
+def alert(self: logging.Logger, message: str, *args, **kwargs) -> None:
+    if self.isEnabledFor(ALERT):
+        self._log(ALERT, message, args, **kwargs)
+
+logging.Logger.alert = alert
 
 handler = logging.StreamHandler(sys.stdout)
 

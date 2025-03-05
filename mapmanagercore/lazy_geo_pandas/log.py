@@ -35,6 +35,9 @@ class Op(Generic[T]):
             commonIndexes).values]
         self.added = after.loc[after.index.difference(commonIndexes).values]
 
+    def __repr__(self):
+        return f"Op(type={self.type}, deleted={self.deleted.index.values}, added={self.added.index.values}, changed={self.changed.index.values})"
+
     def isEmpty(self) -> bool:
         """
         Checks if the operation is empty (no op).

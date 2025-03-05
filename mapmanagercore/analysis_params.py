@@ -4,7 +4,6 @@ from typing import Optional
 import zarr
 from mapmanagercore.logger import logger
 
-
 class AnalysisParams():
     """
     """
@@ -51,10 +50,15 @@ class AnalysisParams():
         for k,v in self.getDict().items():
             print(f'{k} {v}')
 
-    def getJson(self, indent : int = 4):
+    def getJson(self, indent : int = 4, excludeVersion : bool = False) -> str:
         # return json.dumps(self._dict, indent=indent)
+        if excludeVersion:
+            _dict = self._dict.copy()
+            _dict.pop('__version__', None)
+            return json.dumps(_dict)
+
         return json.dumps(self._dict)
-    
+        
     def setDict(self, newDict):
         """ Applies changes
         """
@@ -77,6 +81,7 @@ class AnalysisParams():
                 'defaultValue': 10,
                 'currentValue': 10,
                 'description': 'Points along the tracing to find spine connection (anchor).',
+                "title": "Brightest Path Distance",
                 'type' : "int"
             },
 
@@ -84,6 +89,7 @@ class AnalysisParams():
                 'defaultValue': 0,  # 0 based
                 'currentValue': 0,
                 'description': 'Image color channel to find brightest connection of spine.',
+                "title": "Channel",
                 'type' : "int"
             },
 
@@ -91,6 +97,7 @@ class AnalysisParams():
                 'defaultValue': 3,
                 'currentValue': 3,
                 'description': 'Number of image slices for max project to find brightest connection of spine.',
+                "title": "Z Spread",
                 'type' : "int"
             },
 
@@ -99,6 +106,7 @@ class AnalysisParams():
                 'defaultValue': 4,
                 'currentValue': 4,
                 'description': 'Number of pixels to extend spine head for spine ROI.',
+                "title": "ROI Extend",
                 'type' : "int"
             },
 
@@ -106,6 +114,7 @@ class AnalysisParams():
                 'defaultValue': 4,
                 'currentValue': 4,
                 'description': 'Width of spine ROI.',
+                "title": "ROI Radius",
                 'type' : "int"
             },
 
@@ -114,6 +123,7 @@ class AnalysisParams():
                 'defaultValue': 4,
                 'currentValue': 4,
                 'description': 'Radius of segment tracing.',
+                "title": "Segment Radius",
                 'type' : "int"
             },
 
@@ -124,6 +134,7 @@ class AnalysisParams():
                 'defaultValue': 1000,  # abb was 20
                 'currentValue': 1000,
                 'description': 'Max distance to trace a brightest path with relatively low performance cost.',
+                "title": "Segment Tracing Max Distance",
                 'type' : "int"
             },
 
@@ -141,6 +152,7 @@ class AnalysisParams():
                 'defaultValue': 5,
                 'currentValue': 5,
                 'description': 'Number of points used when calculating background ROI. Number of points (n), where grid is n x n',
+                "title": "Background ROI Grid Points",
                 'type' : "int"
             },
 
@@ -148,6 +160,7 @@ class AnalysisParams():
                 'defaultValue': 0.1,
                 'currentValue': 0.1,
                 'description': 'Value that the background grid points are allowed to overlap',
+                "title": "Background ROI Grid Overlap",
                 'type' : "float"
             },
 
@@ -203,7 +216,7 @@ class AnalysisParams():
             logger.warning('   you may have opened a zar zip, save as a zarr folder and try again')
             return
 
-        zDS = zarr.DirectoryStore(path, 'w')
+        zDS = zarr.storage.LocalStore(path, 'w')
 
         with zDS as store:
             group = zarr.group(store=store)

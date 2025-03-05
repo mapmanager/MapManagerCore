@@ -238,7 +238,7 @@ class AnnotationsLayers(AnnotationsInteractions):
             layers.extend(labels.splitGhost(
                 visiblePoints, opacity=Config.ghostOpacity))
 
-        if selectedSpine in self.points.index:
+        if selectedSpine in points.index:
             self._appendRois(selectedSpine, editing, layers)
 
         return layers

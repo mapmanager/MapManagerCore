@@ -5,7 +5,11 @@ from io import BytesIO
 import weakref
 from typing import Any, Tuple, Union, Optional
 import zipfile
+
+import zarr.storage
+from mapmanagercore.lazy_geo_pandas.lazy import LazyGeoSeries
 from mapmanagercore.lazy_geo_pd_images.loader.base import Position
+from mapmanagercore.schemas.analysis_params import AnalysisParameters
 import numpy as np
 import pandas as pd
 
@@ -41,6 +45,13 @@ class AnnotationsBase(LazyImagesGeoPandas):
 
         super().__init__(loader)
 
+        if analysisParams is None:
+            analysisParams = AnalysisParameters()
+        if lineSegments is None:
+            lineSegments = pd.DataFrame()
+        if points is None:
+            points = pd.DataFrame()
+
         if not isinstance(lineSegments, gp.GeoDataFrame):
             if not isinstance(lineSegments, pd.DataFrame):
                 lineSegments = pd.read_csv(lineSegments, index_col=False)
@@ -52,56 +63,58 @@ class AnnotationsBase(LazyImagesGeoPandas):
         # abj
         self._lastSaveTime = lastSaveTime
 
-        # abb analysisparams
-        self._analysisParams: AnalysisParams = analysisParams
+        self._analysisParameters = LazyGeoSeries(
+            AnalysisParameters, store=weakref.ref(self), context=self
+        )
+        self._analysisParameters.update(analysisParams, skipLog=True)
 
         self._segments = LazyGeoFrame(
-            Segment, data=lineSegments, store=weakref.ref(self))
+            Segment, data=lineSegments, store=weakref.ref(self), context=self)
         self._points = LazyGeoFrame(
-            Spine, data=points, store=weakref.ref(self))
+            Spine, data=points, store=weakref.ref(self), context=self)
 
         self.loader = loader
         self.path = path
-        
+
         # To invalidate columns that were miss-computed in previous version
         # we can conditionally check the version number
         # if version === 0:
         #  then we can invalidate the invalid columns by name
         # self._segments.invalidateColumns([... columns ...])
-        
 
     # abj
+
     def getLastSaveTime(self):
         """
         """
         # get last save time from attributes
-        return self._lastSaveTime 
+        return self._lastSaveTime
 
     # abb convenience
     def getNumTimepoints(self):
         return len(self._images.timePoints())
 
     # abb convenience
-    def getPointDataFrame(self, t : Optional[int] = None) -> pd.DataFrame:
+    def getPointDataFrame(self, t: Optional[int] = None) -> pd.DataFrame:
         """Get the full points dataframe.
         """
         pointsDf = self.points[:]
-        
+
         if t is not None:
 
             # move (,t) index into a column
             pointsDf = pointsDf.reset_index(level=1)
             # reduce my t==t
-            pointsDf = pointsDf[ pointsDf['t']==t ]
-        
+            pointsDf = pointsDf[pointsDf['t'] == t]
+
         return pointsDf
-    
+
     # abj
     # def getChannelTotal(self, t : Optional[int] = None) -> int:
     #     """Get total number of channel
     #     """
-    #     return self._images.channels() 
-    
+    #     return self._images.channels()
+
     # abb convenience
     def __str__(self):
         """Print info about the map.
@@ -112,13 +125,13 @@ class AnnotationsBase(LazyImagesGeoPandas):
         numTimepoints = len(timePoints)
         numPnts = len(self.points)
         numSegments = len(self.segments)
-        
-        theRet =  f'mmmap t:[{numTimepoints}], points:{numPnts} segments:{numSegments}\n'
+
+        theRet = f'mmmap t:[{numTimepoints}], points:{numPnts} segments:{numSegments}\n'
         for tpIdx in timePoints:
             tp = self.getTimePoint(time=tpIdx)
             theRet += f'      {tp}\n'
         return theRet
-    
+
     @property
     def segments(self) -> LazyGeoFrame:
         return self._segments
@@ -128,8 +141,8 @@ class AnnotationsBase(LazyImagesGeoPandas):
         return self._points
 
     @property
-    def analysisParams(self) -> AnalysisParams:
-        return self._analysisParams
+    def analysisParams(self) -> LazyGeoSeries:
+        return self._analysisParameters
 
     def filterPoints(self, filter: Any):
         """
@@ -210,11 +223,13 @@ class AnnotationsBase(LazyImagesGeoPandas):
             lineSegments = gp.GeoDataFrame(lineSegments, geometry="segment")
         else:
             lineSegments = gp.GeoDataFrame()
-            
-        analysisParams = loader.analysisParams()
 
-        # try:
-        if 1:
+        if "analysisParams" in loader.group.attrs:
+            analysisParams = loader.group.attrs["analysisParams"]
+            analysisParams = AnalysisParameters(**analysisParams)
+        else:
+            analysisParams = AnalysisParameters()
+        try:
             lastSaveTime = loader.group.attrs['lastSaveTime']
         # except:
         #     lastSaveTime = ""
@@ -335,7 +350,7 @@ class AnnotationsBase(LazyImagesGeoPandas):
         formatted_time = currentTime.strftime('%Y%m%d %H:%M')
         # logger.info(f"storeLastSaveTime {formatted_time}")
         return formatted_time
-    
+
     # Context manager
     def __enter__(self):
         self._images = self._images.__enter__()
@@ -451,7 +466,7 @@ class AnnotationsBase(LazyImagesGeoPandas):
             return lambda x: symbols_[x]
 
         return values.apply(lambda x: symbols_[x])
-    
+
     # abj
     # def loadInNewChannel(self, path: Union[str, np.ndarray], time: int = 0, channel: int = 0):
     #     """ Load in new channel (tif image)

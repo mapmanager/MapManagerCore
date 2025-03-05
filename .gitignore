@@ -167,3 +167,4 @@ cython_debug/
 data/rr30a_s0u.mmap
 example.ipynb
 data/*.mmap/
+data/

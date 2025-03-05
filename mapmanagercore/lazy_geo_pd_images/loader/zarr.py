@@ -59,6 +59,8 @@ class ZarrLoader(ImageLoader):
 
         self._imagesSrcs: List[Dict[int, np.ndarray]] = []
         self._metadata = []
+        self._maxChannels = self.group.attrs["maxChannels"] if "maxChannels" in self.group.attrs else 2
+
         imagesGroup = self.group["images"]
         for t, group in imagesGroup.groups():
             t = int(t)
@@ -101,38 +103,36 @@ class ZarrLoader(ImageLoader):
 
     # abb we should only create a timepoint if we have raw data (path or np.array)
     def createTimePoint(self) -> bool:
-        self._metadata.append(Metadata(name="Unnamed Time Point"))
+        self._metadata.append(Metadata(name="Unnamed"))
         self._imagesSrcs.append({})
         return True
 
     def appendChannelToTimePoint(self, srcTimePoint: int, srcChannel: int, destTimePoint: int) -> bool:
         if srcTimePoint == destTimePoint:
             return False
-        
+
         if srcTimePoint >= len(self._imagesSrcs) or destTimePoint >= len(self._imagesSrcs):
             return False
-        
+
         if srcChannel not in self._imagesSrcs[srcTimePoint]:
             return False
-        
+
         dest = sorted(self._imagesSrcs[destTimePoint].keys())
-        destChannel = len(dest) 
+        destChannel = len(dest)
         for channel, index in enumerate(dest):
             if channel != index:
                 destChannel = index
                 break
-            
-        
+
         return self.moveChannel(srcTimePoint, srcChannel, destTimePoint, destChannel)
-        
 
     def moveChannel(self, srcTimePoint: int, srcChannel: int, destTimePoint: int, destChannel: int) -> bool:
         if srcTimePoint == destTimePoint and srcChannel == destChannel:
             return False
-        
+
         if srcTimePoint >= len(self._imagesSrcs) or destTimePoint >= len(self._imagesSrcs):
             return False
-        
+
         if srcChannel not in self._imagesSrcs[srcTimePoint]:
             return False
     
@@ -146,10 +146,12 @@ class ZarrLoader(ImageLoader):
         channel = self._imagesSrcs[srcTimePoint].pop(srcChannel)  # dict(int: np.ndarray)
         name = self._metadata[srcTimePoint].channelNames.pop(srcChannel, None)
 
-        if destChannel in self._imagesSrcs[destTimePoint]:    
-            self._imagesSrcs[srcTimePoint][srcChannel] = self._imagesSrcs[destTimePoint].pop(destChannel)
+        if destChannel in self._imagesSrcs[destTimePoint]:
+            self._imagesSrcs[srcTimePoint][srcChannel] = self._imagesSrcs[destTimePoint].pop(
+                destChannel)
             if destChannel in self._metadata[destTimePoint].channelNames:
-                self._metadata[srcTimePoint].channelNames[srcChannel] = self._metadata[destTimePoint].channelNames.pop(destChannel)
+                self._metadata[srcTimePoint].channelNames[srcChannel] = self._metadata[destTimePoint].channelNames.pop(
+                    destChannel)
 
         self._imagesSrcs[destTimePoint][destChannel] = channel
         if name is not None:
