@@ -5,7 +5,7 @@ from mapmanagercore import MapAnnotations, MultiImageLoader
 from mapmanagercore.logger import logger
 import mapmanagercore.data
 
-def test_create_map() -> MapAnnotations:
+def test_create_map(logData: bool = True) -> MapAnnotations:
     """Create a single tp, one channel map.
     """
     ch1_path = mapmanagercore.data.getTiffChannel_1()
@@ -19,11 +19,13 @@ def test_create_map() -> MapAnnotations:
 
     # check metadata
     md0 = loader.metadata(t=0)
-    logger.info('metadata for loader t=0 is:')
-    pprint(md0)
 
-    logger.info('load._metadata3 is:')
-    pprint(loader._metadata3)
+    if logData:
+        logger.info('metadata for loader t=0 is:')
+        pprint(md0)
+
+        logger.info('load._metadata3 is:')
+        pprint(loader._metadata3)
 
     # md1 = loader.metadata(t=1)
     # logger.info('metadata for channel 1 is:')

@@ -227,7 +227,7 @@ class ImageLoader:
 
         return theMin, theMax, globalMin, globalMax
     
-    def fetchSlices(self, time: int, channel: int, sliceRange: Tuple[int, int]) -> np.ndarray:
+    def fetchSlices(self, time: int, channel: int, sliceRange: Tuple[int, int], threeD: bool = False) -> np.ndarray:
         """
         Fetches a range of slices for the given time, channel, and slice range.
 
@@ -235,6 +235,7 @@ class ImageLoader:
           time (int): The time index.
           channel (int): The channel index.
           sliceRange (tuple): The range of slice indices.
+          threeD (bool): get full 3D slice when true - abj
 
         Returns:
           np.ndarray: The fetched slices.
@@ -244,13 +245,17 @@ class ImageLoader:
         z, _x, _y = self.shape(time, channel)
         sliceRange = (max(0, sliceRange[0]), min(z, sliceRange[1]))
 
-        # logger.warning(f'abb 2d sliceRange:{sliceRange}')
+        logger.warning(f'abb 2d sliceRange:{sliceRange}')
 
         # abb handle 2d images
         # if sliceRange[0] == sliceRange[1] - 1:
         if (sliceRange[0] == sliceRange[1] - 1) or (sliceRange[0] == sliceRange[1]):
             # logger.warning(f'abb 2d calling loadSlices with sliceRange[0]:{sliceRange[0]}')
             return self.loadSlice(time, channel, sliceRange[0])
+
+        if threeD:
+            temp = self._images(time, channel)[sliceRange[0]:sliceRange[1]]
+            return temp
 
         return np.max(self._images(time, channel)[sliceRange[0]:sliceRange[1]], axis=0)
 
@@ -318,6 +323,7 @@ class ImageLoader:
         """
         results = []
         indexes = []
+
         if isinstance(shape, list):
             shape = gp.GeoDataFrame(shape, columns=["shape"], geometry="shape")
 
@@ -325,11 +331,12 @@ class ImageLoader:
             shape = shape.to_frame("shape")
 
         if "t" in shape.index.names:
+            logger.info(f"t in shape.index.names")
             if not "t" in shape.columns:
                 shape.reset_index("t", inplace=True)
             else:
                 shape.drop("t", axis=1, inplace=True)
-
+                
         if time is not None:
             shape["t"] = time
 
@@ -345,7 +352,7 @@ class ImageLoader:
         if isinstance(channel, list):
             for (t, z), group in shape.groupby(by=["t", "z"]):
                 images = [self.fetchSlices(
-                    t, c, (z - zSpread, z + zSpread + 1)) for c in channel]
+                      t, c, (z - zSpread, z + zSpread + 1)) for c in channel]
 
                 for idx, row in group.iterrows():
                     xLim, yLim = images[0].shape
@@ -358,10 +365,13 @@ class ImageLoader:
 
                     # inject the nan values where the shape is out of bounds.
                     results.append(
-                        [np.where(inBounds, image[xs, ys], np.nan) for image in images])
+                        # [np.where(inBounds, image[xs, ys], np.nan) for image in images])
+                        # abj: accounting for pixels being inverted when plotting by switching ys and xs
+                        [np.where(inBounds, image[ys, xs], np.nan) for image in images]) 
                     indexes.append(idx)
             return pd.DataFrame(results, indexes, columns=channel)
 
+        # logger.info(f"shape {shape}")
         for (t, z), group in shape.groupby(by=["t", "z"]):
             image = self.fetchSlices(
                 t, channel, (z - zSpread, z + zSpread + 1))
@@ -377,7 +387,10 @@ class ImageLoader:
                 ys = np.clip(ys, 0, yLim - 1)
 
                 # inject the nan values where the shape is out of bounds.
-                results.append(np.where(inBounds, image[xs, ys], np.nan))
+                # results.append(np.where(inBounds, image[xs, ys], np.nan))
+
+                # abj: accounting for pixels being inverted when plotting by switching ys and xs
+                results.append(np.where(inBounds, image[ys, xs], np.nan)) 
                 indexes.append(idx)
 
         return pd.Series(results, indexes, name=channel)

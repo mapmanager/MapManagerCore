@@ -169,7 +169,8 @@ class AnnotationsBase(LazyImagesGeoPandas):
         from .single_time_point import SingleTimePointAnnotations
         return SingleTimePointAnnotations(self, time)
 
-    def getPixels(self, time: int, channel: int, zRange: Tuple[int, int] = None, z: int = None, zSpread: int = 0) -> ImageSlice:
+    def getPixels(self, time: int, channel: int, zRange: Tuple[int, int] = None, z: int = None, zSpread: int = 0,
+                  threeD: bool = False) -> ImageSlice:
         """
         Loads the image data for a slice.
 
@@ -179,6 +180,7 @@ class AnnotationsBase(LazyImagesGeoPandas):
           zRange (Tuple[int, int]): The visible z slice range.
           z (int): The z slice index.
           zSpread (int): The amount to offset z +/-.
+          threeD (bool): Get full 3D np.array when true
 
         Returns:
           ImageSlice: The image slice.
@@ -191,8 +193,7 @@ class AnnotationsBase(LazyImagesGeoPandas):
                 zRangeDf = self.points["z"]
                 zRange = (int(zRangeDf.min()),
                           int(zRangeDf.max()))
-
-        return super().getPixels(time, channel, zRange)
+        return super().getPixels(time, channel, zRange, threeD=threeD)
 
     # Serialization
 
@@ -482,3 +483,85 @@ class AnnotationsBase(LazyImagesGeoPandas):
 
     #     self._images.readNewImages(path = path, channel = channel)
         # self._images.appendChannelToTimePoint()
+
+    def getDendrogramReplot(self, newSegmentID: int, spineAngleChecked: bool, spineLengthChecked: bool, spineLengthConstant: int):
+        """ calculate necessary values to replot dendrogram widget
+
+        Args:
+            newSegmentID: segment ID being plotted
+            spineAngleChecked: True when showing spine angle, False when not (will show perpendicular line instead)
+            spineLengthChecked: True when showing spine length, otherwise use spineLengthConstant
+            spineLengthConstant: value used to plot spine line spineLengthCheck if False
+
+        Return:
+            plotDF: df
+            spineLineDF: df
+            segmentLength:
+
+        """
+        newSegmentID = int(newSegmentID)
+        self._paDF = self.getPointDataFrame()
+
+        filteredPointDF = self._paDF[self._paDF["segmentID"] == newSegmentID]
+        spinePositions, spineLength, spineAngle, spineSide, spineIndex = \
+            [filteredPointDF[col] for col in ["spinePosition", "spineLength", "spineAngle", "spineSide"]] + [filteredPointDF.index]
+
+        anchorX, anchorY = [0] * len(spinePositions), spinePositions.tolist() 
+        spineX, spineY, savedSpineIndex = [None] * len(spineIndex), [], []
+        xVal = np.where(spineLengthChecked, spineLength, spineLengthConstant)
+
+        # Handle direction adjustments for xVal
+        direction_map = {"Left": -1, "Right": 1, "Undefined": np.nan}
+        spineX = np.array([xVal[i] * direction_map.get(direction, 1) for i, direction in enumerate(spineSide)])
+        savedSpineIndex = np.array(spineIndex)
+
+        # Handle Y calculation if the spine angle checkbox is checked
+        if spineAngleChecked:
+            # Define undefined angles for tangent calculation
+            undefinedList = [270, 90, 180, 0, 360]
+
+            # Vectorized angle-based Y calculation
+            angles = spineAngle
+            anchorYVal = np.array(anchorY)
+
+            # Handle undefined angles (where tan function would break)
+            is_undefined_angle = np.isin(np.floor(angles), undefinedList)
+            angledY = np.where(is_undefined_angle, anchorYVal, xVal * np.tan(np.radians(angles)))
+
+            # Adjust Y based on the angle ranges
+            conditions = [
+                (0 <= angles) & (angles <= 90), 
+                (90 < angles) & (angles <= 180), 
+                (180 < angles) & (angles <= 270), 
+                (270 < angles) & (angles <= 360)
+            ]
+
+            adjustments = [
+                lambda y, diff: y + abs(diff),
+                lambda y, diff: y - abs(diff),
+                lambda y, diff: y - abs(diff),
+                lambda y, diff: y + abs(diff)
+            ]
+
+            # Apply the appropriate adjustment for each angle range
+            for cond, adjust in zip(conditions, adjustments):
+                diff = np.abs(anchorYVal) - np.abs(angledY)
+                angledY = np.where(cond, adjust(anchorYVal, diff), angledY)
+
+            spineY = angledY
+        else:
+            spineY = np.array(anchorY) 
+
+        spineLineX = []
+        spineLineY = []
+        for i in range(len(anchorX)):
+            spineLineX.extend([anchorX[i], spineX[i], np.nan])
+            spineLineY.extend([anchorY[i], spineY[i], np.nan])
+
+        laDF = self.segments[:]
+        filteredLineDF = laDF.loc[laDF.index.get_level_values(0) == newSegmentID] # only compare segments id, not time
+
+        segmentLength = filteredLineDF["length"].iloc[0]
+        plotDF = pd.DataFrame({"spineX": spineX, "spineY": spineY, "spineIndex": savedSpineIndex})
+        spineLineDF = pd.DataFrame({"spineLineX": spineLineX, "spineLineY": spineLineY})
+        return plotDF, spineLineDF, segmentLength

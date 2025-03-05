@@ -110,10 +110,11 @@ class Segment:
         # import geopandas as gpd
 
         df = frame[["segment", "radius"]]
-        df["z"] = (df['segment'].apply(lambda geom: [coord[2] for coord in geom.coords]))  
+        df["z"] = (df['segment'].apply(lambda geom: [coord[2] for coord in geom.coords] if geom is not None else []))  
         offsettedSegment = df.apply(lambda d: calculateSegmentOffset(d["segment"], d["radius"], isPositive=False), axis=1)
-        df["x"] = (offsettedSegment.apply(lambda geom: [coord[0] for coord in geom.coords]))
-        df["y"] = (offsettedSegment.apply(lambda geom: [coord[1] for coord in geom.coords]))
+        logger.info(f"offsettedSegment is: {offsettedSegment}")
+        df["x"] = (offsettedSegment.apply(lambda geom: [coord[0] for coord in geom.coords] if geom is not None else []))
+        df["y"] = (offsettedSegment.apply(lambda geom: [coord[1] for coord in geom.coords] if geom is not None else []))
         newDF = gpd.GeoSeries(df[["x", "y", "z"]].apply(lambda ldf: LineString(Point(ldf["x"][i], ldf["y"][i], ldf["z"][i])
                                                                             for i, val in enumerate(ldf["x"])), axis=1))
         return newDF
@@ -129,15 +130,27 @@ class Segment:
 
         df = frame[["segment", "radius"]]
         # logger.info(f" df[radius] {df['radius']}")
-        df["z"] = (df['segment'].apply(lambda geom: [coord[2] for coord in geom.coords]))  
+        df["z"] = (df['segment'].apply(lambda geom: [coord[2] for coord in geom.coords] if geom is not None else []))  
         offsettedSegment = df.apply(lambda d: calculateSegmentOffset(d["segment"], d["radius"], isPositive=True), axis=1)
-        df["x"] = (offsettedSegment.apply(lambda geom: [coord[0] for coord in geom.coords]))
-        df["y"] = (offsettedSegment.apply(lambda geom: [coord[1] for coord in geom.coords]))
+        df["x"] = (offsettedSegment.apply(lambda geom: [coord[0] for coord in geom.coords] if geom is not None else []))
+        df["y"] = (offsettedSegment.apply(lambda geom: [coord[1] for coord in geom.coords] if geom is not None else []))
 
         newDF = gpd.GeoSeries(df[["x", "y", "z"]].apply(lambda ldf: LineString(Point(ldf["x"][i], ldf["y"][i], ldf["z"][i]) 
                                                                             for i, val in enumerate(ldf["x"])), axis=1))
         return newDF
     
+    @compute(title="Segment Length", dependencies=["segment", "segmentID"])
+    def length(frame: LazyGeoFrame) -> float: 
+        """ Calculate the length of the segment for plotting segment in dendrogram widget
+
+        Return:
+            len of segment in float form
+        """
+        segment = frame['segment'] 
+        logger.info(f" segment.length { segment.length}")
+        return segment.length
+        
+
     # abb do we need this?
     # @compute(title="distance", dependencies=["segment"])
     # def distance(frame: LazyGeoFrame): # distance of each point from beginning of the segment

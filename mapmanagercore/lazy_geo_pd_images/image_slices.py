@@ -23,15 +23,21 @@ class ImageSlice:
         """
         return self._image.shape
 
-    def data(self) -> np.ndarray:
+    def data(self, flattened: bool = True) -> np.ndarray:
         """
         Returns the image data.
+
+        Args:
+          flattened (bool): flatten image data if True
 
         Returns:
           np.ndarray: The image data.
         """
-        return self._image.flatten()
-
+        if flattened:
+          return self._image.flatten()
+        else:
+           return self._image
+        
     def extent(self) -> Tuple[int, int]:
         """
         The range of the image data
