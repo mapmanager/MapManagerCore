@@ -302,6 +302,8 @@ def test_mmmap_metadata():
     tpmd = mdl.getTimepointMetadata(1)
     assert tpmd.getChannelProperty(0, 'dtype') == 'uint16'
 
+    mdl.print()
+    
 def tryGeneric():
     import dataclasses
     from typing import Generic, TypeVar

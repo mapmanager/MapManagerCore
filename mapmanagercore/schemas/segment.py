@@ -12,48 +12,9 @@ from mapmanagercore.logger import logger
 
 @schema(
     index=["segmentID", "t"],
-    properties={
-        "segmentID": {
-            "categorical": True,
-            "title": "Segment ID",
-            "description": "Unique identifier for each segment"
-        },
-        "t": {
-            "title": "Time",
-            "description": "Time of the segment"
-        },
-        "segment": {
-            "title": "Segment",
-            "description": "Segment of the spine",
-            "plot": False
-        },
-        "roughTracing": {
-            "title": "Rough Tracing",
-            "description": "Rough tracing of the spine",
-            "plot": False
-        },
-        "radius": {
-            "title": "Radius",
-            "description": "Radius of the segment (points)"
-        },
-        "modified": {
-            "title": "Modified",
-            "description": "Time of last modification",
-            "plot": False
-        },
-        "pivotDistance": {
-            "title": "Pivot Distance",
-            "description": "Distance along tracing to use as 0 coordinate",
-            "plot": False
-        },
-        "color": {
-            "title": "Color",
-            "description": "Color to plot the segment",
-            "plot": False
-        }
-    }
 )
-class Segment:
+@dataclasses.dataclass
+class Segment(Schema):
     """A schema representing a segment"""
 
     segmentID: int = field(

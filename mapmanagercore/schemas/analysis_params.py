@@ -65,3 +65,11 @@ class AnalysisParameters(Schema):
         title="Background ROI Grid Overlap",
         description='Value that the background grid points are allowed to overlap'
     )
+
+    # abb for backward compatibility with original class AnalysisParams()
+    # todo: remove
+    __version__: float = field(
+        default=0.0,
+        title="xxx",
+        description='xxx'
+    )

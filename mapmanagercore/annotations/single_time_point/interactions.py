@@ -676,8 +676,8 @@ class AnnotationsInteractions(AnnotationsSegments):
     #     return closestPivotPoint
 
     # Use setSegmentOrigin instead
-    # def setPivotDistance(self, segmentId: SegmentId, clickedPoint: Point, speculate: bool = False) -> Point:
-    #     """ Sets pivotPoint of segment.
+    def setPivotDistance(self, segmentId: SegmentId, clickedPoint: Point, speculate: bool = False) -> Point:
+        """ Sets pivotPoint of segment.
 
         Given a point, finds the distance along the line to that (projected) point.
         """

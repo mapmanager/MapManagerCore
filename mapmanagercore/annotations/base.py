@@ -226,14 +226,17 @@ class AnnotationsBase(LazyImagesGeoPandas):
             lineSegments = gp.GeoDataFrame()
 
         if "analysisParams" in loader.group.attrs:
-            analysisParams = loader.group.attrs["analysisParams"]
+            analysisParams = loader.group.attrs["analysisParams"]  # this is json
             analysisParams = AnalysisParameters(**analysisParams)
         else:
             analysisParams = AnalysisParameters()
+        
+        # abb lastSaveTime will ALWAYS be in file
+        # abb when using try/catch, ALWAYS name an exception, Do not use bare `except`RuffE722
         try:
             lastSaveTime = loader.group.attrs['lastSaveTime']
-        # except:
-        #     lastSaveTime = ""
+        except:
+            lastSaveTime = ""
 
         _ret = cls(loader, lineSegments, points, analysisParams, path, lastSaveTime)
         logger.warning(f'  returning {type(_ret)}')

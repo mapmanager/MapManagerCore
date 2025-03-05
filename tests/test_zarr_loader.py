@@ -63,5 +63,43 @@ def test_zarr_loader():
     assert _ok is not True
     assert zl.numChannels_ii(timepoint) == 2  # still 2, append channel failed
 
+    # moveTimePoint
+    srcTimepoint = 0
+    dstTimepoint = 1
+    zl.moveTimepoint_ii(srcTimepoint, dstTimepoint)
+    assert zl.numChannels_ii(dstTimepoint) == 2
+    assert zl.numChannels_ii(srcTimepoint) == 2
+
+def test_edits():
+    zl = ZarrLoader()
+
+    print(zl)
+
+    # default zarr loader makes [{}], we just want []
+    print(zl._imagesSrcs)  # [{}]
+    zl._imagesSrcs = []
+
+    path1 = getTiffChannel_1()
+    path2 = getTiffChannel_2()
+
+    zl.appendTimepoint_ii(path1, verbose=True)
+    zl.appendTimepoint_ii(path2, verbose=True)
+
+    assert zl.numTimepoints_ii == 2
+
+    # fails
+    # zl.moveTimePoint(0, 1)
+    assert zl.numChannels_ii(0) == 1
+    assert zl.numChannels_ii(1) == 1
+
+    _ok = zl.deleteTimePoint(0)
+    assert _ok is True
+    assert zl.numTimepoints_ii == 1
+
+    # tp 0 no longer exists
+    _ok = zl.deleteTimePoint(0)
+    assert _ok is False
+    
 if __name__ == '__main__':
-    test_zarr_loader()
+    # test_zarr_loader()
+    test_edits()

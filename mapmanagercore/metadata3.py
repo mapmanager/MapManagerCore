@@ -171,7 +171,7 @@ class _metadataList(_metadataBase):
             return False
         
     def __getitem__(self, index:int):
-        """Prefer to use explicit function getMetadataItem(int)
+        """Limit use, use explicit function getMetadataItem(int)
         """
         return self._metadataList[index]
     
@@ -483,8 +483,18 @@ class TimepointMetadata(_metadataList):
 class mmMapMetadata(_metadataList):
     """A list of TimepointMetadata.
     
-    For single timepoint mmap/zarr, represents a list of independent imaging timepoints.
+    For single timepoint mmap/zarr, represents a list of independent imaging timepoints/sessions.
     """
+
+    def print(self):
+        """Print summary of metadata.
+        """
+        for timepoint in range(self.numTimepoints):
+            print(f'timepoint {timepoint}')
+            for channel in range(self[timepoint].numChannels):
+                print(f'  channel {channel}')
+                print(f'    minInt {self[timepoint][channel].minInt}')
+                print(f'    maxInt {self[timepoint][channel].maxInt}')
 
     def getTimepointMetadata(self, index : int) -> Optional[TimepointMetadata]:
         """Get metadata for a timepoint.
