@@ -113,43 +113,54 @@ class Schema:
         types = cls._annotations
         df = gp.GeoDataFrame(df)
         for key, valueType in types.items():
+            if valueType.__name__ != "Tuple":
+                if hasattr(valueType, "__args__"):
+                    valueType = valueType.__args__[0]
 
-            if hasattr(valueType, "__args__"):
-                valueType = valueType.__args__[0]
+                if issubclass(valueType, np.datetime64):
+                    valueType = "datetime64[ns]"
 
-            if issubclass(valueType, np.datetime64):
-                valueType = "datetime64[ns]"
+                if key in df.index.names:
+                    if int == valueType:
+                        valueType = 'Int64'
 
-            if key in df.index.names:
-                if int == valueType:
-                    valueType = 'Int64'
-
-                if len(df.index.names) == 1:
-                    df.index = df.index.astype(valueType)
+                    if len(df.index.names) == 1:
+                        df.index = df.index.astype(valueType)
+                    else:
+                        i = df.index.names.index(key)
+                        df.index = df.index.set_levels(
+                            df.index.levels[i].astype(valueType), level=i)
+                    continue
+                if not isinstance(valueType, str) and issubclass(valueType, BaseGeometry):
+                    if key in df.columns and len(df[key]) > 0:
+                        if not isinstance(df[key].iloc[0], BaseGeometry):
+                            df[key] = gp.GeoSeries.from_wkt(df[key])
+                    else:
+                        df[key] = gp.GeoSeries()
                 else:
-                    i = df.index.names.index(key)
-                    df.index = df.index.set_levels(
-                        df.index.levels[i].astype(valueType), level=i)
-                continue
-            if not isinstance(valueType, str) and issubclass(valueType, BaseGeometry):
-                if key in df.columns and len(df[key]) > 0:
-                    if not isinstance(df[key].iloc[0], BaseGeometry):
-                        df[key] = gp.GeoSeries.from_wkt(df[key])
-                else:
-                    df[key] = gp.GeoSeries()
+                    if int == valueType:
+                        valueType = 'Int64'
+                        if key in df.columns:
+                            df[key] = np.trunc(df[key])
+
+                    df[key] = df[key].astype(
+                        valueType) if key in df.columns and not df.empty else pd.Series(dtype=valueType)
             else:
-                if int == valueType:
-                    valueType = 'Int64'
-                    if key in df.columns:
-                        df[key] = np.trunc(df[key])
-
                 df[key] = df[key].astype(
-                    valueType) if key in df.columns else pd.Series(dtype=valueType)
+                    "object") if key in df.columns and not df.empty else pd.Series(dtype="object")
 
             if hasattr(defaults, key):
                 default = getattr(defaults, key)
                 if not isinstance(default, MISSING_VALUE_CLASS):
-                    df.loc[:, key] = df.loc[:, key].fillna(default)
+                    if isinstance(default, tuple):
+                        if key in df.columns:
+                            df.loc[:, key] = df.loc[:, key].apply(
+                                lambda x: x if not pd.isna(x) else default)
+                        else:
+                            df.loc[:, key] = df.apply(
+                                lambda x: default, axis=1)
+                    else:
+                        df.loc[:, key] = df.loc[:, key].fillna(default)
 
         if df.index.nlevels != len(cls._index):
             if len(cls._index) != 0:
@@ -203,7 +214,8 @@ class Schema:
                 try:
                     values[key] = expectedType(value)
                     return
-                except:
+                except Exception as e:
+                    print(e)
                     raise ValueError(f"Invalid type for column {key}")
 
 
@@ -213,6 +225,9 @@ def isInstanceExtended(value, expectedType):
     Also checks for numpy int64 type.
     """
     if expectedType == int and isinstance(value, np.int64):
+        return True
+
+    if expectedType.__name__ == "Tuple" and isinstance(value, tuple):
         return True
 
     if hasattr(expectedType, "__args__"):
@@ -310,6 +325,7 @@ def field(default: U = MISSING_VALUE, **attributes: Unpack[ColumnAttributes]) ->
         type (str): The type of the column.
     """
     return Field(default, attributes)
+
 
 def compute(dependencies: Union[List[str], dict[str, list[str]]] = {}, **attributes: Unpack[ColumnAttributes]):
     """

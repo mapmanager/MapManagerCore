@@ -1,5 +1,5 @@
 import dataclasses
-from typing import Union
+from typing import Tuple, Union
 from shapely.geometry import LineString, Point
 from mapmanagercore.utils import interpolate
 import numpy as np
@@ -48,6 +48,14 @@ class Segment(Schema):
         default=0.0,
         title="Pivot Distance",
         description="Distance from the pivot point"
+    )
+    
+    color: Tuple[int, int, int, int] = field(
+        default=(255, 0, 0),
+        type="Tuple[int, int, int, int]",
+        title="Segment Color",
+        description="Color of the segment",
+        plot=False
     )
 
     @compute(title="Pivot Point", dependencies=["segment", "pivotDistance"])

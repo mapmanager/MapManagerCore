@@ -323,6 +323,12 @@ class SingleTimePointAnnotationsBase(_SingleTimePointAnnotationsBase):
         """Get the number of image channels.
         """
         return len(self._annotations._images.channels(self._t))
+    
+    @property
+    def channels(self) -> List[int]:
+        """Get the number of image channels.
+        """
+        return self._annotations._images.channels(self._t)
 
     def getShapePixels(self, shapes: gp.GeoDataFrame, channel: Union[int, List[int]] = 0, zSpread: int = 0, z: int = None) -> pd.Series:
         return self._annotations.getShapePixels(shapes, channel, zSpread, self._t, z=z)

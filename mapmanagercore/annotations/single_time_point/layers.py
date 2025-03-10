@@ -445,13 +445,13 @@ class AnnotationsLayers(AnnotationsInteractions):
     @timer
     def _getSegments(self, zRange: Tuple[int, int], editSegId: SegmentId, selectedSegId: SegmentId, showLineSegmentsRadius: bool, showLineSegmentsOrigin: bool, modeMode: EditMode) -> List[Layer]:
         layers = []
-        segments = self.segments[:, ["segment", "radius"]]
+        segments = self.segments[:, ["segment", "radius", "color"]]
 
         if not editSegId in segments.index:
             editSegId = None
 
         def getStrokeColor(id: SegmentId):
-            return Colors.segmentEditing if id == editSegId else (Colors.segmentSelected if id == selectedSegId else Colors.segment)
+            return Colors.segmentEditing if id == editSegId else (Colors.segmentSelected if id == selectedSegId else segments.loc[id, "color"])
 
         segment = (LineLayer(segments["segment"])
                    .id("segment")
@@ -472,7 +472,7 @@ class AnnotationsLayers(AnnotationsInteractions):
         boarderWidth = Config.segmentLeftRightStrokeWidth
 
         def offset(id: int):
-            return segments.loc[id, "radius"] / boarderWidth
+            return segments.loc[id, "radius"]
 
         # Render the ghost of the edit
         if editSegId is not None:
@@ -537,20 +537,17 @@ class AnnotationsLayers(AnnotationsInteractions):
                           .offset(offset))
             layers.append(right)
 
-            def offset4(id: int):
-                return offset(id) / 4
-
             layers.append(
                 left.copy(id="interaction")
                 .strokeWidth(boarderWidth * 4)
-                .offset(offset4)
+                .offset(offset)
                 .stroke(Colors.transparent)
                 .opacity(0.0)
                 .onDrag(self.moveSegmentRadius))
 
             layers.append(right.copy(
                 id="interaction")
-                .offset(lambda id: -offset4(id))
+                .offset(lambda id: -offset(id))
                 .strokeWidth(boarderWidth * 4).stroke(Colors.transparent)
                 .opacity(0.0)
                 .onDrag(self.moveSegmentRadius))

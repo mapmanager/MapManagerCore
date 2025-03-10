@@ -1,5 +1,4 @@
 from datetime import datetime
-import os
 from copy import copy
 from io import BytesIO
 import weakref

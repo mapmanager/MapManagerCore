@@ -1,10 +1,10 @@
 from typing import Union
+from .utils import AnnotationsUtils
 from mapmanagercore.utils import injectLine
-from .base import SingleTimePointAnnotationsBase
 from shapely.geometry import LineString, Point
 
 
-class AnnotationsSegments(SingleTimePointAnnotationsBase):
+class AnnotationsSegments(AnnotationsUtils):
     def optimizeSegment(self, roughSegment: LineString, segment: LineString = None, updatedIdx: int = None, live: bool = False) -> Union[LineString, None]:
         if segment and len(roughSegment.coords) > 2:
             if updatedIdx > len(roughSegment.coords) - 1:

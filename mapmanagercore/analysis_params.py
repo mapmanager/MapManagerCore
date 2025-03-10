@@ -209,7 +209,7 @@ class AnalysisParams():
             logger.warning('   you may have opened a zar zip, save as a zarr folder and try again')
             return
 
-        zDS = zarr.storage.LocalStore(path, 'w')
+        zDS = zarr.DirectoryStore(path, 'w')
 
         with zDS as store:
             group = zarr.group(store=store)
