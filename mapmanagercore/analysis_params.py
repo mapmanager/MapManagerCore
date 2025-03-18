@@ -86,8 +86,8 @@ class AnalysisParams():
             },
 
             'channel': {
-                'defaultValue': 0,  # 0 based
-                'currentValue': 0,
+                'defaultValue': 1,  # 0 based
+                'currentValue': 1,
                 'description': 'Image color channel to find brightest connection of spine.',
                 "title": "Channel",
                 'type' : "int"
@@ -136,6 +136,16 @@ class AnalysisParams():
                 'description': 'Max distance to trace a brightest path with relatively low performance cost.',
                 "title": "Segment Tracing Max Distance",
                 'type' : "int"
+            },
+
+            'brightestPathTracing': {
+                # 'defaultValue': 90,  # abb was 20
+                # 'currentValue': 90,
+                'defaultValue': False,  # abb was 20
+                'currentValue': False,
+                'description': 'If True then perform brightest path tracing.',
+                "title": "Brightest Path Tracing",
+                'type' : "bool"
             },
 
             # abj

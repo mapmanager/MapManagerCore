@@ -201,10 +201,12 @@ class Schema:
             expectedType = typeColumns[key]
             if not isInstanceExtended(value, expectedType):
                 try:
+                    # abb this is throwing
+                    # TypeError: int() argument must be a string, a bytes-like object or a real number, not 'dict'
                     values[key] = expectedType(value)
                     return
                 except:
-                    raise ValueError(f"Invalid type for column {key}")
+                    raise ValueError(f"Invalid type for column {key}, expectedType is:{expectedType} but got :{type(value)} {value}")
 
 
 def isInstanceExtended(value, expectedType):

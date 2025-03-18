@@ -299,11 +299,13 @@ class LazyGeoFrame(Generic[T]):
     # Context is passed as the first argument to the computed function
     _context: Any
     _baseFilter: Callable[[gp.GeoDataFrame], pd.Index]
-
+    
     def __init__(self,
                  schema: Schema = None,
                  data: gp.GeoDataFrame = None,
-                 store: weakref.ReferenceType[T] = None):
+                 store: weakref.ReferenceType[T] = None,
+                 context: Any = None):
+
         self._schema = schema
         if data is None:
             data = gp.GeoDataFrame()

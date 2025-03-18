@@ -54,6 +54,13 @@ class Segment(Schema):
         description="Distance from the pivot point"
     )
 
+    # abb 20250318, added back in
+    color: str = field(
+        default='ff0000',
+        title="Color",
+        description="Color for plotting"
+    )
+
     @compute(title="Pivot Point", dependencies=["segment", "pivotDistance"])
     def pivotPoint(frame: LazyGeoFrame):
         return interpolate(frame['segment'], frame['pivotDistance'])

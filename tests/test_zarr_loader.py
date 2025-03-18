@@ -99,7 +99,28 @@ def test_edits():
     # tp 0 no longer exists
     _ok = zl.deleteTimePoint(0)
     assert _ok is False
+
+def test_rename():
+    import zarr
     
+    path = '/Users/cudmore/Desktop/data/multi_timepoint_seg_connected_copy.mmap'
+    zl = ZarrLoader(path, lazy=True)
+    print(zl)
+    imagesGroup = zl.group["images"]  # zarr.hierarchy.Group
+    print(imagesGroup)
+    
+    print(imagesGroup['0'])
+    src_path = 'images/0'
+    dst_path = 'images/xxx'
+    zarr.storage.rename(zl._store, src_path, dst_path)
+
+    for t, group in imagesGroup.groups():
+        # t: str
+        # group: <zarr.hierarchy.Group '/images/0'>
+        print(f'{t} type:{type(t)} {group}')
+
 if __name__ == '__main__':
     # test_zarr_loader()
-    test_edits()
+    # test_edits()
+
+    test_rename()

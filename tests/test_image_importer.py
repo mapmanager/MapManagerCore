@@ -1,8 +1,11 @@
 from pprint import pprint
 
-import bioio_base.exceptions
+try:
+    import bioio_base.exceptions
+except (ModuleNotFoundError):
+    pass
 
-from mapmanagercore.imageImporter import _ImageImporter
+from mapmanagercore.imageImporter import ImageImporter_bioio, ImageImporter_tiff, getImageImporter
 import mapmanagercore.data
 from mapmanagercore.logger import logger
 
@@ -17,14 +20,12 @@ def test_bioio_exceptions():
     ]
     for path in pathList:
         try:
-            ii = _ImageImporter(path, loadImgData=True)
+            ii = ImageImporter_bioio(path, loadImgData=True)
         except (bioio_base.exceptions.UnsupportedFileFormatError, FileNotFoundError) as e:
             # logger.error(e)
             continue
 
-def test_bioio():
-    logger.info('loading lots of files from mapmanagercore-data ...')
-
+def getPathList():
     pathList = [
 
         mapmanagercore.data.getTiffChannel_2(),  # 3d tif no scale
@@ -41,18 +42,25 @@ def test_bioio():
         # this works but is not usefull (very slow and no feedback, assuming it downloads file first?)
         #'https://github.com/mapmanager/MapManagerCore-Data/raw/main/data/rr30a_s0u/t0/rr30a_s0_ch1.tif'
     ]
+    return pathList
+
+def test_bioio():
+    logger.info('loading lots of files from mapmanagercore-data ...')
+
+    pathList = getPathList()
 
     for idx, path in enumerate(pathList):
-        logger.info(f'opening file: {path}')
+        # logger.info(f'opening file: {path}')
         
         try:
             loadImgData = True
-            ii = _ImageImporter(path, loadImgData=loadImgData)
+            ii = ImageImporter_bioio(path, loadImgData=loadImgData)
         except (bioio_base.exceptions.UnsupportedFileFormatError, FileNotFoundError) as e:
             # logger.error(e)
             continue
 
-        print(f'  {ii.filename} num channels:{ii.numChannels} {ii.channelShape} {ii.physicalPixelSizes}')
+        logger.info(f'  {ii.filename}')
+        logger.info(f'   num channels:{ii.numChannels} {ii.channelShape} {ii.physicalPixelSizes}')
 
         if ii.filename.endswith('rr30a_s0_ch2_imagej_scale.tif') and 'MAX_' not in ii.filename:
             assert ii.numChannels == 1
@@ -113,10 +121,28 @@ def test_zarr_loader():
     zl = ZarrLoader(path)
     # appendChannels
 
+def test_get_image_importer():
+    pathList = getPathList()
+    
+    for idx, path in enumerate(pathList):
+        # logger.info(f'opening file: {path}')
+        
+        loadImgData = True
+        # ii = ImageImporter_tiff(path, loadImgData=loadImgData)
+        ii = getImageImporter(path, loadImgData=loadImgData)
+        if ii is None:
+            logger.error(f'  failed to open file: {path}')
+            continue
+
+        logger.info(f'  {ii.filename}')
+        logger.info(f'   num channels:{ii.numChannels} {ii.channelShape} {ii.physicalPixelSizes}')
+
 if __name__ == '__main__':
 
     # test_bioio_exceptions()
     
-    test_bioio()
+    #test_bioio()
 
     # test_zarr_loader()
+
+    test_get_image_importer()

@@ -11,14 +11,15 @@ def test_create_map(logData: bool = True) -> MapAnnotations:
     ch1_path = mapmanagercore.data.getTiffChannel_1()
     ch2_path = mapmanagercore.data.getTiffChannel_2()
 
+    # abb old loader
     loader = MultiImageLoader()
 
-    tp = 0
+    tp = 1  # abb 20250317 timepoints are 1 based
     loader.read(ch1_path, time=tp, channel=0)
     loader.read(ch2_path, time=tp, channel=1)
 
     # check metadata
-    md0 = loader.metadata(t=0)
+    md0 = loader.metadata(t=1)
 
     if logData:
         logger.info('metadata for loader t=0 is:')
@@ -41,10 +42,14 @@ def test_add_segment():
     map = test_create_map()
 
     # would be nice if we could create a new segment by specifying the timepoint
-    tp = map.getTimePoint(time=0)
+    # timepoints are 1 based
+    # tp = map.getTimePoint(time=0)
+    timepoint = 1  # timepoints are 1 based
+    tp = map.getTimePoint(time=timepoint)
     
     newSegmentID = tp.newSegment()
-
+    logger.info(f'newSegmentID:{newSegmentID}')
+    
     # fails because the segment has no points
     # tp.addSpine(newSegmentID, x=20, y=30, z=12)
 
@@ -71,7 +76,7 @@ def test_add_segment():
 
 if __name__ == '__main__':
     logger.setLevel('DEBUG')
-    mapAnnotations = test_create_map()
-    print(mapAnnotations)
+    # mapAnnotations = test_create_map()
+    # print(mapAnnotations)
 
-    # test_add_segment()
+    test_add_segment()

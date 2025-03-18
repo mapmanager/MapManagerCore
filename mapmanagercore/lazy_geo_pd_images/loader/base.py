@@ -93,6 +93,7 @@ class ImageLoader:
 
     def _images(self, t: int, channel: int) -> np.ndarray:
         ("implemented by subclass", t, channel)
+        logger.error('base class called')
         return np.array([])
 
     def loadSlice(self, time: int, channel: int, slice: int) -> np.ndarray:
@@ -245,20 +246,23 @@ class ImageLoader:
         z, _x, _y = self.shape(time, channel)
         sliceRange = (max(0, sliceRange[0]), min(z, sliceRange[1]))
 
-        logger.warning(f'abb 2d sliceRange:{sliceRange}')
-
         # abb handle 2d images
         # if sliceRange[0] == sliceRange[1] - 1:
         if (sliceRange[0] == sliceRange[1] - 1) or (sliceRange[0] == sliceRange[1]):
             # logger.warning(f'abb 2d calling loadSlices with sliceRange[0]:{sliceRange[0]}')
-            return self.loadSlice(time, channel, sliceRange[0])
+            _ret = self.loadSlice(time, channel, sliceRange[0])
+        elif threeD:
+            if sliceRange[0] > sliceRange[1]:
+                logger.warning('slice range is backwards???')
+                sliceRange = (sliceRange[1], sliceRange[0])
+            _ret = self._images(time, channel)[sliceRange[0]:sliceRange[1]]
+        else:
+            _ret = np.max(self._images(time, channel)[sliceRange[0]:sliceRange[1]], axis=0)
+        
+        logger.warning(f'abb time:{time} channel:{channel} sliceRange:{sliceRange} threeD:{threeD} self._images:{type(self._images)} got shape:{_ret.shape}')
 
-        if threeD:
-            temp = self._images(time, channel)[sliceRange[0]:sliceRange[1]]
-            return temp
-
-        return np.max(self._images(time, channel)[sliceRange[0]:sliceRange[1]], axis=0)
-
+        return _ret
+    
     def cached(self, maxsize=15) -> Self:
         """
         Adds a cache to a subset of methods method.

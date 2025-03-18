@@ -270,7 +270,8 @@ class _SingleTimePointAnnotationsBase:
 
     @property
     def analysisParams(self) -> LazyGeoSeries:
-        return self._annotations._analysisParameters
+        # return self._annotations._analysisParameters
+        return self._annotations._analysisParams
 
     # abb not used
     @property
@@ -291,7 +292,11 @@ class SingleTimePointAnnotationsBase(_SingleTimePointAnnotationsBase):
                 
         return f't:{numTimepoints}, points:{numPnts} segments:{numSegments} images:{self.shape}'
         
-    def getPixels(self, channel: int, zRange: Tuple[int, int] = None, z: int = None, zSpread: int = 0,
+    def getPixels(self,
+                  channel: int,
+                  zRange: Tuple[int, int] = None,
+                  z: int = None,
+                  zSpread: int = 0,
                   threeD: bool = False) -> ImageSlice:
         """
         Loads the image data for a slice.

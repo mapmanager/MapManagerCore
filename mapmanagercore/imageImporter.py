@@ -54,24 +54,173 @@ from typing import Tuple, List, Optional
 
 import numpy as np
 
-import bioio_base.exceptions
-import bioio
-
-from mapmanagercore.metadata3 import TimepointMetadata, VoxelMetadata
 from mapmanagercore.logger import logger
+
+try:
+    import bioio
+    import bioio_base.exceptions
+except (ImportError) as e:
+    bioio = None
+    import tifffile
+    logger.error('did not import bioio, defaulting to tifffile')
+
+from mapmanagercore.metadata.metadata3 import TimepointMetadata, VoxelMetadata
 
 def acceptedExtensions() -> List[str]:
     """Get list of accepted extensions from bioio.
 
     This list will depend on bioio plugins installed with `pip install`.
+
+    Default is ['.tif'] if bioio is not installed.
     """
     _acceptedExtensions = []
-    report = bioio.plugins.get_plugins(use_cache=False)
-    for item in report.items():
-        _acceptedExtensions.append(item[0])
+    if bioio is not None:
+        report = bioio.plugins.get_plugins(use_cache=False)
+        for item in report.items():
+            _acceptedExtensions.append(item[0])
+    else:
+        _acceptedExtensions = ['.tif']
     return _acceptedExtensions
 
-class _ImageImporter():
+from abc import ABC, abstractmethod
+
+class ImageImporter_Base(ABC):
+    """Abstract base class for ImageImporter.
+    """
+
+    @abstractmethod
+    def __init__(self, path:str, loadImgData:bool=False):
+        # check if file exists (does not work for url like http).
+        try:
+            with open(path) as _file:
+                pass
+        except FileNotFoundError as e:
+            logger.error(e)
+            raise e
+
+        self._path = path
+
+        # self._img = None
+        # self._img: bioio.BioImage = bioio.BioImage(path, reader=None) 
+        """BioImage that provides metadata info and lazy loading of pixels."""
+        
+        self._imgDataList: List[np.ndarray] = []
+        """List of np.ndarray, one index per color channel. See loadData()"""
+
+        self._timepointMetadata: TimepointMetadata = None
+        """TimepointMeta data including info on each color channel."""
+
+        if loadImgData:
+            self.loadData()
+            self.getTimepointMetadata()
+
+    def __str__(self):
+        return (
+            '\n_ImageImporter'
+            f'  path:{self.path}\n'
+            f'  num channels:{self.numChannels}\n'
+            f'  channelShape:{self.channelShape}\n'
+            f'  physicalPixelSizes:{self.physicalPixelSizes}\n'
+        )
+
+    @property
+    def path(self) -> str:
+        """Path to file we loaded from.
+        """
+        return self._path
+    
+    @property
+    def filename(self) -> str:
+        return os.path.split(self.path)[1]
+
+    @property
+    def numChannels(self) -> int:
+        return len(self._imgDataList)
+
+    @property
+    def channelShape(self) -> Tuple[int, int, int]:
+        """Get the channel pixel shape like (z, y, x).
+
+        Notes:
+            All channels in a file have the same shape.
+        """
+        if self.numChannels == 0:
+            return (0, 0, 0)
+        else:
+            return self._imgDataList[0].shape
+
+    @property
+    def physicalPixelSizes(self) -> Tuple[float, float, float]:
+        """Get ZYX voxel size. Usually in um.
+        """
+        return (1, 1, 1)
+
+    @property
+    def channelNames(self) -> List[str]:
+        names = ['Undefined' for channel in self._imgDataList]
+        return names
+
+    def getChannelData(self, channelIdx:int) -> Optional[np.ndarray]:
+        """Get image data for one channel.
+        """
+        if channelIdx > self.numChannels-1:
+            logger.error(f'bad channel index {channelIdx}, num channels is {self.numChannels}')
+            return
+        return self._imgDataList[channelIdx]
+
+    @abstractmethod
+    def loadData(self) -> List[np.ndarray]:
+        """Load all image data and store each channel in _imgDataList[]
+        """
+        pass
+
+    def getTimepointMetadata(self) -> TimepointMetadata:
+        """Get TimepointMetadata from loaded img data.
+        
+        Notes:
+            Need to call loadData() first.
+        """
+        if self.numChannels == 0:
+            logger.warning(f'num channels is {self.numChannels}, no image data loaded. Did you call loadData()?')
+            return
+        
+        if self._timepointMetadata is None:
+            md = TimepointMetadata(name=self.filename)
+
+            zVoxel, yVoxel, xVoxel = self.physicalPixelSizes
+            voxelMetadata = VoxelMetadata(zVoxel=zVoxel, yVoxel=yVoxel, xVoxel=xVoxel)
+            md.setVoxelMetadata(voxelMetadata)
+
+            for channelIdx in range(self.numChannels):
+                userChannelName= self.channelNames[channelIdx]
+                md.appendChannel(imgData=self._imgDataList[channelIdx], name=userChannelName)
+
+            self._timepointMetadata = md
+
+        return self._timepointMetadata
+
+class ImageImporter_tiff(ImageImporter_Base):
+    """Import image data from tiff file.
+    """
+    def __init__(self, path: str, loadImgData:bool = False):
+        """Loading from tiff will always set loadImgData=True.
+        """
+        super().__init__(path, loadImgData=True)
+
+        # self.loadData()
+
+    def loadData(self) -> List[np.ndarray]:
+        if len(self._imgDataList) > 0:
+            logger.error('already loaded')
+            return self._imgDataList
+    
+        imgData = tifffile.imread(self.path)
+        if len(imgData.shape) == 2:
+            imgData = np.expand_dims(imgData, axis=0)
+        self._imgDataList.append(imgData)
+        return self._imgDataList
+    
+class ImageImporter_bioio(ImageImporter_Base):
     """Import image data from file.
     """
     
@@ -90,14 +239,19 @@ class _ImageImporter():
         Notes:
             Use standalone function getImageImporter() during runtime.
         """
-        
+        _reader = None  
+        self._img: bioio.BioImage = bioio.BioImage(path, reader=_reader) 
+        """BioImage that provides metadata info and lazy loading of pixels."""
+
+        super().__init__(path, loadImgData)
+
         # check if file exists (does not work for url like http).
-        try:
-            with open(path) as _file:
-                pass
-        except FileNotFoundError as e:
-            logger.error(e)
-            raise e
+        # try:
+        #     with open(path) as _file:
+        #         pass
+        # except FileNotFoundError as e:
+        #     logger.error(e)
+        #     raise e
 
         # check we know how to open it using extension
         try:
@@ -109,29 +263,29 @@ class _ImageImporter():
             logger.error(f'  bioio accepted extensions are: {acceptedExtensions()}')
             raise e
 
-        self._path = path
+        # self._path = path
 
         # load image meatadata (not raw pixels)
         # reader=None, BioImage will determine loader (in future specifically specify things like TiffLoader)
         # This will be needed because bioio loaders like bio-formats includes TiffFile
         # but we want to use the actual TiffFile loader (not bio-format)
 
-        _reader = None  
-        self._img: bioio.BioImage = bioio.BioImage(path, reader=_reader) 
-        """BioImage that provides metadata info and lazy loading of pixels."""
+        # _reader = None  
+        # self._img: bioio.BioImage = bioio.BioImage(path, reader=_reader) 
+        # """BioImage that provides metadata info and lazy loading of pixels."""
         
-        self._imgDataList: List[np.ndarray] = []
-        """List of np.ndarray, one index per color channel. See loadData()"""
+        # self._imgDataList: List[np.ndarray] = []
+        # """List of np.ndarray, one index per color channel. See loadData()"""
 
-        self._timepointMetadata: TimepointMetadata = None
-        """TimepointMeta data including info on each color channel."""
+        # self._timepointMetadata: TimepointMetadata = None
+        # """TimepointMeta data including info on each color channel."""
 
         # logger.info(f'created _ImageImporter with loadImgData:{loadImgData} path: {path}')
         # logger.info(f'  numChannels:{self.numChannels} shape:{self.channelShape}')
 
-        if loadImgData:
-            self.loadData()
-            self.getTimepointMetadata()
+        # if loadImgData:
+        #     self.loadData()
+        #     self.getTimepointMetadata()
 
         # example API for BioImage
         # logger.info(f'  img:{type(img)}')
@@ -143,24 +297,24 @@ class _ImageImporter():
         # logger.info(f'  img.physical_pixel_sizes:{img.physical_pixel_sizes}')
         # logger.info(f'  img.channel_names:{img.channel_names}')
 
-    def __str__(self):
-        return (
-            '\n_ImageImporter'
-            f'  path:{self.path}\n'
-            f'  num channels:{self.numChannels}\n'
-            f'  channelShape:{self.channelShape}\n'
-            f'  physicalPixelSizes:{self.physicalPixelSizes}\n'
-        )
+    # def __str__(self):
+    #     return (
+    #         '\n_ImageImporter'
+    #         f'  path:{self.path}\n'
+    #         f'  num channels:{self.numChannels}\n'
+    #         f'  channelShape:{self.channelShape}\n'
+    #         f'  physicalPixelSizes:{self.physicalPixelSizes}\n'
+    #     )
     
-    @property
-    def path(self) -> str:
-        """Path to file we loaded from.
-        """
-        return self._path
+    # @property
+    # def path(self) -> str:
+    #     """Path to file we loaded from.
+    #     """
+    #     return self._path
     
-    @property
-    def filename(self) -> str:
-        return os.path.split(self.path)[1]
+    # @property
+    # def filename(self) -> str:
+    #     return os.path.split(self.path)[1]
     
     @property
     def numChannels(self) -> int:
@@ -197,13 +351,13 @@ class _ImageImporter():
         names = [str(nameStr) for nameStr in self._img.channel_names]
         return names
     
-    def getChannelData(self, channelIdx:int) -> Optional[np.ndarray]:
-        """Get image data for one channel.
-        """
-        if channelIdx > self.numChannels-1:
-            logger.error(f'bad channel index {channelIdx}, num channels is {self.numChannels}')
-            return
-        return self._imgDataList[channelIdx]
+    # def getChannelData(self, channelIdx:int) -> Optional[np.ndarray]:
+    #     """Get image data for one channel.
+    #     """
+    #     if channelIdx > self.numChannels-1:
+    #         logger.error(f'bad channel index {channelIdx}, num channels is {self.numChannels}')
+    #         return
+    #     return self._imgDataList[channelIdx]
 
     def loadData(self) -> List[np.ndarray]:
         """Load all image data and store each channel in _imgDataList[]
@@ -246,7 +400,7 @@ class _ImageImporter():
 
         return self._timepointMetadata
     
-def getImageImporter(path:str, loadImgData:bool=False) -> Optional[_ImageImporter]:
+def getImageImporter(path:str, loadImgData:bool=False) -> Optional[ImageImporter_Base]:
     """Get an ImageImporter from a path.
     
     Args:
@@ -259,10 +413,22 @@ def getImageImporter(path:str, loadImgData:bool=False) -> Optional[_ImageImporte
     Notes:
         Will fail (return None) when extension is not supported or file does not exist.
     """
-    try:
-        ii = _ImageImporter(path, loadImgData)
-    except (bioio_base.exceptions.UnsupportedFileFormatError, FileNotFoundError):
+    _, _ext = os.path.splitext(path)
+    if _ext not in acceptedExtensions():
+        logger.error(f'extension "{_ext}" not supported, accepted extensions are: {acceptedExtensions()}')
         return
+    
+    if bioio is not None:
+        try:
+            ii = ImageImporter_bioio(path, loadImgData)
+        except (bioio_base.exceptions.UnsupportedFileFormatError, FileNotFoundError):
+            return
+    else:
+        try:
+            ii = ImageImporter_tiff(path, loadImgData)
+        except (FileNotFoundError):
+            return
+
     if ii.numChannels == 0:
         logger.error('did not find any channels in file')
         return

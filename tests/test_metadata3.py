@@ -5,7 +5,7 @@ from typing import List
 
 import numpy as np
 
-from mapmanagercore.metadata3 import (TimepointMetadata,
+from mapmanagercore.metadata.metadata3 import (TimepointMetadata,
                                                          mmMapMetadata,
                                                          ChannelMetadata,
                                                          AnalysisParams)
@@ -31,8 +31,8 @@ def test_metadata():
 
     assert tmd.numChannels == 1
     # tmd.setChannelName(0, 'my new name!')
-    tmd.setChannelProperty(0, 'name', 'my new name!')
-    assert tmd.getChannelMetadata(0).getValue('name') == 'my new name!'
+    tmd.setChannelProperty(1, 'name', 'my new name!')
+    assert tmd.getChannelMetadata(1).getValue('name') == 'my new name!'
 
     # add a channel with wrong shape
     imgData_bad = np.random.randint(low=0, high=2**11, size=(30,512,512), dtype=np.uint16)
@@ -55,7 +55,7 @@ def test_metadata():
     # pprint(tmd.asDict())
 
     tmd.deleteChannel(5)
-    tmd.deleteChannel(0)
+    tmd.deleteChannel(1)
     
     # each singleton timepoint needs it's own analysis parameters !!!
     # apDict = md.analysisParameters.getDict()
@@ -76,13 +76,13 @@ def test_metadata():
 
         imgData = np.random.randint(low=0, high=2**11, size=(20,512,512), dtype=np.uint16)
         newChannelIndex = tmd.appendChannel(imgData)
-        assert newChannelIndex == 0
+        assert newChannelIndex == 1
         assert tmd.numChannels == 1
         # tmd.setChannelName(newChannelIndex, f'tp {index} ch {newChannelIndex}')
         tmd.setChannelProperty(newChannelIndex, 'name', f'tp {index} ch {newChannelIndex}')
         imgData = np.random.randint(low=0, high=2**11, size=(20,512,512), dtype=np.uint16)
         newChannelIndex = tmd.appendChannel(imgData)
-        assert newChannelIndex == 1
+        assert newChannelIndex == 2
         assert tmd.numChannels == 2
         # tmd.setChannelName(newChannelIndex, f'tp {index} ch {newChannelIndex}')
         tmd.setChannelProperty(newChannelIndex, 'name', f'tp {index} ch {newChannelIndex}')
@@ -172,12 +172,12 @@ def test_timepoint_metadata():
     # append a channel to tpmd, this is on import (we have the whole image volume)
     imgData = np.random.randint(low=0, high=2**11, size=(20,512,512), dtype=np.uint16)
     channelIdx = tpmd.appendChannel(imgData)
-    assert channelIdx == 0
+    assert channelIdx == 1
     assert tpmd.numChannels == 1
 
     # set the name of a color channel
-    tpmd.setChannelProperty(channelIdx, 'name', 'my new name')
-    assert tpmd.getChannelProperty(channelIdx, 'name') == 'my new name'
+    tpmd.setChannelProperty(channelIdx, 'name', '1) my new name')
+    assert tpmd.getChannelProperty(channelIdx, 'name') == '1) my new name'
 
     # add another channel (bad shape)
     imgData = np.random.randint(low=0, high=2**11, size=(10,512,512), dtype=np.uint16)
@@ -186,27 +186,29 @@ def test_timepoint_metadata():
 
     # add another channel (good shape, different dtype)
     imgData = np.random.randint(low=0, high=2**8, size=(20,512,512), dtype=np.uint8)
-    channelIdx = tpmd.appendChannel(imgData)  # return None on bad shape
-    assert channelIdx == 1
+    channelIdx = tpmd.appendChannel(imgData)  # ok to add with different dtype
+    assert channelIdx == 2
 
     # swap channels (bad src channel idx)
     _swapped = tpmd.swapChannels(srcChannelIdx=5, dstChannelIdx=0)
     assert _swapped is False
 
-    # swap channels (bad dst channel idx)
-    _swapped = tpmd.swapChannels(srcChannelIdx=0, dstChannelIdx=5)
+    # swap channels (bad src channel idx)
+    _swapped = tpmd.swapChannels(srcChannelIdx=0, dstChannelIdx=2)
+    assert _swapped is False
+    _swapped = tpmd.swapChannels(srcChannelIdx=2, dstChannelIdx=0)
     assert _swapped is False
 
     # swap channels (good src and dst)
-    _swapped = tpmd.swapChannels(srcChannelIdx=0, dstChannelIdx=1)
+    _swapped = tpmd.swapChannels(srcChannelIdx=1, dstChannelIdx=2)
     assert _swapped is True
 
     # check that swapped channel have the correct name/dtype
-    name = tpmd.getChannelProperty(0, 'name')
-    assert name == 'Untitled'
-
     name = tpmd.getChannelProperty(1, 'name')
-    assert name == 'my new name'
+    assert name == '1) my new name'
+
+    name = tpmd.getChannelProperty(2, 'name')
+    assert name == 'Untitled'
 
     # delete channel 5 (error)
     _deleted = tpmd.deleteChannel(channelIdx=5)
@@ -236,7 +238,7 @@ def test_mmmap_metadata():
     """
     mdl = mmMapMetadata()
     assert mdl.numTimepoints == 0
-    assert mdl._metadataList == []
+    assert mdl._metadataList == {}
 
     # this is an error, we need to have a populated TimepointMetadata !!!
     # tpmd = TimepointMetadata()
@@ -246,7 +248,7 @@ def test_mmmap_metadata():
     tpmd = TimepointMetadata()  # empty tpmd
     imgData = np.random.randint(low=0, high=2**11, size=(20,512,512), dtype=np.uint16)
     channelIdx = tpmd.appendChannel(imgData)
-    assert channelIdx == 0
+    assert channelIdx == 1
     assert tpmd.numChannels == 1
 
     # append the new timepoint
@@ -254,11 +256,11 @@ def test_mmmap_metadata():
     assert mdl.numTimepoints == 1
 
     # delete bad timepoint
-    _deletedItem = mdl.deleteTimepoint(1)
+    _deletedItem = mdl.deleteTimepoint(3)
     assert _deletedItem is None
 
     # delete good timepoint
-    _deletedItem = mdl.deleteTimepoint(0)
+    _deletedItem = mdl.deleteTimepoint(1)
     assert mdl.numTimepoints == 0
     assert isinstance(_deletedItem, TimepointMetadata)
     assert _deletedItem is not None
@@ -278,52 +280,45 @@ def test_mmmap_metadata():
     assert mdl.numTimepoints == 2
 
     # print(mdl[0])
-    assert mdl[0] is not None
-    assert mdl[1] == tpmd
+    assert mdl[1] is not None
+    assert mdl[2] == tpmd
     
     # swap timepoint (bad src)
-    _swapped = mdl.swapTimepoint(srcTimepoint=5, dstTimepoint=0)
+    _swapped = mdl.swapTimepoint(srcTimepoint=6, dstTimepoint=0)
     assert _swapped is False
     
     # swap timepoint (bad dst)
-    _swapped = mdl.swapTimepoint(srcTimepoint=0, dstTimepoint=5)
+    _swapped = mdl.swapTimepoint(srcTimepoint=1, dstTimepoint=6)
     assert _swapped is False
 
+    # check before we swap
+    assert mdl.getTimepointMetadata(1).getChannelProperty(1, 'dtype') == 'uint16'
+    assert mdl.getTimepointMetadata(2).getChannelProperty(1, 'dtype') == 'uint8'
+
     # swap timepoint (good)
-    _swapped = mdl.swapTimepoint(srcTimepoint=0, dstTimepoint=1)
+    _swapped = mdl.swapTimepoint(srcTimepoint=1, dstTimepoint=2)
     assert _swapped is True
 
     # check that swap worked
     assert mdl.numTimepoints == 2
+        
+    # pprint(mdl, sort_dicts=False)
 
-    tpmd = mdl.getTimepointMetadata(0)
-    assert tpmd.getChannelProperty(0, 'dtype') == 'uint8'
+    assert mdl.getTimepointMetadata(1).getChannelProperty(1, 'dtype') == 'uint16'
+    assert mdl.getTimepointMetadata(2).getChannelProperty(1, 'dtype') == 'uint8'
 
-    tpmd = mdl.getTimepointMetadata(1)
-    assert tpmd.getChannelProperty(0, 'dtype') == 'uint16'
+    # add another channel and test swap
+    mdl.getTimepointMetadata(1).appendChannel(imgData)
+    assert mdl.getTimepointMetadata(1).numChannels == 2
+    mdl.getTimepointMetadata(1).swapChannels(srcChannelIdx=1, dstChannelIdx=2)
 
+    for idx, tp in enumerate(mdl):
+        logger.info(f'tp idx:{idx}')
+        pprint(tp, sort_dicts=False)
+        for ch in tp:
+            pprint(ch, sort_dicts=False, indent=4)
+ 
     mdl.print()
-    
-def tryGeneric():
-    import dataclasses
-    from typing import Generic, TypeVar
-    # StringType = str | None
-    # StringType = TypeVar('StringType', str, None)
-    T = TypeVar('StringType')
-
-    @dataclasses.dataclass
-    class _metadataBase:
-        aString:str = 'xxx'
-
-    @dataclasses.dataclass
-    class _metadataList(Generic[T], _metadataBase):
-        # metadataList : list[T] = dataclasses.field(default_factory=lambda: [])
-        metadataList : List[T] = dataclasses.field(default_factory=list)
-        # metadataList : List[T]
-
-    tryGen = _metadataList(str)
-    tryGen.metadataList.append(1)
-    pprint(asdict(tryGen))
 
 if __name__ == '__main__':
     logger.setLevel('DEBUG')

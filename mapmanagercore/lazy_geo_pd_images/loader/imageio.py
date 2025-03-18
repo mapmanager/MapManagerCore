@@ -1,10 +1,10 @@
 from typing import Optional
 
 import numpy as np
-import tifffile  # abb depreciate and use ImageImpoter
+import tifffile  # abb depreciate and use ImageImporter
 # import nd2
 
-import bioio_base
+# import bioio_base
 from mapmanagercore.imageImporter import getImageImporter
 
 from mapmanagercore.analysis_params import AnalysisParams
@@ -27,7 +27,7 @@ class MultiImageLoader(ImageLoader):
         self.paths = []  # for logging only
 
         # abb md3
-        from mapmanagercore.metadata3 import mmMapMetadata
+        from mapmanagercore.metadata.metadata3 import mmMapMetadata
         self._metadata3 = mmMapMetadata()
 
     def __str__(self):
@@ -207,7 +207,7 @@ class MultiImageLoader(ImageLoader):
             self._metadata[time] = _metaData
 
             # abb md3
-            from mapmanagercore.metadata3 import TimepointMetadata
+            from mapmanagercore.metadata.metadata3 import TimepointMetadata
             timepointMetadata = TimepointMetadata()  # empty, no channels
             timepointMetadata.appendChannel(imgData)
             self._metadata3.appendTimepoint(timepointMetadata)
@@ -318,6 +318,8 @@ class MultiImageLoader(ImageLoader):
         return list(self._imagesSrc[t].keys())
 
     def _images(self, t: int, channel: int) -> np.ndarray:
+        if t not in self._imagesSrc.keys():
+            logger.error(f'abb got bad image key timepoint key {t}, available keys are {self.timePoints()}')
         return self._imagesSrc[t][channel]
 
 

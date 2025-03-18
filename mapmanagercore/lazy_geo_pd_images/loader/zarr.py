@@ -9,7 +9,7 @@ from mapmanagercore.analysis_params import AnalysisParams
 from mapmanagercore.lazy_geo_pd_images.metadata import Metadata
 from .base import ImageLoader, Position
 
-from mapmanagercore.metadata3 import mmMapMetadata, TimepointMetadata
+from mapmanagercore.metadata.metadata3 import mmMapMetadata, TimepointMetadata
 from mapmanagercore.imageImporter import getImageImporter
 
 from mapmanagercore.logger import logger

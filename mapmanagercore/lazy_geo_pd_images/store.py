@@ -167,7 +167,12 @@ class LazyImagesGeoPandas(LazyGeoPandas):
         """
         return self._images.getAutoContrast_qt(time, channel)
 
-    def getPixels(self, time: int, channel: int, zRange: Tuple[int, int] = None, z: int = None, zSpread: int = 0,
+    def getPixels(self,
+                  time: int,
+                  channel: int,
+                  zRange: Tuple[int, int] = None,
+                  z: int = None,
+                  zSpread: int = 0,
                   threeD: bool = False) -> ImageSlice:
         """
         Loads the image data for a slice.

@@ -27,10 +27,7 @@ install_requires = [
     'brightest-path-lib',
     'pooch',  # to load data from MapManagerCore-Data repo
     'imagecodecs',
-    'tifffile',
-
-    # install mofified bioio
-    'bioio @ git+ssh://git@github.com/mapmanager/bioio.git',
+    #'tifffile',
 
     # image import with bioio
     # 'bioio>=1.2.0',  # this is bleading edge and leads to version problems (worth it)
@@ -42,8 +39,18 @@ install_requires = [
     # # 'bioio-bioformats',  # for oir requires maven/java
 ]
 
-bioioRequirements = [
-]
+if pyodide:
+    bioioRequirements = ['tifffile']
+else:
+    bioioRequirements = [
+        # install mofified bioio
+        #'bioio @ git+ssh://git@github.com/mapmanager/bioio.git',
+        'bioio',
+        'bioio-tifffile',
+        'bioio-czi',
+        'bioio-nd2',
+        'bioio-ome-tiff',
+    ]
 
 testRequirements = [
     'tox',
@@ -113,6 +120,7 @@ setup(
         'dev': devRequirements,
         'tests': testRequirements,
         'docs': docsRequirements,
+        'bioio': bioioRequirements,
     },
 
     python_requires=">=3.11",

@@ -70,13 +70,19 @@ class AnnotationsSegments(SingleTimePointAnnotationsBase):
         #     # TODO: Consider adding the mutation type along with the prior result if we can use it to speed things up
         #     return None
 
+        logger.error('abb turned off')
+        return roughSegment
+    
         zSpread = self.analysisParams.getValue('zSpread')
-        channel = self.analysisParams.getValue('channel')
-
-        # logger.info(f"z: {z} zSpread: {zSpread} channel {channel}")
+        channel = self.analysisParams.getValue('channel')  # 1 based
 
         # 3D
-        image = self.getPixels(channel=channel, z=z, zSpread=zSpread, threeD = True).data(flattened=False) # returning in ndarray form
+        image = self.getPixels(channel=channel,
+                               zSpread=zSpread,  # abb swapped order
+                               z=z,
+                               threeD = True).data(flattened=False) # returning in ndarray form
+
+        logger.info(f"channel:{channel} z:{z} zSpread:{zSpread} live:{live} image.shape:{image.shape}")
 
         x1,y1,z1 = roughSegment.coords[0]
         x2,y2,z2 = roughSegment.coords[1]
@@ -127,8 +133,16 @@ class AnnotationsSegments(SingleTimePointAnnotationsBase):
             #             goal_point = np.array([reIndexZ,newImageSize[0],newImageSize[1]]))
             
             # Standard Search with full image
-            astar = brightest_path_lib.algorithm.AStarSearch(image, start_point = np.array([reIndexZ,y1,x1]), 
-                                                goal_point = np.array([reIndexZ,y2,x2]))
+            start_point = np.array([reIndexZ,y1,x1])
+            goal_point = np.array([reIndexZ,y2,x2])
+            # abb
+            # expecting (z, x, y)
+            # start_point = np.array([reIndexZ,x1,y1])
+            # goal_point = np.array([reIndexZ,x2,y2])
+            logger.warning(f'AStarSearch with image:{image.shape} start_point:{start_point} goal_point:{goal_point}')
+            astar = brightest_path_lib.algorithm.AStarSearch(image, start_point = start_point, 
+                                                goal_point = goal_point
+                                                )
             
             path = astar.search()
 

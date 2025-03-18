@@ -9,14 +9,16 @@ import zipfile
 import zarr.storage
 from mapmanagercore.lazy_geo_pandas.lazy import LazyGeoSeries
 from mapmanagercore.lazy_geo_pd_images.loader.base import Position
-from mapmanagercore.schemas.analysis_params import AnalysisParameters
+# abb reverting analysisparams to class (not lazy)
+# from mapmanagercore.schemas.analysis_params import AnalysisParameters
 import numpy as np
 import pandas as pd
 
 from mapmanagercore.benchmark import timer
 from mapmanagercore.config import Colors, scaleColors, symbols
 from mapmanagercore.lazy_geo_pd_images.loader.imageio import MultiImageLoader
-from mapmanagercore.lazy_geo_pd_images.loader.zarr import ZarrLoader
+# abb depreciated
+# from mapmanagercore.lazy_geo_pd_images.loader.zarr import ZarrLoader
 from ..lazy_geo_pandas import LazyGeoFrame
 from ..schemas import Segment, Spine
 from ..lazy_geo_pd_images import LazyImagesGeoPandas, ImageLoader
@@ -46,7 +48,8 @@ class AnnotationsBase(LazyImagesGeoPandas):
         super().__init__(loader)
 
         if analysisParams is None:
-            analysisParams = AnalysisParameters()
+            analysisParams = AnalysisParams()
+            # analysisParams = AnalysisParameters()
         if lineSegments is None:
             lineSegments = pd.DataFrame()
         if points is None:
@@ -63,11 +66,13 @@ class AnnotationsBase(LazyImagesGeoPandas):
         # abj
         self._lastSaveTime = lastSaveTime
 
-        self._analysisParameters = LazyGeoSeries(
-            AnalysisParameters, store=weakref.ref(self), context=self
-        )
-        self._analysisParameters.update(analysisParams, skipLog=True)
-
+        # abb reverting analysisparams to class (not lazy)
+        # self._analysisParameters = LazyGeoSeries(
+        #     AnalysisParameters, store=weakref.ref(self), context=self
+        # )
+        # self._analysisParameters.update(analysisParams, skipLog=True)
+        self._analysisParams = analysisParams
+        
         self._segments = LazyGeoFrame(
             Segment, data=lineSegments, store=weakref.ref(self), context=self)
         self._points = LazyGeoFrame(
@@ -92,7 +97,8 @@ class AnnotationsBase(LazyImagesGeoPandas):
 
     # abb convenience
     def getNumTimepoints(self):
-        return len(self._images.timePoints())
+        # return len(self._images.timePoints())
+        return self._images.numTimepoints
 
     # abb convenience
     def getPointDataFrame(self, t: Optional[int] = None) -> pd.DataFrame:
@@ -142,7 +148,7 @@ class AnnotationsBase(LazyImagesGeoPandas):
 
     @property
     def analysisParams(self) -> LazyGeoSeries:
-        return self._analysisParameters
+        return self._analysisParams
 
     def filterPoints(self, filter: Any):
         """
@@ -169,7 +175,11 @@ class AnnotationsBase(LazyImagesGeoPandas):
         from .single_time_point import SingleTimePointAnnotations
         return SingleTimePointAnnotations(self, time)
 
-    def getPixels(self, time: int, channel: int, zRange: Tuple[int, int] = None, z: int = None, zSpread: int = 0,
+    def getPixels(self, time: int,
+                  channel: int,
+                  zRange: Tuple[int, int] = None,
+                  z: int = None,
+                  zSpread: int = 0,
                   threeD: bool = False) -> ImageSlice:
         """
         Loads the image data for a slice.
@@ -205,7 +215,13 @@ class AnnotationsBase(LazyImagesGeoPandas):
         logger.warning(f'abb creating ZarrLoader from path:{path}')
         logger.warning(f'  cls:{cls}')
 
-        loader = ZarrLoader(path, lazy=lazy)
+        # abb was this
+        # from mapmanagercore.lazy_geo_pd_images.loader.zarr import ZarrLoader
+        # loader = ZarrLoader(path, lazy=lazy)
+        # now this 20250317
+        logger.info(f'TODO: switch to zarrLoader2 !!!')
+        from mapmanagercore.lazy_geo_pd_images.loader.zarrloader import ZarrLoader2
+        loader = ZarrLoader2(path)
 
         # abb read_pickle() is failing if we have an older version of numpy
         # when building for pyinstaller, we end up with numpy==1.26.4
@@ -227,9 +243,11 @@ class AnnotationsBase(LazyImagesGeoPandas):
 
         if "analysisParams" in loader.group.attrs:
             analysisParams = loader.group.attrs["analysisParams"]  # this is json
-            analysisParams = AnalysisParameters(**analysisParams)
+            # analysisParams = AnalysisParameters(**analysisParams)
+            analysisParams = AnalysisParams(loadedDict=analysisParams)
         else:
-            analysisParams = AnalysisParameters()
+            # analysisParams = AnalysisParameters()
+            analysisParams = AnalysisParams()
         
         # abb lastSaveTime will ALWAYS be in file
         # abb when using try/catch, ALWAYS name an exception, Do not use bare `except`RuffE722
@@ -293,12 +311,17 @@ class AnnotationsBase(LazyImagesGeoPandas):
                 # # abb error on saving changes to existing mmap
                 # zarr.errors.ContainsGroupError: path 'images' contains a group
                 # if not self._group_exists(store, "images"):
-                if "images" not in group.keys():
-                    images = group.create_group("images")
-                else:
-                    images = zarr.group(store=store)['images']
-                self._images.saveTo(images)
                 
+                # v1, replaced by ZarrLoader2
+                # if "images" not in group.keys():
+                #     images = group.create_group("images")
+                # else:
+                #     images = zarr.group(store=store)['images']
+                # self._images.saveTo(images)
+                
+                #v2
+                self._images.saveAs(path)
+
                 # abb added overwrite=True, need to implement dirty flag for points and segments
                 # zarr.errors.ContainsArrayError: path 'points' contains an array
                 logger.warning('abb imageImporter saving points/segments as text')
