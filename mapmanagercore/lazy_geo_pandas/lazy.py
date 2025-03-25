@@ -172,7 +172,6 @@ class LazyGeoPandas:
 
         value = {key: val for key, val in vars(
             value).items() if not isinstance(val, MISSING_VALUE_CLASS)}
-
         store._schema.validateColumns(value, dropIndex=False)
 
         df = store._df

@@ -1,12 +1,13 @@
 import json
 from typing import Tuple
+from mapmanagercore.schemas.segment import Segment
 from mapmanagercore.schemas import AnalysisParameters
 from mapmanagercore.lazy_geo_pd_images.loader.base import Position
 from mapmanagercore.lazy_geo_pd_images.loader.imageio import MultiImageLoader
 from mapmanagercore.lazy_geo_pd_images.loader.zarr import ZarrLoader
 import numpy as np
 from ..benchmark import timeAll
-from ..config import SpineId
+from ..config import Color, SpineId
 from .single_time_point.layers import AnnotationsOptions
 from ..lazy_geo_pd_images.image_slices import ImageSlice
 from ..layers.utils import inRange
@@ -14,6 +15,7 @@ from ..utils import filterMask
 from . import Annotations
 from pyodide.ffi import to_js
 from .single_time_point import SingleTimePointAnnotations
+
 
 class JsonEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -64,16 +66,42 @@ class PyodideSingleTimePoint(SingleTimePointAnnotations):
 
             segments.append({
                 "segmentID": segmentID,
+                "color": self.segments[segmentID, "color"],
                 "spines": spines.to_dict('records')
             })
 
-        for segmentId in missingSegments:
+        for segmentID in missingSegments:
             segments.append({
-                "segmentID": segmentId,
+                "segmentID": segmentID,
+                "color": self.segments[segmentID, "color"],
                 "spines": []
             })
 
         return segments
+
+    def setSegmentColor(self, segmentId, colors: Color):
+        return super().updateSegment(segmentId, Segment(
+            color=tuple(colors.to_py())
+        ))
+        
+    def loadFile(self, path: str, channel: int = None, name: str = None):
+        if name is None:
+            name = path
+            
+        if channel is None:
+            channel = 0
+            for c in self.channels:
+                if channel == c:
+                    channel += 1
+        
+        # TODO: remove max channels & standardize channels
+
+        if path.endswith(".mmap"):
+            loader = ZarrLoader(path)
+        if path.endswith(".tif"):
+            loader = MultiImageLoader()
+            loader.read(path, time=self._t, channel=channel, name=name)
+        self._annotations.loader.merge(loader)
 
     def slices_js(self, channel: int, zRange: Tuple[int, int]) -> ImageSlice:
         """
@@ -88,6 +116,8 @@ class PyodideSingleTimePoint(SingleTimePointAnnotations):
         """
         return self.getPixels(channel, (zRange[0], zRange[1]))
 
+    def deleteChannel(self, channel: int) -> bool:
+        return self._annotations.loader.deleteChannel(self._t, channel)
 
 class PyodideAnnotations(Annotations):
     """ PyodideAnnotations contains pyodide specific helper methods to allow JS to use Annotations.
@@ -194,7 +224,7 @@ class PyodideAnnotations(Annotations):
     def setMaxChannels(self, maxChannels: int):
         return self.loader.setMaxChannels(maxChannels)
 
-    def analysisParams(self):
+    def analysisParams_js(self):
         params = self._analysisParameters.columnsAttributes.copy()
         for key in params:
             params[key]["value"] = self._analysisParameters[key]

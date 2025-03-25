@@ -1,6 +1,5 @@
 import dataclasses
-from typing import Union
-
+from typing import Tuple, Union
 from shapely.geometry import LineString, Point
 import geopandas as gpd
 import numpy as np
@@ -53,12 +52,13 @@ class Segment(Schema):
         title="Pivot Distance",
         description="Distance from the pivot point"
     )
-
-    # abb 20250318, added back in
-    color: str = field(
-        default='#00FF00',
-        title="Color",
-        description="Color for plotting"
+    
+    color: Tuple[int, int, int, int] = field(
+        default=(255, 0, 0),
+        type="Tuple[int, int, int, int]",
+        title="Segment Color",
+        description="Color of the segment",
+        plot=False
     )
 
     @compute(title="Pivot Point", dependencies=["segment", "pivotDistance"])

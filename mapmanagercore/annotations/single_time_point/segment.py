@@ -7,7 +7,6 @@ import numpy as np
 import scipy
 from scipy.interpolate import splprep, splev
 from mapmanagercore.utils import injectLine
-from .base import SingleTimePointAnnotationsBase
 from shapely.geometry import LineString, Point
 import brightest_path_lib
 from mapmanagercore.logger import logger
