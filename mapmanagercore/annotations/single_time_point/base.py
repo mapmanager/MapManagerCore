@@ -241,7 +241,7 @@ class _SingleTimePointAnnotationsBase:
 
         # abb CRITICAL was this
         # self._annotations = copy(annotations)
-        logger.warning('abb turned OFF copy of Annotations in _SingleTimePointAnnotationsBase()')
+        # logger.warning('abb turned OFF copy of Annotations in _SingleTimePointAnnotationsBase()')
         self._annotations = annotations
 
         self._segments = SingleTimePointFrame(
@@ -314,7 +314,7 @@ class SingleTimePointAnnotationsBase(_SingleTimePointAnnotationsBase):
         return self._annotations.getPixels(self._t, channel, zRange, z, zSpread, threeD)
 
     # abb depreciated
-    def getAutoContrast_qt(self, channel: int) -> Tuple[int, int]:
+    def _old_getAutoContrast_qt(self, channel: int) -> Tuple[int, int]:
         """Get the auto contrast from the entire image volume.
 
         Used in PyQt interface.
@@ -330,7 +330,8 @@ class SingleTimePointAnnotationsBase(_SingleTimePointAnnotationsBase):
     def numChannels(self) -> int:
         """Get the number of image channels.
         """
-        return len(self._annotations._images.channels(self._t))
+        # return len(self._annotations._images.channels(self._t))
+        return self._annotations._images.metadata.getTimepointMetadata(self._t).numChannels
 
     def getShapePixels(self, shapes: gp.GeoDataFrame, channel: Union[int, List[int]] = 0, zSpread: int = 0, z: int = None) -> pd.Series:
         return self._annotations.getShapePixels(shapes, channel, zSpread, self._t, z=z)

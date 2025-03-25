@@ -63,15 +63,16 @@ class _metadataList(_metadataBase):
         """Get a unique key for this metadata list.
 
         This is 1 based.
+        Nope, back to zero based to be compatible with gui
         """
         _keys = list(self._metadataList.keys())
-        _max = max(_keys) if _keys else 0
-        return _max + 1
+        _max = max(_keys)+1 if _keys else 0
+        return _max
     
     # abb refactor for dict
     @property
-    def listIndices(self) -> List[int]:
-        """Get a list of indices from our _metadataList.
+    def listKeys(self) -> List[int]:
+        """Get a list of keys from our _metadataList.
         """
         # return list(range(self.numItems))
         return list(self._metadataList.keys())
@@ -91,17 +92,15 @@ class _metadataList(_metadataBase):
         See also:
             __getitem__(int)
         """
-        if index in self.listIndices:
+        if index in self.listKeys:
             return self._metadataList[index]
         
-    # abb, refactor for dict
     def appendMetadataItem(self, metadata : object) -> int:
         """Append a metadata item.
         
         Returns:
             index of new item (1 based).
         """
-        # self._metadataList.append(metadata)
         _newKey = self.getNewKey()
         self._metadataList[_newKey] = metadata
         metadata._key = _newKey  # keys are immutable, convenience so items know there key
@@ -113,7 +112,7 @@ class _metadataList(_metadataBase):
         Returns:
             The item removed, otherwise None
         """
-        if index in self.listIndices:
+        if index in self.listKeys:
             item = self._metadataList.pop(index)
             return item
     
@@ -124,7 +123,7 @@ class _metadataList(_metadataBase):
         Returns
             True on success, otherwise None
         """
-        if index in self.listIndices:
+        if index in self.listKeys:
             self._metadataList.insert(index, metadata)
             return True
 
@@ -135,16 +134,16 @@ class _metadataList(_metadataBase):
         Returns
             True on success, otherwise False
         """
-        if srcIndex not in self.listIndices:
+        if srcIndex not in self.listKeys:
             logger.mmlog(f'src {srcIndex} does not exist')
             return False
-        if dstIndex not in self.listIndices:
+        if dstIndex not in self.listKeys:
             logger.mmlog(f'dst {dstIndex} does not exist')
             return False
         
-        listIndices = self.listIndices
-        src =  listIndices.index(srcIndex)
-        dst =  listIndices.index(dstIndex)
+        listKeys = self.listKeys
+        src =  listKeys.index(srcIndex)
+        dst =  listKeys.index(dstIndex)
 
         _tupleList = list(self._metadataList.items())
     
@@ -158,7 +157,7 @@ class _metadataList(_metadataBase):
     def setItem(self, index, key, value) -> bool:
         """Set one item (key/value) in list.
         """
-        if index in self.listIndices:
+        if index in self.listKeys:
             return self._metadataList[index].setValue(key, value)
         else:
             return False
@@ -174,5 +173,5 @@ class _metadataList(_metadataBase):
     def __iter__(self):
         """Iterate over the metadata list.
         """
-        for index in self.listIndices:
+        for index in self.listKeys:
             yield self._metadataList[index]

@@ -56,7 +56,7 @@ class Segment(Schema):
 
     # abb 20250318, added back in
     color: str = field(
-        default='ff0000',
+        default='#00FF00',
         title="Color",
         description="Color for plotting"
     )

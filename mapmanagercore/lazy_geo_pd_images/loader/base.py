@@ -200,7 +200,7 @@ class ImageLoader:
                     timePoint.create_dataset(
                         str(channel), data=image, dtype=image.dtype)
 
-    def getAutoContrast_qt(self, time: int, channel: int) -> Tuple[int, int, int, int]:
+    def _old_getAutoContrast_qt(self, time: int, channel: int) -> Tuple[int, int, int, int]:
         """Get the auto contrast from the entire image volume.
 
         Used in PyQt interface.
@@ -379,8 +379,6 @@ class ImageLoader:
         for (t, z), group in shape.groupby(by=["t", "z"]):
             image = self.fetchSlices(
                 t, channel, (z - zSpread, z + zSpread + 1))
-
-            # logger.warning(f'abb 2d image:{image.shape}')
 
             for idx, row in group.iterrows():
                 xLim, yLim = image.shape

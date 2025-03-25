@@ -199,7 +199,9 @@ class ShapeMetadata:
     zPixels: int = 1
 
     @property
-    def shape(self):
+    def shape(self) -> Tuple[int, int, int]:
+        """Get shape as (z, y, x).
+        """
         return (self.zPixels, self.yPixels, self.xPixels)
     
     def _initFromImgData(self, imgData : np.ndarray):
@@ -254,19 +256,19 @@ class TimepointMetadata(_metadataList):
 
     def __post_init__(self):
         if isinstance(self._metadataList, dict):
-            # logger.info('TimepointMetadata -->> converting dict to ChannelMetadata')
             _metadataList = copy(self._metadataList)
-            # logger.info(f'original self._metadataList:')
-            # pprint(self._metadataList)
             self._metadataList = {}
             for k,v in _metadataList.items():
                 # channelMetadata = ChannelMetadata(v)
                 channelMetadata = ChannelMetadata.from_dict(v)
                 newChannelIndex = self.appendMetadataItem(channelMetadata)
 
-            # logger.info('after:')
-            # pprint(self._metadataList)
-
+    def getNewChannelKey(self) -> str:
+        """Get a new timepoint key.
+        """
+        channelKeys = self.channelKeys
+        return max(channelKeys) + 1
+    
     def fromImgData(imgData: np.ndarray) -> Self:
         tpmd = TimepointMetadata()
         tpmd.appendChannel(imgData)
@@ -288,8 +290,8 @@ class TimepointMetadata(_metadataList):
             Appended channel index on success, otherwise None.
 
         Notes:
-            Will fail if appending channel index > 0 and
-            proposed channel imgData.shape does not match channel index 0 shape.
+            Will fail if appending channel > 1 and
+            proposed channel imgData.shape does not match channel index 1 shape.
         """
         
         proposedShape = imgData.shape
@@ -301,15 +303,15 @@ class TimepointMetadata(_metadataList):
         else:
             # check proposedShape
             if proposedShape != self.shape:
-                logger.mmlog(f'expecting shape {self.shape} but got {proposedShape}')
+                logger.error(f'expecting shape {self.shape} but got {proposedShape}')
                 return
                 
         metadataContrast = ChannelMetadata(name=name)
         metadataContrast._initFromImgData(imgData)
         
         # do the append
-        newChannelIndex = self.appendMetadataItem(metadataContrast)
-        return newChannelIndex
+        newChannelKey = self.appendMetadataItem(metadataContrast)
+        return newChannelKey
     
     def deleteChannel(self, channelIdx:int) -> Optional[ChannelMetadata]:
         """Delete a color channel.
@@ -357,27 +359,22 @@ class TimepointMetadata(_metadataList):
     def setChannelProperty(self, channelIdx, key, value):
         """Set channel property.
         """
-        if channelIdx not in self.listIndices:
+        if channelIdx not in self.listKeys:
             return
         return self._metadataList[channelIdx].setValue(key, value)
 
     def getChannelProperty(self, channelIdx, key):
         """Get channel property.
         """
-        if channelIdx not in self.listIndices:
+        if channelIdx not in self.listKeys:
             return
         return self._metadataList[channelIdx].getValue(key)
     
     @property
-    def channelIndices(self) -> List[int]:
-        """Get the list[int] of channel indices.
+    def channelKeys(self) -> List[int]:
+        """Get the list[int] of channel keys.
         """
-        return self.listIndices
-
-    def getChannelKeys(self) -> List[int]:
-        """Get the list of channel keys.
-        """
-        return self.channelIndices
+        return self.listKeys
     
 @dataclass_json
 @dataclasses.dataclass
@@ -389,24 +386,25 @@ class mmMapMetadata(_metadataList):
 
     def __post_init__(self):
         if isinstance(self._metadataList, dict):
-            # logger.info('mmMapMetadata -->> converting dict to TimepointMetadata')
             _metadataList = copy(self._metadataList)
-            # logger.info('before:')
-            # pprint(self._metadataList)
             self._metadataList = {}
             for k,v in _metadataList.items():
                 # timepointMetadata = TimepointMetadata(v)
                 timepointMetadata = TimepointMetadata.from_dict(v)
                 self.appendTimepoint(timepointMetadata)
-            # logger.info('mmMapMetadata after self._metadataList:')
-            # pprint(self._metadataList)
+
+    def getNewTimepointKey(self) -> str:
+        """Get a new timepoint key.
+        """
+        timepointKeys = self.timepointKeys
+        return max(timepointKeys) + 1
 
     def print(self):
         """Print summary of metadata.
         """
-        for timepoint in self.timepointIndices:
+        for timepoint in self.timepointKeys:
             print(f'timepoint {timepoint}')
-            for channel in self[timepoint].channelIndices:
+            for channel in self[timepoint].channelKeys:
                 print(f'  channel {channel}')
                 print(f'    minInt {self[timepoint][channel].minInt}')
                 print(f'    maxInt {self[timepoint][channel].maxInt}')
@@ -425,13 +423,10 @@ class mmMapMetadata(_metadataList):
         """
         _metadata = self.getMetadataItem(index)
         if _metadata is None:
-            logger.error(f'did not find timepoint {index}, available timepoints are {self.timepointIndices}')
+            logger.error(f'did not find timepoint {index}, available timepoints are {self.timepointKeys}')
+            raise ValueError
         return _metadata
     
-        # _item = self.getMetadataItem(index)
-        # logger.info(f'_item:{type(_item)}')
-        # return TimepointMetadata.from_dict(_item)
-
     def insertTimepoint(self, index : int, metadata : TimepointMetadata) -> bool:
         """Insert a new timepoint.
 
@@ -442,22 +437,24 @@ class mmMapMetadata(_metadataList):
         Returns:
             True on success, otherwise False.
         """
-        if index not in self.listIndices:
-            logger.mmlog(f'src {index} does not exist, available indices are {self.listIndices}')
+        if index not in self.listKeys:
+            logger.mmlog(f'src {index} does not exist, available keys are {self.listKeys}')
             return False
         self.insertMetadataItem(index, metadata)
         return True
     
-    def appendTimepoint(self, timepointMetadata : TimepointMetadata):
+    def appendTimepoint(self, timepointMetadata : TimepointMetadata = None) -> int:
         """Append a new timepoint.
 
         Args:
             timepointMetadata: The timepoint to append.
         """
-        self.appendMetadataItem(timepointMetadata)
+        if timepointMetadata is None:
+            timepointMetadata = TimepointMetadata()
+        return self.appendMetadataItem(timepointMetadata)
 
     def deleteTimepoint(self, index : int) -> Optional[TimepointMetadata]:
-        if index in self.listIndices:
+        if index in self.listKeys:
             return self.deleteMetadataItem(index)
 
     def swapTimepoint(self, srcTimepoint : int, dstTimepoint : int) -> bool:
@@ -484,16 +481,16 @@ class mmMapMetadata(_metadataList):
         """
 
         # check source timepoint and channel
-        if srcTimepoint not in self.timepointIndices:
+        if srcTimepoint not in self.timepointKeys:
             return False
-        if srcChannelIdx not in self[srcTimepoint].channelIndices:
+        if srcChannelIdx not in self[srcTimepoint].channelKeys:
             return False
         # check dst timepoint and channel
-        if dstTimepoint not in self.timepointIndices:
+        if dstTimepoint not in self.timepointKeys:
             return False
         # hold off on dst channel check,
         # if within range then insert, otherwise ignore and always append
-        # if dstChannel not in self[srcTimepoint].channelIndices:
+        # if dstChannel not in self[srcTimepoint].channelKeys:
         #     return False
         
         # remove from source
@@ -514,15 +511,13 @@ class mmMapMetadata(_metadataList):
         return self.numItems
 
     @property
-    def timepointIndices(self) -> List[int]:
-        """Get the list[int] of timepoint indices.
+    def timepointKeys(self) -> List[int]:
+        """Get the list[int] of timepoint keys.
         """
-        return self.listIndices
+        return self.listKeys
 
-    def getTimepointKeys(self) -> List[int]:
-        """Get the list of timepoint keys.
-        """
-        return self.timepointIndices
+    def timepointExists(self, t:int) -> bool:
+        return t in self.timepointKeys
     
     def __getitem__(self, index:int) -> TimepointMetadata:
         return super().__getitem__(index)

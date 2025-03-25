@@ -29,7 +29,7 @@ class ImageColumnAttributes(ColumnAttributes):
 
 def parseColumns(columns: List[str], prefix: str) -> Tuple[set[int], set[str]]:
     """Parse the roi computed columns to get the channels and aggregates."""
-    logger.error(f'columns:{columns} prefix:{prefix}')
+    # logger.error(f'columns:{columns} prefix:{prefix}')
     
     channels = set()
     aggregates = set()
@@ -63,7 +63,7 @@ class LazyImagesGeoPandas(LazyGeoPandas):
 
     def __init__(self, images: ImageLoader, overrideDefault=True):
         super().__init__()
-        logger.info(f'abb creating LazyImagesGeoPandas() with images:{type(images)}')
+        # logger.info(f'abb creating LazyImagesGeoPandas() with images:{type(images)}')
         self._images = images
 
         if overrideDefault:
@@ -96,13 +96,20 @@ class LazyImagesGeoPandas(LazyGeoPandas):
 
             shapes["t"] = frame["t"] if timeIndexLevel is None else frame._df.index.get_level_values(
                 timeIndexLevel)
+            
+            logger.error('too complicated')
+            logger.warning(f'  original channels is: {channels}')
+            
             # abb >= 1
             # FIXME: S: Channels should only be a list if there are multiple channels in which case we return a DataFrame instead of a single Series
             # if the use case for a single channel isn't needed, we can remove the check and always return a DataFrame
             # which will simplify the code base
             channels = list(channels) if len(channels) >= 1 else next(channels)
 
-            logger.error(f'post channels:{channels}')
+            logger.warning('  abb agreed ... why is this so complicated???')
+            logger.warning(f'    channels is:{channels}')
+
+            # logger.error(f'post channels:{channels}')
             # logger.error(f'next(channels):{next(channels)}')
 
             # Compute the aggregates over the pixels
@@ -152,15 +159,17 @@ class LazyImagesGeoPandas(LazyGeoPandas):
     def _maxChannels(self):
         return self._images.maxChannels()
 
+    # abb this is overly complex, why is this using next() and iter() ???
     def imageBounds(self, t: int = None, channel: int = None) -> gp.GeoSeries:
         """Get the image bounds."""
         if t == None:
             t = next(iter(self._images.timePoints()))
         if channel == None:
             channel = next(iter(self._images.channels(t=t)))
+        # abb all channels within a given timepoint will have the same shape
         return self._images.shape(t, channel)
 
-    def getAutoContrast_qt(self, time: int, channel: int) -> Tuple[int, int]:
+    def _old_getAutoContrast_qt(self, time: int, channel: int) -> Tuple[int, int]:
         """Get the auto contrast from the entire image volume.
 
         Used in PyQt interface.

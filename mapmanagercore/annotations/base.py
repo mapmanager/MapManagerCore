@@ -219,9 +219,9 @@ class AnnotationsBase(LazyImagesGeoPandas):
         # from mapmanagercore.lazy_geo_pd_images.loader.zarr import ZarrLoader
         # loader = ZarrLoader(path, lazy=lazy)
         # now this 20250317
-        logger.info(f'TODO: switch to zarrLoader2 !!!')
-        from mapmanagercore.lazy_geo_pd_images.loader.zarrloader import ZarrLoader2
-        loader = ZarrLoader2(path)
+        logger.info(f'TODO: switch to mm_map_loader mmMapLoader !!!')
+        from mapmanagercore.lazy_geo_pd_images.loader.mm_map_loader import mmMapLoader
+        loader = mmMapLoader(path)
 
         # abb read_pickle() is failing if we have an older version of numpy
         # when building for pyinstaller, we end up with numpy==1.26.4

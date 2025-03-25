@@ -74,12 +74,12 @@ class ZarrLoader(ImageLoader):
                 channels[channel] = images if lazy else images[:][:]
 
                 # in future we import channels when we always have full imgData volume, will not ned images[:][:]
-                logger.warning('abb temporary fix, remove once we use metadata3')
-                logger.warning(f'  adding tp:{t} channel:{channel}')
-                imgData = images[:][:]
-                timepointMetadata = TimepointMetadata()
-                timepointMetadata.appendChannel(imgData)
-                self._metadata3.appendTimepoint(timepointMetadata=timepointMetadata)
+                # logger.warning('abb temporary fix, remove once we use metadata3')
+                # logger.warning(f'  adding tp:{t} channel:{channel}')
+                # imgData = images[:][:]
+                # timepointMetadata = TimepointMetadata()
+                # timepointMetadata.appendChannel(imgData)
+                # self._metadata3.appendTimepoint(timepointMetadata=timepointMetadata)
 
             self._imagesSrcs.append(channels)
 
