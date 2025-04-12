@@ -49,75 +49,132 @@ class TestAppendSegmentPoint(unittest.TestCase):
         # logger.info(f"tp._segments {tp._segments[:]}")
         # logger.info(f"len of tp._segments {len(tp._segments[:])}")
 
-    def test_higher_to_lower_append(self):
-        """ This tests when a user adds two points. The first point being lower in coordinate value and the second being higher 
-        in coordinate value. For brightest-Path-Tracing, the order matters
+    # 9 Test Cases for Brightest Path
+    # Currently Brightest Path uses a reduced image for speeding up processing time
+    # This reduced image defines a new lower and upper bound of xMin,yMin and xMax,yMax
+    # Since brightestPath() calls brightest_path_lib.algorithm.AStarSearch
+    # with the reduced image and points, 
+    # this creates different cases for the comparison of the two added points
+    # Ex: With Point 1 being (x1,x2) and Point 2 being (x2,y2), x1 < x2 and y1 < y2
+
+    def pointComparison(self, point1: tuple, point2: tuple):
         """
-        logger.info(f"here test")
+
+        point1: first point added in form of (x,y,z)
+        point2: second point added in form of (x,y,z)
+        """
         map = test_single_timepoint_map.test_create_map(logData = False)
         tp = map.getTimePoint(time=0)
         newSegmentID = tp.newSegment()
 
-        x = 811 
-        y = 939 
-        z = 32 
+        x,y,z = point1
         start_point = (x,y,z)
         tp.appendSegmentPoint(newSegmentID, x, y, z)
 
-        x = 729 
-        y = 908 
-        z = 32 
+        x,y,z = point2
         end_point = (x,y,z)
         tp.appendSegmentPoint(newSegmentID, x, y, z)
 
         newSegment = tp._segments[newSegmentID]
         # check that first and last point of segment matches that of the appended points
         unload = newSegment[:]
+        logger.info(f"unloaded segment {unload}")
         geom = unload.loc[1, 'segment']
         segmentPoint0 = geom.coords[0]
         segmentPointLast = geom.coords[-1]
         
         logger.info(f"segmentPoint0 {segmentPoint0}")
         logger.info(f"segmentPointLast {segmentPointLast}")
-        # Note: the "start_point" within brightest path tracing is the last added point
+
+        # if not isReversed:
+        #     self.assertEqual(segmentPoint0, start_point)
+        #     self.assertEqual(segmentPointLast, end_point)
+        # else:
         self.assertEqual(segmentPointLast, start_point)
         self.assertEqual(segmentPoint0, end_point)
 
-    def test_lower_to_higher_append(self):
-        """ This tests when a user adds two points. The first point being higher in coordinate value and the second being lower 
-        in coordinate value. For brightest-Path-Tracing, the order matters
+    def test_case_1(self):
+        """ This tests when a user adds two points, where x1 < x2 and y1 < y2
+
+        With Point 1 being (x1,x2) and Point 2 being (x2,y2)
+
         """
-        logger.info(f"here test")
-        map = test_single_timepoint_map.test_create_map(logData = False)
-        tp = map.getTimePoint(time=0)
-        newSegmentID = tp.newSegment()
+        point1 = (811, 939, 32) 
+        point2 = (729, 908, 32) 
+        self.pointComparison(point1, point2)
 
-        x = 729 
-        y = 908 
-        z = 32 
-        start_point = (x,y,z)
-        tp.appendSegmentPoint(newSegmentID, x, y, z)
+    def test_case_2(self):
+        """ This tests when a user adds two points, where x1 > x2 and y1 > y2
 
-        x = 811 
-        y = 939 
-        z = 32 
-        end_point = (x,y,z)
-        tp.appendSegmentPoint(newSegmentID, x, y, z)
+        With Point 1 being (x1,x2) and Point 2 being (x2,y2)
+        """
+        point1 = (729, 908, 32) 
+        point2 = (811, 939, 32)  
+        self.pointComparison(point1, point2)
 
-        newSegment = tp._segments[newSegmentID]
-        # check that first and last point of segment matches that of the appended points
-        unload = newSegment[:]
-        geom = unload.loc[1, 'segment']
-        segmentPoint0 = geom.coords[0]
-        segmentPointLast = geom.coords[-1]
+    def test_case_3(self):
+        """ This tests when a user adds two points, where x1 > x2 and y1 < y2:
+
+        With Point 1 being (x1,x2) and Point 2 being (x2,y2)
+        """
+        point1 = (209, 168, 11) 
+        point2 = (250, 143, 11)  
+        self.pointComparison(point1, point2)
+        # self.pointComparison(point1, point2, isReversed = True)
+
+    def test_case_4(self):
+        """ This tests when a user adds two points, where x1 < x2 and y1 > y2:
+
+        With Point 1 being (x1,x2) and Point 2 being (x2,y2)
+        """
+        point1 = (250, 143, 11)
+        point2 = (209, 168, 11)
+        self.pointComparison(point1, point2)
+
+    def test_case_5(self):
+        """ This tests when a user adds two points, where x1 < x2 and y1 == y2:
+
+        With Point 1 being (x1,x2) and Point 2 being (x2,y2)
+        """
+        point1 = (593, 401, 20)
+        point2 = (584, 401, 20)
+        self.pointComparison(point1, point2)
+
+    def test_case_6(self):
+        """ This tests when a user adds two points, where x1 > x2 and y1 == y2:
+
+        With Point 1 being (x1,x2) and Point 2 being (x2,y2)
+        """
+        point1 = (584, 401, 20)
+        point2 = (593, 401, 20)
+        self.pointComparison(point1, point2)
+
+    def test_case_7(self):
+        """ This tests when a user adds two points, where x1 == x2 and y1 > y2:
+
+        With Point 1 being (x1,x2) and Point 2 being (x2,y2)
+        """
+        point1 = (237, 614, 25)
+        point2 = (237, 631, 25)
+        self.pointComparison(point1, point2)
+
+    def test_case_8(self):
+        """ This tests when a user adds two points, where x1 == x2 and y1 < y2:
+
+        With Point 1 being (x1,x2) and Point 2 being (x2,y2)
+        """
+        point1 = (237, 631, 25)
+        point2 = (237, 614, 25)
+        self.pointComparison(point1, point2)
+
+    def test_case_9(self):
+        """ This tests when a user adds two points, where x1 == x2 and y1 == y2:
+
+        With Point 1 being (x1,x2) and Point 2 being (x2,y2)
+        """
         
-        # logger.info(f"segmentPoint0 {segmentPoint0}")
-        # logger.info(f"segmentPointLast {segmentPointLast}")
-        # Note: the "start_point" within brightest path tracing is the last added point
-        self.assertEqual(segmentPointLast, start_point)
-        self.assertEqual(segmentPoint0, end_point)
-
-    # def 
+        # When points are equal it is the same as this previous test case:
+        self.test_same_first_point_append()
 
 if __name__ == '__main__':
     unittest.main()

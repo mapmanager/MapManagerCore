@@ -104,18 +104,33 @@ def brightestPath():
     segmentId = 6
 
 
-    x = 811 # 405
-    y = 939 # 708
-    z = 32 #45
+    # x = 811 # 405
+    # y = 939 # 708
+    # z = 32 #45
+
+    # 25 (237,614) (237, 631)
+
+    x = 237#
+    y = 614
+    z = 25 
+
     speculate: bool = False
     start_point = np.array([x,y,z])
     _singleTimePoint.appendSegmentPoint(segmentId, x, y, z)
     # map2.segments.appendSegmentPoint(segmentId, x, y, z)
 
     # end_point = np.array([725,424])
-    x = 729 #385
-    y = 908 #693
-    z = 32 #45
+    # x = 729 #385
+    # y = 908 #693
+    # z = 32 #45
+    x = 584
+    y = 401
+    z = 20
+
+    x = 237
+    y = 631
+    z = 25
+
     end_point = np.array([x,y,z])
     _singleTimePoint.appendSegmentPoint(segmentId, x, y, z)
 
@@ -129,8 +144,8 @@ def brightestPath():
 
     slices = map2.getPixels(time=0, channel=channel, zRange=(z-3, z+3))
     slices.plot(ax=ax, vmin=300, vmax=1500, alpha=0.3, cmap='CMRmap')
-    ax.set_xlim(700, 850) # ax.set_xlim(322, 612)
-    ax.set_ylim(840, 1000) # ax.set_ylim(610, 866)
+    ax.set_xlim(170, 300)#ax.set_xlim(700, 850) # ax.set_xlim(322, 612)
+    ax.set_ylim(100, 200)#ax.set_ylim(840, 1000) # ax.set_ylim(610, 866)
     plt.gca().invert_yaxis()
 
     plt.plot(start_point[0], start_point[1], 'og')
@@ -139,6 +154,8 @@ def brightestPath():
 
 
 def brightestPathIsolated():
+    """ Testing logic for astar search before moving into backend functions
+    """
     path = 'C:\\Users\\johns\\Documents\\GitHub\\MapManagerCore-Data\\data\\single_timepoint.mmap'
     map2 = MapAnnotations.load(path)
 
@@ -311,8 +328,10 @@ def speedTest():
     _singleTimePoint = map2.getTimePoint(timepoint)
 
     boundingBoxRange = 0
-    x1, y1 = 729, 811  # X-axis
-    x2, y2 = 908, 939  # Y-axis
+    # x1, y1 = 729, 811  # X-axis
+    # x2, y2 = 908, 939  # Y-axis
+    x1, y1 = 729, 908  # X-axis
+    x2, y2 = 811, 939  # Y-axis
 
     import time
     start = time.time()  # Start time
@@ -321,18 +340,19 @@ def speedTest():
     logger.info(f"brightestPath {brightestPath}")
 
     end = time.time()  # End time
-    print(f"Execution Time: {end - start:.4f} seconds")
+    # print(f"Execution Time: {end - start:.4f} seconds")
 
 if __name__ == '__main__':
     import time
 
     start = time.time()  # Start time
     # boundingBox()
-    brightestPath()
+    # brightestPath()
     # brightestPathIsolated()
     # brightestPathIsolated3D()
     # testBrightestPathAPI()
-    # speedTest()
+    speedTest()
+    # brightestPath()
     end = time.time()  # End time
     print(f"Execution Time: {end - start:.4f} seconds")
 
