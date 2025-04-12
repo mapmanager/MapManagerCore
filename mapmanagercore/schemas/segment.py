@@ -54,7 +54,9 @@ class Segment(Schema):
     )
     
     color: Tuple[int, int, int, int] = field(
-        default=(255, 0, 0),
+        # abb 202504
+        # default=(255, 0, 0),
+        default=(255, 0, 0, 0),
         type="Tuple[int, int, int, int]",
         title="Segment Color",
         description="Color of the segment",
@@ -115,7 +117,7 @@ class Segment(Schema):
             len of segment in float form
         """
         segment = frame['segment'] 
-        logger.info(f" segment.length { segment.length}")
+        logger.info(f" segment.length: {segment.length}")
         return segment.length
         
 

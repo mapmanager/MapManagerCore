@@ -2,13 +2,14 @@ import os
 from pprint import pprint
 import time
 
-from mapmanagercore.lazy_geo_pd_images.loader.mm_map_loader import mmMapLoader, mmMapImageChannel
+from mapmanagercore.lazy_geo_pd_images.loader.mm_map_loader import mmMapLoader
 from mapmanagercore.data import getTiffChannel_1, getTiffChannel_2
+from mapmanagercore import MapAnnotations
 
 from mapmanagercore.logger import logger
 import mapmanagercore.metadata
 
-def test_image_map(numTimepoints):
+def test_make_save_map(numTimepoints):
     zl = mmMapLoader()
 
     path1 = getTiffChannel_1()
@@ -17,20 +18,22 @@ def test_image_map(numTimepoints):
     for tp in range(numTimepoints):
         # append a new timepoint with image data from a file
         logger.info('appending timepoint 1 from single channel tif')
-        ok = zl.importTimepoint(path1)
-        assert ok is True
+        _newTimepoint = zl.importTimepoint(path1)
         assert zl.numTimepoints == tp+1
 
         # append another channel
         logger.info('appending channel to timepoint 1')
-        ok = zl.importChannel(path2, timepoint=tp)
+        ok = zl.importChannel(path2, timepoint=_newTimepoint)
         assert ok is True
-        assert zl.numChannels(tp) == 2
-        assert 1 in zl.getTimepointMetadata(tp).channelKeys
+        assert zl.numChannels(_newTimepoint) == 2
+        assert 1 in zl.getTimepointMetadata(_newTimepoint).channelKeys
 
-    saveFile = f'zarrLoader_{numTimepoints}.mmap'
-    savePath = os.path.join('/Users/cudmore/Desktop', saveFile)
+    saveFile = f'zarLoader_{numTimepoints}.mmap'
+    savePath = os.path.join('/Users/cudmore/Desktop/sample_mmaps', saveFile)
     zl.saveAs(savePath)
+
+    # logger.info(f'loading saved map: {savePath}')
+    # loadedMap = MapAnnotations.load(savePath)
 
 def test_empty_loader(numTimepoint=1):
     logger.info('creating empty zarr loader')
@@ -41,11 +44,12 @@ def test_empty_loader(numTimepoint=1):
     
     # append a new timepoint with image data from a file
     logger.info('appending timepoint 1 from single channel tif')
-    ok = zl.importTimepoint(path1)
-    assert ok is True
+    _newTimepoint = zl.importTimepoint(path1)
+    logger.info(f'_newTimepoint:{_newTimepoint}')
+    # assert _newTimepoint == 1
     assert zl.numTimepoints == 1
-
-    md_tp1 = zl.metadata.getTimepointMetadata(1)
+    
+    md_tp1 = zl.metadata.getTimepoint(_newTimepoint)
     from mapmanagercore.metadata.metadata3 import TimepointMetadata
     assert isinstance(md_tp1, TimepointMetadata)
 
@@ -56,51 +60,71 @@ def test_empty_loader(numTimepoint=1):
 
     # append another channel
     logger.info('appending channel to timepoint 1')
-    ok = zl.importChannel(path2, timepoint=1)
+    ok = zl.importChannel(path2, timepoint=_newTimepoint)
     assert ok is True
-    assert zl.numChannels(1) == 2
-    assert 2 in zl.getTimepointMetadata(1).channelKeys
+    assert zl.numChannels(_newTimepoint) == 2
+    # assert 2 in zl.getTimepoint(_tp).channelKeys
     # zl._printImgSrcs()
 
     # print('before importTimepoint z1 is:')
     # zl.print()
 
-    if numTimepoint > 1:
-        # append a second timepoint
-        logger.info('appending timepoint 2 from single channel tif')
-        ok = zl.importTimepoint(path1)
-        assert ok is True
-        assert zl.numTimepoints == 2
+    # if numTimepoint > 1:
+    #     # append a second timepoint
+    #     logger.info('appending timepoint 2 from single channel tif')
+    #     ok = zl.importTimepoint(path1)
+    #     assert ok is True
+    #     assert zl.numTimepoints == 2
 
-        logger.info('after importTimepoint 2nd timepoint, z1 is:')
-        zl.print()
+    #     logger.info('after importTimepoint 2nd timepoint, z1 is:')
+    #     zl.print()
 
-    savePath = '/Users/cudmore/Desktop/zarLoader2.mmap'
+    # save 1 tp, 2 channels
+    # this is runtime metadata before we save
+
+    # print('zl.metadata.asDict() is:')
+    # pprint(zl.metadata.asDict())
+    
+    # return
+
+    savePath = '/Users/cudmore/Desktop/sample_mmaps/zarLoader2.mmap'
     zl.saveAs(savePath)
 
     # add a 3rd channel to tp 1
-    ok = zl.importChannel(path1, timepoint=1)
+    ok = zl.importChannel(path1, timepoint=_newTimepoint)
     assert ok is True
-    assert zl.numChannels(1) == 3
+    assert zl.numChannels(_newTimepoint) == 3
 
-    savePath = '/Users/cudmore/Desktop/zarLoader2.mmap'
+    # print('zl.metadata.asDict() after add 3rd channel:')
+    # pprint(zl.metadata.asDict())
+
+    # return
+
+    # resave with new channel
+    logger.info('resaving with new channel')
     zl.saveAs(savePath)
 
+    # load again
+    logger.info(f're-loading saved map: {savePath}')
+    loadedMap = MapAnnotations.load(savePath)
+    print(loadedMap)
+
+
 def test_load_zarr() -> mmMapLoader:
-    path = '/Users/cudmore/Desktop/zarLoader2.mmap'
+    path = '/Users/cudmore/Desktop/sample_mmaps/zarLoader_1.mmap'  # zarLoader2
     logger.info(f'loading:{path}')
     zl = mmMapLoader(path)
     return zl
 
+def test_load_map_annotations():
+    # load an mmap like we do in pymapmanager
+    path = '/Users/cudmore/Desktop/sample_mmaps/zarLoader_1.mmap'
+    mmap = MapAnnotations.load(path)
+    print(mmap)
+
 def test_mmmap_image_channel():
     logger.info('test_mmmap_image_channel')
     zl = test_load_zarr()
-
-    # timepoint = 1
-    # channel = 1
-    # imageChannel = mmMapImageChannel(zl, timepoint=timepoint, channel=channel)
-    # oneSlice = imageChannel.getSlice(10)
-    # print(f'oneSlice:{oneSlice.shape}')
 
     # use metadata to traverse
     _start = time.time()
@@ -108,7 +132,6 @@ def test_mmmap_image_channel():
         t = oneTimepoint._key
         for oneChannel in oneTimepoint:
             c = oneChannel._key
-            #imageChannel = mmMapImageChannel(zl, timepoint=t, channel=c)
             imageChannel = zl.getImageChannel(t, c)
             imageChannel.getSlice(10)
             imageChannel.getSlice(11)
@@ -124,12 +147,15 @@ def test_mmmap_image_channel():
 
 if __name__ == '__main__':
     
-    # test_empty_loader()
+    test_empty_loader()
 
+    # test_make_save_map(1)
+    # test_make_save_map(3)
+
+    # load our saved zarr mmap
     # test_load_zarr()
 
     # test_mmmap_image_channel()
 
-    test_image_map(1)
-    test_image_map(3)
-    
+    # load like pymapmanager
+    # test_load_map_annotations()

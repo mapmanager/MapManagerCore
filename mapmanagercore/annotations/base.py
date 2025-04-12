@@ -18,6 +18,7 @@ from mapmanagercore.config import Colors, scaleColors, symbols
 from mapmanagercore.lazy_geo_pd_images.loader.imageio import MultiImageLoader
 # abb depreciated
 # from mapmanagercore.lazy_geo_pd_images.loader.zarr import ZarrLoader
+from mapmanagercore.lazy_geo_pd_images.loader.mm_map_loader import mmMapLoader
 from ..lazy_geo_pandas import LazyGeoFrame
 from ..schemas import Segment, Spine
 from ..lazy_geo_pd_images import LazyImagesGeoPandas, ImageLoader
@@ -211,15 +212,14 @@ class AnnotationsBase(LazyImagesGeoPandas):
 
     @classmethod
     def load(cls, path: Union[str, None], lazy=False):
-        logger.warning(f'abb creating ZarrLoader from path:{path}')
-        logger.warning(f'  cls:{cls}')
+        # logger.warning(f'abb creating ZarrLoader from path:{path}')
+        # logger.warning(f'  cls:{cls}')
 
         # abb was this
         # from mapmanagercore.lazy_geo_pd_images.loader.zarr import ZarrLoader
         # loader = ZarrLoader(path, lazy=lazy)
         # now this 20250317
-        logger.info(f'TODO: switch to mm_map_loader mmMapLoader !!!')
-        from mapmanagercore.lazy_geo_pd_images.loader.mm_map_loader import mmMapLoader
+        # logger.info(f'TODO: switch to mm_map_loader mmMapLoader !!!')
         loader = mmMapLoader(path)
 
         # abb read_pickle() is failing if we have an older version of numpy

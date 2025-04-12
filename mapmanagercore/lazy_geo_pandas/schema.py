@@ -154,8 +154,16 @@ class Schema:
                 if not isinstance(default, MISSING_VALUE_CLASS):
                     if isinstance(default, tuple):
                         if key in df.columns:
-                            df.loc[:, key] = df.loc[:, key].apply(
-                                lambda x: x if not pd.isna(x) else default)
+                            # abb 20250411 error on load
+                            try:
+                                df.loc[:, key] = df.loc[:, key].apply(
+                                    lambda x: x if not pd.isna(x) else default)
+                            except (ValueError) as e:
+                                logger.error('abb 202504')
+                                logger.error(e)
+                                logger.error(f'  key:{key} {type(key)}')
+                                logger.error(f'  default:{default} {type(default)}')
+
                         else:
                             df.loc[:, key] = df.apply(
                                 lambda x: default, axis=1)

@@ -19,7 +19,7 @@ else:
 
 from mapmanagercore.logger import logger
 
-# abb add this to core and don't use 'LEft' 'Right' as string, use this type
+# abb add this to core and don't use 'Left' 'Right' as string, use this type
 # but when we write to a file, use, SpineSide.Left.value -> str
 # spioneSideAsStr = SpineSide.Left.value
 class SpineSide(StrEnum):

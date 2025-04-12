@@ -1,13 +1,14 @@
 import dataclasses
 from typing import List, Optional
 
+from mapmanagercore.exceptions import MetadataError
+
 from mapmanagercore.logger import logger
 
 @dataclasses.dataclass
 class _metadataBase:
     """Base class for all metadata dataclass.
     """
-    _key:Optional[int] = None  # when added to a dict
     
     def setValue(self, key, value) -> bool:
         """Set a field value.
@@ -54,12 +55,10 @@ class _metadataList(_metadataBase):
         - MetadataList that has a list of TimepointMetadata
     """
 
-    # _metadataList: list = dataclasses.field(default_factory=list)
+    # abb, I want derived classes to have meaninful names like (timepoints, channels)
     _metadataList: dict = dataclasses.field(default_factory=dict)
-    # _metadataList: dict[_metadataBase] = dataclasses.field(default_factory=dict)
 
-    # abb refactor for dict (add)
-    def getNewKey(self):
+    def _getNewKey(self):
         """Get a unique key for this metadata list.
 
         This is 1 based.
@@ -101,9 +100,8 @@ class _metadataList(_metadataBase):
         Returns:
             index of new item (1 based).
         """
-        _newKey = self.getNewKey()
+        _newKey = self._getNewKey()
         self._metadataList[_newKey] = metadata
-        metadata._key = _newKey  # keys are immutable, convenience so items know there key
         return _newKey
     
     def deleteMetadataItem(self, index : int) -> Optional[object]:
@@ -116,30 +114,21 @@ class _metadataList(_metadataBase):
             item = self._metadataList.pop(index)
             return item
     
-    # TODO: implement this
-    def _old_insertMetadataItem(self, index : int, metadata : object) -> Optional[bool]:
-        """Insert an item at given index.
-        
-        Returns
-            True on success, otherwise None
-        """
-        if index in self.listKeys:
-            self._metadataList.insert(index, metadata)
-            return True
-
-    # TODO: implement this
-    def swapMetadataItems(self, srcIndex, dstIndex) -> bool:
+    def swapMetadataItems(self, srcIndex, dstIndex) -> MetadataError | bool:
         """Swap/move an item in the list.
         
         Returns
             True on success, otherwise False
+
+        Raises:
+            MetadataError
         """
         if srcIndex not in self.listKeys:
-            logger.mmlog(f'src {srcIndex} does not exist')
-            return False
+            _err = f'src {srcIndex} does not exist, expecting one of {self.listKeys}'
+            raise MetadataError(_err)
         if dstIndex not in self.listKeys:
-            logger.mmlog(f'dst {dstIndex} does not exist')
-            return False
+            _err = f'dst {dstIndex} does not exist, expecting one of {self.listKeys}'
+            raise MetadataError(_err)
         
         listKeys = self.listKeys
         src =  listKeys.index(srcIndex)
@@ -162,13 +151,13 @@ class _metadataList(_metadataBase):
         else:
             return False
         
-    def __getitem__(self, index:int):
-        """Limit use, use explicit function getMetadataItem(int)
-        """
-        if index not in self._metadataList.keys():
-            logger.error(f'did not find key:{index}')
-            return
-        return self._metadataList[index]
+    # def __getitem__(self, index:int):
+    #     """Limit use, use explicit function getMetadataItem(int)
+    #     """
+    #     if index not in self._metadataList.keys():
+    #         logger.error(f'did not find key:{index}')
+    #         return
+    #     return self._metadataList[index]
     
     def __iter__(self):
         """Iterate over the metadata list.

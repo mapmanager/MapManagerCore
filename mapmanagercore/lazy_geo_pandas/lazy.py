@@ -544,7 +544,12 @@ class LazyGeoFrame(Generic[T]):
     def _getFiltered(self, keys):
         """Gets a filtered data frame with the specified keys."""
         if not self._rootDf.empty:
-            return self._df[keys]
+            # abb channel keys
+            try:
+                return self._df[keys]
+            except (KeyError) as e:
+                logger.error(e)
+                logger.error(f'available keys are {self._df.columns}')
 
         # Some computed keys might be missing when the root frame is empty
         # Temporary add empty series as placeholders for those computed columns

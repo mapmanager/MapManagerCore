@@ -11,6 +11,9 @@ from shapely.geometry import LineString, Point
 import brightest_path_lib
 from mapmanagercore.logger import logger
 
+# abb had to add this
+from .base import SingleTimePointAnnotationsBase
+
 class AnnotationsSegments(SingleTimePointAnnotationsBase):
     def optimizeSegment(self, roughSegment: LineString, segment: LineString = None, updatedIdx: int = None, live: bool = False, 
                         z: int = None) -> Union[LineString, None]:

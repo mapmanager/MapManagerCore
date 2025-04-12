@@ -45,8 +45,9 @@ from dataclasses_json import dataclass_json
 
 import numpy as np
 
-from mapmanagercore.metadata._metadata import _metadataBase, _metadataList
+from mapmanagercore.metadata._metadata3 import _metadataBase, _metadataList
 from mapmanagercore.utils import getAutoContrast  # given img data, get min/max
+from mapmanagercore.exceptions import MetadataError
 from mapmanagercore.logger import logger
 
 @dataclass_json
@@ -220,9 +221,9 @@ class ShapeMetadata:
             self.xPixels = proposedShape[2]
             self.yPixels = proposedShape[1]
         else:
-            logger.mmlog('expecting img data of shape len 2 or 3, got {proposedShape}')
-            return
-        # self.dtype = imgData.dtype.name
+            _err = 'expecting img data of shape len 2 or 3, got {proposedShape}'
+            logger.mmlog(_err)
+            raise MetadataError(_err)
 
 @dataclass_json
 @dataclasses.dataclass
@@ -238,6 +239,9 @@ class TimepointMetadata(_metadataList):
         When we are in a multi-timepoint map (with segments and spine connected)
         we need one global AnalysisParameters (At root of zarr file)
     """
+
+    channels: dict = dataclasses.field(default_factory=dict)
+    _key = 'channels'
 
     name: str = 'Untitled'
 
@@ -258,16 +262,11 @@ class TimepointMetadata(_metadataList):
         if isinstance(self._metadataList, dict):
             _metadataList = copy(self._metadataList)
             self._metadataList = {}
+
             for k,v in _metadataList.items():
                 # channelMetadata = ChannelMetadata(v)
                 channelMetadata = ChannelMetadata.from_dict(v)
                 newChannelIndex = self.appendMetadataItem(channelMetadata)
-
-    def getNewChannelKey(self) -> str:
-        """Get a new timepoint key.
-        """
-        channelKeys = self.channelKeys
-        return max(channelKeys) + 1
     
     def fromImgData(imgData: np.ndarray) -> Self:
         tpmd = TimepointMetadata()
@@ -303,8 +302,9 @@ class TimepointMetadata(_metadataList):
         else:
             # check proposedShape
             if proposedShape != self.shape:
-                logger.error(f'expecting shape {self.shape} but got {proposedShape}')
-                return
+                _err = f'expecting shape {self.shape} but got {proposedShape}'
+                # logger.error(_err)
+                raise MetadataError(_err)
                 
         metadataContrast = ChannelMetadata(name=name)
         metadataContrast._initFromImgData(imgData)
@@ -337,8 +337,8 @@ class TimepointMetadata(_metadataList):
         """
         return self.getMetadataItem(channelIdx)
 
-    def __getitem__(self, index:int) -> ChannelMetadata:
-        return super().__getitem__(index)
+    # def __getitem__(self, index:int) -> ChannelMetadata:
+    #     return super().__getitem__(index)
     
     @property
     def numChannels(self) -> int:
@@ -356,18 +356,22 @@ class TimepointMetadata(_metadataList):
         """
         return self.shapeMetadata.shape
 
-    def setChannelProperty(self, channelIdx, key, value):
+    def setChannelProperty(self, channelIdx, key, value) -> MetadataError | object:
         """Set channel property.
         """
-        if channelIdx not in self.listKeys:
-            return
+        if not self.channelExists(channelIdx):
+            _err = f'channel {channelIdx} does not exist, expecting one of {self.channelKeys}'
+            raise MetadataError(_err)
+        
         return self._metadataList[channelIdx].setValue(key, value)
 
-    def getChannelProperty(self, channelIdx, key):
+    def getChannelProperty(self, channelIdx, key) -> MetadataError | object:
         """Get channel property.
         """
-        if channelIdx not in self.listKeys:
-            return
+        if not self.channelExists(channelIdx):
+            _err = f'channel {channelIdx} does not exist, expecting one of {self.channelKeys}'
+            raise MetadataError(_err)
+
         return self._metadataList[channelIdx].getValue(key)
     
     @property
@@ -375,6 +379,10 @@ class TimepointMetadata(_metadataList):
         """Get the list[int] of channel keys.
         """
         return self.listKeys
+    
+    def channelExists(self, channelIdx) -> bool:
+        return self.keyExists(channelIdx)
+        # return channelIdx in self.channelKeys
     
 @dataclass_json
 @dataclasses.dataclass
@@ -384,6 +392,9 @@ class mmMapMetadata(_metadataList):
     For single timepoint mmap/zarr, represents a list of independent imaging timepoints/sessions.
     """
 
+    timepoints: dict = dataclasses.field(default_factory=dict)
+    _key = 'timepoints'
+
     def __post_init__(self):
         if isinstance(self._metadataList, dict):
             _metadataList = copy(self._metadataList)
@@ -391,115 +402,113 @@ class mmMapMetadata(_metadataList):
             for k,v in _metadataList.items():
                 # timepointMetadata = TimepointMetadata(v)
                 timepointMetadata = TimepointMetadata.from_dict(v)
-                self.appendTimepoint(timepointMetadata)
-
-    def getNewTimepointKey(self) -> str:
-        """Get a new timepoint key.
-        """
-        timepointKeys = self.timepointKeys
-        return max(timepointKeys) + 1
+                # appending just metadata, not imgData
+                self.appendTimepoint(None, timepointMetadata=timepointMetadata)
 
     def print(self):
         """Print summary of metadata.
         """
         for timepoint in self.timepointKeys:
-            print(f'timepoint {timepoint}')
-            for channel in self[timepoint].channelKeys:
-                print(f'  channel {channel}')
-                print(f'    minInt {self[timepoint][channel].minInt}')
-                print(f'    maxInt {self[timepoint][channel].maxInt}')
+            print(f't:{timepoint}')
+            for channel in self.getTimepoint(timepoint).channelKeys:
+                print(f'  c:{channel} {self.getTimepoint(timepoint).shape}')
+                # print(f'    minInt {self[timepoint][channel].minInt}')
+                # print(f'    maxInt {self[timepoint][channel].maxInt}')
 
-    def getTimepointMetadata(self, index : int) -> Optional[TimepointMetadata]:
+    def getTimepoint(self, index : int) -> MetadataError | TimepointMetadata:
         """Get metadata for a timepoint.
         
         Args:
             index: Timepoint index to get.
         
-        See Also:
-            __getitem__
-            
         Returns:
             Metadata for timepoint at index.
+
+        Raises:
+            MetadataError if timepoint does not exist.
         """
+        if not self.timepointExists(index):
+            _err = f'did not find timepoint {index}, available timepoints are {self.timepointKeys}'
+            raise MetadataError(_err)
+        
         _metadata = self.getMetadataItem(index)
-        if _metadata is None:
-            logger.error(f'did not find timepoint {index}, available timepoints are {self.timepointKeys}')
-            raise ValueError
         return _metadata
     
-    def insertTimepoint(self, index : int, metadata : TimepointMetadata) -> bool:
-        """Insert a new timepoint.
-
-        Args:
-            index: The index to insert into.
-            metadata: The TimepointMetadata to insert.
-
-        Returns:
-            True on success, otherwise False.
-        """
-        if index not in self.listKeys:
-            logger.mmlog(f'src {index} does not exist, available keys are {self.listKeys}')
-            return False
-        self.insertMetadataItem(index, metadata)
-        return True
-    
-    def appendTimepoint(self, timepointMetadata : TimepointMetadata = None) -> int:
+    def appendTimepoint(self, 
+                        imgData : np.ndarray,
+                        timepointMetadata:TimepointMetadata = None) -> int:
         """Append a new timepoint.
 
-        Args:
-            timepointMetadata: The timepoint to append.
+        Parameters
+        ==========
+            imgData: imgData to seed the timepoint with (first channel)
+        
+        Returns
+        =======
+            New timepoint key
         """
+
         if timepointMetadata is None:
-            timepointMetadata = TimepointMetadata()
+            timepointMetadata = TimepointMetadata()  # empty
+            timepointMetadata.appendChannel(imgData)  # append first channel from data
+        
         return self.appendMetadataItem(timepointMetadata)
 
-    def deleteTimepoint(self, index : int) -> Optional[TimepointMetadata]:
-        if index in self.listKeys:
-            return self.deleteMetadataItem(index)
+    def deleteTimepoint(self, index : int) -> MetadataError | TimepointMetadata:
+        if not self.timepointExists(index):
+            raise MetadataError(f'timepoint {index} does not exist, expecting one of {self.timepointKeys}')
+        return self.deleteMetadataItem(index)
 
-    def swapTimepoint(self, srcTimepoint : int, dstTimepoint : int) -> bool:
-        """Move/swap timepoints.
+    def swapTimepoint(self, srcTimepoint : int, dstTimepoint : int) -> Optional[MetadataError]:
+        """Swap position of timepoints.
         
-        Returns:
-            True on success, otherwise False
+        Raises:
+            MetadataError: If src or dst timepoint does not exist
         """
-        ok = self.swapMetadataItems(srcTimepoint, dstTimepoint)
-        return ok
+        if not self.timepointExists(srcTimepoint):
+            raise MetadataError(f'srcTimepoint {srcTimepoint} does not exist, expecting one of {self.timepointKeys}')
+        if not self.timepointExists(dstTimepoint):
+            raise MetadataError(f'dstTimepoint {dstTimepoint} does not exist, expecting one of {self.timepointKeys}')
 
-    def moveChannel(self, srcTimepoint:int, srcChannelIdx:int,
-                    dstTimepoint:int, dstChannelIdx:int) -> bool:
-        """Move a channel from one timepoint to another.
+        self.swapMetadataItems(srcTimepoint, dstTimepoint)
+
+    def channelExists(self, timepoint:int, channel:int) -> MetadataError | bool:
+        # check timepoint 
+        if not self.timepointExists(timepoint):
+            raise MetadataError(f'timepoint {timepoint} does not exist, expecting one of {self.timepointKeys}')
+
+        # check channel
+        if not self.getTimepoint(timepoint).channelExists(channel):
+            raise MetadataError(f'timepoint {timepoint} srcChannelIdx:{channel} does not exist, expecting one of {self.getTimepoint(timepoint).channelKeys}')
+  
+        return True
+
+    def moveChannel(self,
+                    timepoint:int,
+                    srcChannelIdx:int,
+                    dstChannelIdx:int) -> MetadataError:
+        """Move a channel within a timepoint.
         
         Args:
-            srcTimepoint: Source timepoint to move from.
+            timepoint: Source timepoint to move from.
             srcChannelIdx: Source channel to move from.
-            dstTimepoint: Destination timepoint to move to.
             dstChannelIdx: Destination channel to move to.
 
-        Returns:
-            True on success, otherwise false.
+        Raises:
+            MetadataError: If either timepoint or src or dst channels do not exist
         """
 
-        # check source timepoint and channel
-        if srcTimepoint not in self.timepointKeys:
-            return False
-        if srcChannelIdx not in self[srcTimepoint].channelKeys:
-            return False
-        # check dst timepoint and channel
-        if dstTimepoint not in self.timepointKeys:
-            return False
-        # hold off on dst channel check,
-        # if within range then insert, otherwise ignore and always append
-        # if dstChannel not in self[srcTimepoint].channelKeys:
-        #     return False
+        # check timepoint 
+        if not self.timepointExists(timepoint):
+            raise MetadataError(f'timepoint {timepoint} does not exist, expecting one of {self.timepointKeys}')
+
+        # check channel
+        if not self.getTimepoint(timepoint).channelExists(srcChannelIdx):
+            raise MetadataError(f'timepoint {timepoint} srcChannelIdx:{srcChannelIdx} does not exist, expecting one of {self.getTimepoint(timepoint).channelKeys}')
+        if not self.getTimepoint(timepoint).channelExists(dstChannelIdx):
+            raise MetadataError(f'timepoint {timepoint} dstChannelIdx:{dstChannelIdx} does not exist, expecting one of {self.getTimepoint(timepoint).channelKeys}')
         
-        # remove from source
-        _removedChannelMetadata = self[srcTimepoint].deleteChannel(srcChannelIdx)
-
-        # insert into destinations
-        _newIndex = self[dstTimepoint].appendMetadataItem(_removedChannelMetadata)  # to do write 
-
-        return True
+        self.getTimepoint(timepoint).swapChannels(srcChannelIdx, dstChannelIdx)
     
     @property
     def numTimepoints(self) -> int:
@@ -517,10 +526,9 @@ class mmMapMetadata(_metadataList):
         return self.listKeys
 
     def timepointExists(self, t:int) -> bool:
-        return t in self.timepointKeys
+        return self.keyExists(t)
+        # return t in self.timepointKeys
     
-    def __getitem__(self, index:int) -> TimepointMetadata:
-        return super().__getitem__(index)
+    # def __getitem__(self, index:int) -> TimepointMetadata:
+    #     return super().__getitem__(index)
 
-    def asDict(self):
-        return dataclasses.asdict(self)

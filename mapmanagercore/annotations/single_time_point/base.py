@@ -290,7 +290,7 @@ class SingleTimePointAnnotationsBase(_SingleTimePointAnnotationsBase):
         numPnts = len(self.points)
         numSegments = len(self.segments)
                 
-        return f't:{numTimepoints}, points:{numPnts} segments:{numSegments} images:{self.shape}'
+        return f't:{numTimepoints}, points:{numPnts} segments:{numSegments} channels:{self.numChannels} images:{self.shape}'
         
     def getPixels(self,
                   channel: int,
@@ -331,7 +331,7 @@ class SingleTimePointAnnotationsBase(_SingleTimePointAnnotationsBase):
         """Get the number of image channels.
         """
         # return len(self._annotations._images.channels(self._t))
-        return self._annotations._images.metadata.getTimepointMetadata(self._t).numChannels
+        return self._annotations._images.metadata.getTimepoint(self._t).numChannels
 
     def getShapePixels(self, shapes: gp.GeoDataFrame, channel: Union[int, List[int]] = 0, zSpread: int = 0, z: int = None) -> pd.Series:
         return self._annotations.getShapePixels(shapes, channel, zSpread, self._t, z=z)

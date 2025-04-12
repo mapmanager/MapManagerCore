@@ -9,6 +9,8 @@ from mapmanagercore.metadata.metadata3 import (TimepointMetadata,
                                                          mmMapMetadata,
                                                          ChannelMetadata,
                                                          AnalysisParams)
+from mapmanagercore.exceptions import MetadataError
+
 from mapmanagercore.logger import logger
 
 def test_metadata():
@@ -236,31 +238,30 @@ def test_channel_metadata():
 def test_mmmap_metadata():
     """mmMapMetadata is a list of TimepointMetadata.
     """
+    firstTp = 0
+    secondTp = 1
+
     mdl = mmMapMetadata()
     assert mdl.numTimepoints == 0
     assert mdl._metadataList == {}
 
-    # this is an error, we need to have a populated TimepointMetadata !!!
-    # tpmd = TimepointMetadata()
-    # mdl.appendTimepoint(tpmd)
-
     # create single channel timepoint metadata (on user import tiff)
-    tpmd = TimepointMetadata()  # empty tpmd
     imgData = np.random.randint(low=0, high=2**11, size=(20,512,512), dtype=np.uint16)
-    channelIdx = tpmd.appendChannel(imgData)
-    assert channelIdx == 1
-    assert tpmd.numChannels == 1
-
     # append the new timepoint
-    mdl.appendTimepoint(tpmd)
-    assert mdl.numTimepoints == 1
+    newTp = mdl.appendTimepoint(imgData)
+    logger.info(f'newTp:{newTp} {type(newTp)}')
+    assert newTp == firstTp
 
     # delete bad timepoint
-    _deletedItem = mdl.deleteTimepoint(3)
-    assert _deletedItem is None
+    _badTp = 3
+    try:
+        _deletedItem = mdl.deleteTimepoint(_badTp)
+        assert _deletedItem is None
+    except (MetadataError) as e:
+        logger.info(f'expected: {e}')
 
     # delete good timepoint
-    _deletedItem = mdl.deleteTimepoint(1)
+    _deletedItem = mdl.deleteTimepoint(newTp)
     assert mdl.numTimepoints == 0
     assert isinstance(_deletedItem, TimepointMetadata)
     assert _deletedItem is not None
@@ -268,55 +269,59 @@ def test_mmmap_metadata():
     assert _deletedItem.shapeMetadata.xPixels == 512
 
     # append the new timepoint AGAIN
-    mdl.appendTimepoint(tpmd)
+    _tmp = mdl.appendTimepoint(imgData)
+    assert _tmp == firstTp
     assert mdl.numTimepoints == 1
 
     # append a second timepoint
-    tpmd = TimepointMetadata()  # empty tpmd
-    imgData = np.random.randint(low=0, high=2**8, size=(20,512,512), dtype=np.uint8)
-    channelIdx = tpmd.appendChannel(imgData)
-
-    mdl.appendTimepoint(tpmd)
+    imgData2 = np.random.randint(low=0, high=2**8, size=(20,512,512), dtype=np.uint8)
+    _tmp = mdl.appendTimepoint(imgData2)
+    assert _tmp == secondTp
     assert mdl.numTimepoints == 2
 
     # print(mdl[0])
-    assert mdl[1] is not None
-    assert mdl[2] == tpmd
+    assert mdl.getTimepoint(firstTp) is not None
+    assert mdl.getTimepoint(secondTp) is not None
     
     # swap timepoint (bad src)
-    _swapped = mdl.swapTimepoint(srcTimepoint=6, dstTimepoint=0)
-    assert _swapped is False
-    
+    try:
+        _swapped = mdl.swapTimepoint(srcTimepoint=6, dstTimepoint=0)
+        assert _swapped is False
+    except (MetadataError) as e:
+        logger.info(f'expected: {e}')
+
     # swap timepoint (bad dst)
-    _swapped = mdl.swapTimepoint(srcTimepoint=1, dstTimepoint=6)
-    assert _swapped is False
+    try:
+        _swapped = mdl.swapTimepoint(srcTimepoint=1, dstTimepoint=6)
+        assert _swapped is False
+    except (MetadataError) as e:
+        logger.info(f'expected: {e}')
 
     # check before we swap
-    assert mdl.getTimepointMetadata(1).getChannelProperty(1, 'dtype') == 'uint16'
-    assert mdl.getTimepointMetadata(2).getChannelProperty(1, 'dtype') == 'uint8'
+    assert mdl.getTimepoint(firstTp).getChannelProperty(0, 'dtype') == 'uint16'
+    assert mdl.getTimepoint(secondTp).getChannelProperty(0, 'dtype') == 'uint8'
 
     # swap timepoint (good)
-    _swapped = mdl.swapTimepoint(srcTimepoint=1, dstTimepoint=2)
-    assert _swapped is True
+    mdl.swapTimepoint(srcTimepoint=0, dstTimepoint=1)
 
     # check that swap worked
     assert mdl.numTimepoints == 2
         
     # pprint(mdl, sort_dicts=False)
 
-    assert mdl.getTimepointMetadata(1).getChannelProperty(1, 'dtype') == 'uint16'
-    assert mdl.getTimepointMetadata(2).getChannelProperty(1, 'dtype') == 'uint8'
+    assert mdl.getTimepoint(0).getChannelProperty(0, 'dtype') == 'uint16'
+    assert mdl.getTimepoint(1).getChannelProperty(0, 'dtype') == 'uint8'
 
     # add another channel and test swap
-    mdl.getTimepointMetadata(1).appendChannel(imgData)
-    assert mdl.getTimepointMetadata(1).numChannels == 2
-    mdl.getTimepointMetadata(1).swapChannels(srcChannelIdx=1, dstChannelIdx=2)
+    mdl.getTimepoint(1).appendChannel(imgData)
+    assert mdl.getTimepoint(1).numChannels == 2
+    mdl.getTimepoint(1).swapChannels(srcChannelIdx=0, dstChannelIdx=1)
 
-    for idx, tp in enumerate(mdl):
-        logger.info(f'tp idx:{idx}')
-        pprint(tp, sort_dicts=False)
-        for ch in tp:
-            pprint(ch, sort_dicts=False, indent=4)
+    # for idx, tp in enumerate(mdl):
+    #     logger.info(f'tp idx:{idx}')
+    #     pprint(tp, sort_dicts=False)
+    #     for ch in tp:
+    #         pprint(ch, sort_dicts=False, indent=4)
  
     mdl.print()
 

@@ -41,7 +41,12 @@ def parseColumns(columns: List[str], prefix: str) -> Tuple[set[int], set[str]]:
         if len(parts) < 3:
             continue
 
-        channels.add(int(parts[1][2:]) - 1)
+        logger.warning(f'=== abb column:{column} prefix:{prefix} parts:{parts}')
+        logger.warning('  abb removing -1 in channel')
+        # channels.add(int(parts[1][2:]) - 1)
+        # abb, removed -1
+        channels.add(int(parts[1][2:]))
+
         aggregates.add(parts[2])
 
     return channels, aggregates
@@ -218,6 +223,7 @@ class LazyImagesGeoPandas(LazyGeoPandas):
             time ([type], optional): The time to get the pixels for. Defaults to None.
             z (int, optional): The z to get the pixels for. Defaults to None.
         """
+        logger.error(f'channel:{channel}')
         return self._images.getShapePixels(shapes, channel=channel, zSpread=zSpread, time=time, z=z)
 
 
