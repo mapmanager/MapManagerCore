@@ -273,8 +273,8 @@ def test_channel_metadata():
 def test_mmmap_metadata():
     """mmMapMetadata is a list of TimepointMetadata.
     """
-    firstTp = 0
-    secondTp = 1
+    firstTp = 1
+    secondTp = 2
 
     mdl = mmMapMetadata()
     assert mdl.numTimepoints == 0

@@ -27,14 +27,14 @@ install_requires = [
     'brightest-path-lib',
     'pooch',  # to load data from MapManagerCore-Data repo
     'imagecodecs',
-    #'tifffile',
+    'tifffile',  # may conflict with bioio
 
     # image import with bioio
     # 'bioio>=1.2.0',  # this is bleading edge and leads to version problems (worth it)
-    'bioio-tifffile',
-    'bioio-czi',
-    'bioio-nd2',
-    'bioio-ome-tiff',
+    # 'bioio-tifffile',
+    # 'bioio-czi',
+    # 'bioio-nd2',
+    # 'bioio-ome-tiff',
     # # 'bioio-imageio',  # PNG , GIF , & other similar formats seen here
     # # 'bioio-bioformats',  # for oir requires maven/java
 ]
