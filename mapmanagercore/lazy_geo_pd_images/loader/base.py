@@ -1,7 +1,7 @@
 from enum import IntEnum
 from functools import lru_cache
 from typing import Iterator, List, Self, Tuple, TypedDict, Union
-from mapmanagercore.analysis_params import AnalysisParams
+# from mapmanagercore.analysis_params import AnalysisParams
 from mapmanagercore.lazy_geo_pd_images.metadata import Metadata
 from mapmanagercore.logger import logger
 
@@ -143,15 +143,15 @@ class ImageLoader:
         return list(metaData.channelNames.keys())
 
     # abb depreciate
-    def maxChannels(self) -> int:
-        return self._maxChannels
+    # def maxChannels(self) -> int:
+    #     return self._maxChannels
 
     # abb depreciate
-    def setMaxChannels(self, maxChannels: int) -> bool:
-        if self.maxChannels() == maxChannels:
-            return False
-        self._analysisParams.setValue("maxChannels", maxChannels)  # abb md3 depreciated
-        return True
+    # def setMaxChannels(self, maxChannels: int) -> bool:
+    #     if self.maxChannels() == maxChannels:
+    #         return False
+    #     self._analysisParams.setValue("maxChannels", maxChannels)  # abb md3 depreciated
+    #     return True
 
     def slices(self, t: int, channel: int = 0) -> int:
         """

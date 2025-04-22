@@ -36,85 +36,23 @@ Example:
     print(mapmd.numTimepoint)  # -> 1
 """
 
-from typing import Tuple, List, Optional, Literal, Self
+from typing import Tuple, List, Optional, Literal, Self, Any
 from copy import copy
 from pprint import pprint
 
 import dataclasses
+from dataclasses import field, fields
 from dataclasses_json import dataclass_json
 
 import numpy as np
 
 from mapmanagercore.metadata._metadata3 import _metadataBase, _metadataList
+from mapmanagercore.metadata import AnalysisParams
 from mapmanagercore.utils import getAutoContrast  # given img data, get min/max
 from mapmanagercore.exceptions import MetadataError
 from mapmanagercore.logger import logger
 
-@dataclass_json
-@dataclasses.dataclass
-class AnalysisParams(_metadataBase):
-    """Analysis parameters for a single timepoint (also for all timepoints in a mmap).
-    """
-    version:float = 0.6
-    """Manually increment this when we add to this class."""
-
-    # spines
-    brightestPathDistance: int = dataclasses.field(default=10, metadata={'description': 
-                                                             'Points along the tracing to find spine connection (anchor).'
-                                                             })
-    brightestPathChannel: int = dataclasses.field(default=0, metadata={'description': 
-                                                             'Image color channel to find brightest connection of spine.'
-                                                             })
-    brightestPathZSpread: int = dataclasses.field(default=3, metadata={'description': 
-                                                             'Number of image slices for max project to find brightest connection of spine.'
-                                                             })
-    roiExtend: int = dataclasses.field(default=4, metadata={'description': 
-                                                             'Number of pixels to extend spine head for spine ROI.'
-                                                             })
-    roiRadius: int = dataclasses.field(default=4, metadata={'description': 
-                                                             'Width of spine ROI.'
-                                                             })
-    
-    # segments
-    segmentRadius: int = dataclasses.field(default=4, metadata={'description': 
-                                                             'Radius of segment tracing.'
-                                                             })
-    segmentTracingMaxDistance: int = dataclasses.field(default=90, metadata={'description': 
-                                                             'Max distance to trace a brightest path.'
-                                                             })
-    backgroundRoiGridPoints: int = dataclasses.field(default=5, metadata={'description': 
-                                                             'Number of points in grid (nxn) to calculate background ROI.'
-                                                             })
-    backgroundRoiGridOverlap: float = dataclasses.field(default=0.1, metadata={'description': 
-                                                             'Overlap of background grid points.'
-                                                             })
-
-    def getDescription(self, attribute_name:str) -> str:
-        """Get the 'description' from one attribute metadata.
-        """
-        return self.__dataclass_fields__[attribute_name].metadata['description']
-
-    def printFields(self):
-        """debugging.
-        """
-        for oneField in dataclasses.fields(self):
-            # print(f'oneField:{oneField}')
-            
-            name = oneField.name
-            _type = oneField.type
- 
-            value = self.getValue(name)
-            default = oneField.default
-            try:
-                metadata = oneField.metadata
-            except (KeyError) as e:
-                metadata = ''
-            print(name, value, _type, default, metadata)
-        
-        # _fields = list(self.__annotations__)
-        # print(_fields)
-
-
+# TODO: move to its own file
 @dataclasses.dataclass
 class ExperimentMetadata(_metadataBase):
     """For each image acquired, user can specify `Experiment` metadata.
@@ -150,11 +88,17 @@ class ChannelMetadata(_metadataBase):
     """Max intensity of image data, set on import then immutable."""
     dtype: str = 'Unknown'
     """String representation of dtype"""
+    minAutoContrast: int = 0
+    """Min auto contrast from all imgData, set on import then imutable."""
+    maxAutoContrast: int = 256
+    """Max auto contrast from all imgData, set on import then imutable."""
+
     #
     # the remaining fields can be set by the user.
-    minContrast: int = 1
-    maxContrast: int = 1
-    color : str = "x00FF00"  # map -> 'green'
+    minUserContrast: int = 1
+    maxUserContrast: int = 1
+    
+    color : str = "green"  # map -> 'green'
     """Color LUT for the image."""
 
     name: str = 'Untitled'
@@ -165,13 +109,34 @@ class ChannelMetadata(_metadataBase):
 
         This assumes we have the entire image volume.
         """
-        self.minInt = int(np.min(imgData))
+        self.minInt = int(np.min(imgData))  # immutable
         self.maxInt = int(np.max(imgData))
+        
         minContrast, maxContrast = getAutoContrast(imgData)
-        self.minContrast = minContrast
-        self.maxContrast = maxContrast
+        # new 20250415
+        self.minAutoContrast = minContrast  # immutable
+        self.maxAutoContrast = maxContrast
+
+        # set by user
+        self.minUserContrast = minContrast
+        self.maxUserContrast = maxContrast
 
         self.dtype = imgData.dtype.name
+
+    def resetAutoContrast(self):
+        """Reset to auto contrast (calculated once on import).
+        """
+        self.minUserContrast = self.minAutoContrast
+        self.maxUserContrast = self.maxAutoContrast
+
+    def getUserContrast(self) -> Tuple[int, int]:
+        """Get min/max of current user contrast.
+        """
+        return [self.minUserContrast, self.maxUserContrast]
+    
+    def setUserContrast(self, theMin, theMax):
+        self.minUserContrast = theMin
+        self.maxUserContrast = theMax
 
 @dataclass_json
 @dataclasses.dataclass
@@ -279,7 +244,8 @@ class TimepointMetadata(_metadataList):
     def appendChannel(self,
                       imgData : np.ndarray,
                       name: Optional[str] = 'Untitled') -> Optional[int]:
-        """Given img data, append a new color channel. Used when we are importing data.
+        """Given img data, append a new color channel.
+            Used when we are importing data.
         
         Parameters:
             imgData: The channel image data to append.
@@ -311,6 +277,14 @@ class TimepointMetadata(_metadataList):
         
         # do the append
         newChannelKey = self.appendMetadataItem(metadataContrast)
+        
+        logger.info(f'setting hard coded color using newChannelKey:{newChannelKey}')
+        if newChannelKey==1:
+            metadataContrast.color = 'red'
+        elif newChannelKey == 2:
+            metadataContrast.color = 'green'
+        elif newChannelKey == 3:
+            metadataContrast.color = 'blue'
         return newChannelKey
     
     def deleteChannel(self, channelIdx:int) -> Optional[ChannelMetadata]:
@@ -347,6 +321,14 @@ class TimepointMetadata(_metadataList):
         return self.numItems
     
     @property
+    def numSlices(self) -> int:
+        """The number of image slices in the timepoint.
+
+        All channels are the same
+        """
+        return self.shape[0]
+    
+    @property
     def shape(self) -> Tuple[int,int,int]:
         """The shape of the image data in the timepoint.
         
@@ -356,6 +338,16 @@ class TimepointMetadata(_metadataList):
         """
         return self.shapeMetadata.shape
 
+    @property
+    def shapeDict(self) -> dict:
+        """Get shape as a dict.
+        """
+        return {
+            'z': self.shape[0],
+            'y': self.shape[1],
+            'x': self.shape[2],
+        }
+        
     def setChannelProperty(self, channelIdx, key, value) -> MetadataError | object:
         """Set channel property.
         """
@@ -389,12 +381,19 @@ class TimepointMetadata(_metadataList):
 class mmMapMetadata(_metadataList):
     """A list of TimepointMetadata.
     
-    For single timepoint mmap/zarr, represents a list of independent imaging timepoints/sessions.
+    For single timepoint mmap/zarr,
+    represents a list of independent imaging timepoints/sessions.
     """
+
+    _maxChannel = 3
 
     timepoints: dict = dataclasses.field(default_factory=dict)
     _key = 'timepoints'
 
+    @property
+    def possibleChannelKeys(self) -> List[int]:
+        return list(range(1, self._maxChannel+1))
+    
     def __post_init__(self):
         if isinstance(self._metadataList, dict):
             _metadataList = copy(self._metadataList)

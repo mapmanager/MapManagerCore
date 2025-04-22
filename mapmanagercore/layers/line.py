@@ -265,7 +265,7 @@ def calculateSegmentOffset(segmentLine: gp.GeoSeries,
                                             # , mitre_limit = 15
                                             )
     # logger.warning(f'abb offsetSegment:{offsetSegment}')
-    logger.warning('turned off matchZToSegment ???')
+    # logger.warning('turned off matchZToSegment ???')
     # return gp.GeoSeries(offsetSegment.combine(segmentLine, matchZToSegment))
     return offsetSegment
 

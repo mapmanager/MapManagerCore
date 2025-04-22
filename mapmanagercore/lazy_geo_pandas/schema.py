@@ -160,7 +160,7 @@ class Schema:
                                     lambda x: x if not pd.isna(x) else default)
                             except (ValueError) as e:
                                 logger.error('abb 202504')
-                                logger.error(e)
+                                logger.error(f'e is:{e}')
                                 logger.error(f'  key:{key} {type(key)}')
                                 logger.error(f'  default:{default} {type(default)}')
 

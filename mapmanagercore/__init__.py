@@ -1,9 +1,10 @@
 import numpy as np
 
 from .annotations import Annotations as MapAnnotations
-from .lazy_geo_pd_images.loader import MultiImageLoader
+from .lazy_geo_pd_images.loader.mm_map_loader import mmMapLoader
 
-# abb 20250116
+# depreciated
+# from .lazy_geo_pd_images.loader import MultiImageLoader
 
 # when importing in gui or scripts
 # abb depreciate, use ImageImpoter

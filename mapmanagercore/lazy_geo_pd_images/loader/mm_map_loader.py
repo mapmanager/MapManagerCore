@@ -15,7 +15,7 @@ import pandas as pd
 import geopandas as gp
 
 # from mapmanagercore.lazy_geo_pd_images.loader.base import ImageLoader
-from mapmanagercore.metadata.metadata3 import mmMapMetadata, TimepointMetadata, ChannelMetadata
+from mapmanagercore.metadata import mmMapMetadata, TimepointMetadata, ChannelMetadata
 from mapmanagercore.imageImporter import getImageImporter
 
 from mapmanagercore.logger import logger
@@ -55,11 +55,12 @@ def shapeIndexes(d: Union[Polygon, LineString]) -> Tuple[np.ndarray, np.ndarray]
     # Shift the coordinates back to the original position.
     xs, ys = xs + minx, ys + miny
     return xs, ys
-
+    
 class mmMapLoader():
     """Class to encapsulate an mmMap loader.
     
-    Used during runtime to create and manage an mmMap as well as to load/manage/save to an mmmap file.
+    Used during runtime to create and manage an mmMap
+    as well as to load/manage/save to an mmap file.
     """
     def __init__(self,
                  path: Optional[str] = None):
@@ -86,7 +87,7 @@ class mmMapLoader():
         self._imageChannelDict = {}
 
         if path is not None:
-            self._loadZarFromPath()
+            self._load()
 
     def deleteChannel(self, timepoint:int, channel:int):
         """Delete an image channel.
@@ -193,9 +194,9 @@ class mmMapLoader():
             # set metadata
             _newChannelKey = timepointMetadata.appendChannel(imgData, name=channelName)
             
-            logger.warning(f'timepoint:{timepoint} {type(timepoint)}')
-            logger.warning(f'_newChannelKey:{_newChannelKey} {type(_newChannelKey)}')
-            logger.warning(f'self._imageChannelDict.keys() is: {self._imageChannelDict.keys()}')
+            # logger.warning(f'timepoint:{timepoint} {type(timepoint)}')
+            # logger.warning(f'_newChannelKey:{_newChannelKey} {type(_newChannelKey)}')
+            # logger.warning(f'self._imageChannelDict.keys() is: {self._imageChannelDict.keys()}')
 
             # _timepointStr = str(timepoint)
 
@@ -206,7 +207,7 @@ class mmMapLoader():
         return True
     
     def timepointShape(self, timepoint:int) -> Optional[Tuple[int, int, int]]:
-        """Get the shape of imagedata at a timepoint.
+        """Get the shape of image data at a timepoint.
 
         All channels have the same shape.
 
@@ -278,7 +279,7 @@ class mmMapLoader():
         if os.path.isdir(path):
             store = zarr.DirectoryStore(path)
         else:
-            store = zarr.ZipStore(self.path, mode="r")
+            store = zarr.ZipStore(self.path, mode="r", compression=zipfile.ZIP_STORED)
         
         return store
     
@@ -296,53 +297,62 @@ class mmMapLoader():
                 _metadataDict: dict = group.attrs['metadata']
                 # _metadata = mmMapMetadata.from_dict(_metadataDict)
                 channelPathsList = []
-                for timepoint in _metadataDict['tiepoints'].keys():
-                    for channel in timepoint['channels'].keys():
-                        channelPathsList.append(f'{timepoint}/{channel}')
+                for timepointKey, timepoint in _metadataDict['timepoints'].items():
+                    for channelKeys in timepoint['channels'].keys():
+                        channelPathsList.append(f'{timepointKey}/{channelKeys}')
             except (KeyError) as e:
                 # no metadata in file
+                logger.error(f'while fetching "metadata" -> {e}')
                 return
         return channelPathsList
     
     def _zarrExists(self, path: str) -> bool:
         return os.path.isdir(path) or os.path.isfile(path)
     
-    def _loadZarFromPath(self):
-        """Load an mmap zarr from path.
+    def _load(self):
+        """Load an .mmap or .mmap.zip from path.
         """
         if os.path.isdir(self.path):
-            store = zarr.DirectoryStore(self.path)
+            # store = zarr.DirectoryStore(self.path)
+            _zipStore = False
         else:
-            store = zarr.ZipStore(self.path, mode="r")
+            # store = zarr.ZipStore(self.path, mode="r")
+            _zipStore = True
         
         # logger.info(f'loading {type(store)} fom {self.path}')
 
-        group: zarr.hierarchy.Group = zarr.group(store=store)
-        self.group = group
-        """root level of zarr file (on load will contain points, segment, image folders 0,1,2,..., etc)
-        """
+        with zarr.ZipStore(self.path, mode="r") \
+            if _zipStore else zarr.DirectoryStore(self.path) as store:
 
-        # load metadata (use this to create placeholder for t/c)
-        try:
-            _metadataDict: dict = group.attrs['metadata']
-        except (KeyError, ValueError):
-            logger.error('metadata not found in zarr file')
-            return
-            
-        # create metadata from loaded dict
-        # dict is nested, need to use dataclasses_json @dataclass_json decorator
-        self._metadata = mmMapMetadata.from_dict(_metadataDict)
+            self.group: zarr.hierarchy.Group = zarr.open(store=store, mode='r')  # / zarr.hierarchy.Group
+            # self.group: zarr.hierarchy.Group = zarr.group(store=store)
+            """root level of zarr file (on load will contain points, segment, image folders 0,1,2,..., etc)
+            """
 
-        # logger.info(f'loaded self._metadata as {type(self._metadata)}')
-        # pprint(self._metadata)
-    
-        # a dict of dict that holds each ImageChannel
-        for t in self.metadata.timepointKeys:
-            self._imageChannelDict[t] = {}
-            timepointMetadata = self.metadata.getTimepoint(t)
-            for c in timepointMetadata.channelKeys:
-                # self._imageChannelDict[t][c] = ImageChannel(self, t, c)
-                self._imageChannelDict[t][c] = None
+            # load metadata (use this to create placeholder for t/c)
+            try:
+                # fails on load zip ???
+                # logger.info(f"group.attrs['metadata']:{group.attrs['metadata']}")
+                _metadataDict: dict = self.group.attrs['metadata']
+                # _metadataDict: dict = store.attrs['metadata']
+            except (KeyError, ValueError):
+                logger.error('metadata not found in zarr file')
+                return
+                
+            # create metadata from loaded dict
+            # dict is nested, need to use dataclasses_json @dataclass_json decorator
+            self._metadata = mmMapMetadata.from_dict(_metadataDict)
+
+            # logger.info(f'loaded self._metadata as {type(self._metadata)}')
+            # pprint(self._metadata)
+        
+            # a dict of dict that holds each ImageChannel
+            for t in self.metadata.timepointKeys:
+                self._imageChannelDict[t] = {}
+                timepointMetadata = self.metadata.getTimepoint(t)
+                for c in timepointMetadata.channelKeys:
+                    # self._imageChannelDict[t][c] = ImageChannel(self, t, c)
+                    self._imageChannelDict[t][c] = ImageChannel(self, t, c)
     
     def save(self):
         """Save to an existing mmap file.
@@ -355,9 +365,9 @@ class mmMapLoader():
         """Save the zarr file to disk.
         """
         if path.endswith('.mmap'):
-            fs = zarr.DirectoryStore(path)
+            _zipStore = False
         elif path.endswith('.mmap.zip'):
-            fs = zarr.ZipStore(path, mode="w", compression=zipfile.ZIP_STORED)
+            _zipStore = True
         else:
             logger.error('path must end with .mmap or .mmap.zip')
             logger.error(f'  got {path}')
@@ -366,7 +376,10 @@ class mmMapLoader():
         _zarrExists = self._zarrExists(path)
         logger.info(f'saving to _zarrExists:{_zarrExists} path:{path}')
 
-        with fs as store:
+        # with fs as store:
+        with zarr.ZipStore(path, mode="w", compression=zipfile.ZIP_STORED) if _zipStore \
+            else zarr.DirectoryStore(path) as store:
+            
             group: zarr.hierarchy.Group = zarr.group(store=store)
 
             # save what we have loaded (use metadata)
@@ -374,7 +387,7 @@ class mmMapLoader():
             # Remove keys from the zarr file that are not in the current metadata
 
             # if existing mmap file
-            if _zarrExists:
+            if _zarrExists and not _zipStore:
                 _existingMetadata = self._getChannelPaths(path)
                 if _existingMetadata is None:
                     # zarr exists but no metadata yet
@@ -383,10 +396,11 @@ class mmMapLoader():
                     # logger.info('from path _existingMetadata:')
                     # pprint(_existingMetadata)
                     
-                    existing_channel_keys = {f"{t}/{c}"
-                                            for t in _existingMetadata.timepointKeys
-                                            for c in _existingMetadata.getTimepoint(t).channelKeys}
-                
+                    # existing_channel_keys = {f"{t}/{c}"
+                    #                         for t in _existingMetadata.timepointKeys
+                    #                         for c in _existingMetadata.getTimepoint(t).channelKeys}
+                    existing_channel_keys = set(_existingMetadata)
+
                     # current runtime
                     expected_channel_keys = {f"{t}/{c}"
                                             for t in self.metadata.timepointKeys
@@ -396,9 +410,10 @@ class mmMapLoader():
                     # pprint(expected_channel_keys)
 
                     channel_keys_to_remove = existing_channel_keys - expected_channel_keys
-                    logger.info(f'file existing_channel_keys:{existing_channel_keys}')
-                    logger.info(f'runtime expected_channel_keys:{expected_channel_keys}')
-                    logger.info(f'channel_keys_to_remove:{channel_keys_to_remove}')
+
+                    # logger.info(f'file existing_channel_keys:{existing_channel_keys}')
+                    # logger.info(f'runtime expected_channel_keys:{expected_channel_keys}')
+                    # logger.info(f'channel_keys_to_remove:{channel_keys_to_remove}')
                 
                     for key in channel_keys_to_remove:
                         logger.warning(f"  Removing unused key from zarr file: {key}")
@@ -418,15 +433,19 @@ class mmMapLoader():
                     # check if already in zarr
                     # do not save again (time and channel keys are immutable)
                     _channelPath = f'{t}/{c}'
+                    logger.info(f'  _channelPath:{_channelPath}')
                     if _channelPath in group:
                         logger.info(f'    {_channelPath} already in file skipping')
                         continue
                     else:
                         #TODO: true save as will have to LOAD ALL DATA (not lazy)
+                        if _zipStore:
+                            self.getImageChannel(t, c).loadAllImageData()
+                            logger.info(f'_zipStore loaded numLoaded:{self.getImageChannel(t, c).numLoaded}')
                         imgData = self.getChannelData(t, c)  # full image data
-                        logger.info(f"    {_channelPath} saving -> {imgData.shape}")
+                        # logger.info(f"    {_channelPath} saving -> {imgData.shape}")
                         # store imgData in zarr file/folder
-                        group[f'{t}/{c}'] = imgData
+                        group[_channelPath] = imgData
 
         # logger.info(f'zarr file saved to {path}')
 
@@ -438,7 +457,7 @@ class mmMapLoader():
     
     # TODO: max channels is a misnomer. Each timepoint has a number of channels
     # can be 1,2,3, etc
-    def maxChannels(self) -> int:
+    def _old_maxChannels(self) -> int:
         # return 3
         return 2
     
@@ -455,7 +474,7 @@ class mmMapLoader():
         _imageChannel = self.getImageChannel(t, channelIdx)
         
         _firstSlice = zRange[0]
-        return _imageChannel.getSlice(_firstSlice)
+        return _imageChannel.getSlice(_firstSlice)  # lazy
 
 
     def timePoints(self) -> Iterator[int]:
@@ -474,7 +493,11 @@ class mmMapLoader():
     def getShapePixels(self,
                        shape: gp.GeoDataFrame,
                        zSpread: int = 0,
-                       channel: Union[int, List[int]] = 0,
+                    # abb remove dependency on default (channels are now 1 based)
+                    # at this level, we don't need to do that, use
+                    # mmMap.metadata._possibleChannels
+                    #    channel: Union[int, List[int]] = 0,
+                       channel: Union[int, List[int]] = 1,
                        time=None,
                        z: int = None):
         """
@@ -490,7 +513,7 @@ class mmMapLoader():
         Returns:
             pd.Series: Series containing the image slices corresponding to the shape.
         """
-        logger.info('TODO: FIX')
+        # logger.info('TODO: FIX')
         # print(f'  shape is:')
         # print(shape)
         # print(f'  zSpread:{zSpread}')
@@ -509,11 +532,16 @@ class mmMapLoader():
 
         if "t" in shape.index.names:
             # logger.info(f"'t' is in shape.index.names ... why is this important???")
-            if not "t" in shape.columns:
+            if "t" not in shape.columns:
                 shape.reset_index("t", inplace=True)
             else:
                 shape.drop("t", axis=1, inplace=True)
-                
+
+        # time is sometimes None
+        # if time is None:
+        #     logger.warning(f'time is:{time} channel:{channel}')
+        # abb if channel is list, reduce to available in each timepoint
+
         if time is not None:
             shape["t"] = time
 
@@ -526,10 +554,21 @@ class mmMapLoader():
 
         shape["z"] = shape["z"].astype(int)
 
+        _firstTimepointChannels = channel
         if isinstance(channel, list):
+            # abb does this handle different timepoint with different channels?
             for (t, z), group in shape.groupby(by=["t", "z"]):
+                # abb only fetch channels that exis
+                # channel list is metadata _possibleChannels
+                # logger.warning(f'(t,z) is t:{t} z:{z}')
+                # abb limit channels to those that exist in timpepoint t
+                _channelKeys = self.metadata.getTimepoint(t).channelKeys
+                # abb
+                _firstTimepointChannels = _channelKeys
+                
                 images = [self.fetchSlices(
-                      t, c, (z - zSpread, z + zSpread + 1)) for c in channel]
+                    #   t, c, (z - zSpread, z + zSpread + 1)) for c in channel]
+                      t, c, (z - zSpread, z + zSpread + 1)) for c in _channelKeys]
 
                 for idx, row in group.iterrows():
                     xLim, yLim = images[0].shape
@@ -546,12 +585,23 @@ class mmMapLoader():
                         # abj: accounting for pixels being inverted when plotting by switching ys and xs
                         [np.where(inBounds, image[ys, xs], np.nan) for image in images]) 
                     indexes.append(idx)
-            return pd.DataFrame(results, indexes, columns=channel)
+            
+            # abb this is tricky, sometimes `channel` is int, sometimes list ???
+            # print(len(results))
+            # print(len(indexes))
+            # print(len(channel))
+            # return pd.DataFrame(results, indexes, columns=channel)
+            # logger.warning(f'  -->> _firstTimepointChannels:{_firstTimepointChannels}')
+            return pd.DataFrame(results, indexes, columns=_firstTimepointChannels)
 
         # logger.info(f"shape {shape}")
         for (t, z), group in shape.groupby(by=["t", "z"]):
+            # abb
+            # _channelKeys = self.metadata.getTimepoint(t).channelKeys
+
             image = self.fetchSlices(
                 t, channel, (z - zSpread, z + zSpread + 1))
+                # t, _channelKeys, (z - zSpread, z + zSpread + 1))
 
             for idx, row in group.iterrows():
                 xLim, yLim = image.shape
@@ -571,7 +621,7 @@ class mmMapLoader():
         return pd.Series(results, indexes, name=channel)
 
 class ImageChannel():
-    """Class to encapsulate a single channel stack in an mmap file.
+    """Class to encapsulate a single color channel stack.
 
     Provides lazy loading of individual images.
     """

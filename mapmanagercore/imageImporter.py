@@ -64,7 +64,7 @@ except (ImportError) as e:
     import tifffile
     logger.error('did not import bioio, defaulting to tifffile')
 
-from mapmanagercore.metadata.metadata3 import TimepointMetadata, VoxelMetadata
+from mapmanagercore.metadata import TimepointMetadata, VoxelMetadata
 
 def acceptedExtensions() -> List[str]:
     """Get list of accepted extensions from bioio.

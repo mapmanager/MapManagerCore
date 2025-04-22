@@ -8,7 +8,8 @@ import numpy as np
 from mapmanagercore.metadata.metadata3 import (TimepointMetadata,
                                                          mmMapMetadata,
                                                          ChannelMetadata,
-                                                         AnalysisParams)
+                                                         AnalysisParams,
+                                                         ExperimentMetadata)
 from mapmanagercore.exceptions import MetadataError
 
 from mapmanagercore.logger import logger
@@ -154,15 +155,49 @@ def test_TimepointMetadata():
     pprint(tpmd2)
 
 def test_analysis_params():
+    from mapmanagercore.metadata.analysis_params import AnalysisParams
+    
     ap = AnalysisParams()
 
     # test description in AnalysisParams
-    print(f"segmentRadius: {ap.getDescription('segmentRadius')}")
-    ap.printFields()
+    # print(f"segmentRadius: {ap.getDescription('segmentRadius')}")
+    # ap.printFields()
 
-    logger.info('after set')
-    ap.brightestPathDistance = 500
-    ap.printFields()
+    logger.info(f'before set ap.brightestPathDistance:{ap.brightestPathDistance}')
+    ap.setValue('brightestPathDistance', 500)
+    # could do this, I prefer using API `setValue(key, value)
+    # ap.brightestPathDistance = 500
+    logger.info(f'after set ap.brightestPathDistance:{ap.brightestPathDistance}')
+    # _dict = ap.asDict()
+    # pprint(_dict)
+
+    ap.reset_to_defaults()  # in place
+    logger.info(f'after reset ap.brightestPathDistance:{ap.brightestPathDistance}')
+    # _dict = ap.asDict()
+    # pprint(_dict)
+
+    _dictForQtWidget = ap.to_dict_with_metadata()
+    logger.info('_dictForQtWidget')
+    pprint(_dictForQtWidget)
+
+
+def test_experimental_metadata():
+    #
+    # test ExperimentMetadata
+    emd = ExperimentMetadata()
+
+    logger.info('initial ExperimentMetadata')
+    _dict = emd.asDict()
+    pprint(_dict)
+
+    emd.setValue('CellType', 'new cell type')
+    logger.info(f'after set emd.CellType:{emd.CellType}')
+
+    emd.reset_to_defaults()
+    logger.info(f'after reset emd.CellType:{emd.CellType}')
+
+    _dict = emd.to_dict_with_metadata()
+    pprint(_dict)
 
 def test_timepoint_metadata():
     """Test metadata for one timepoint.
@@ -332,12 +367,13 @@ if __name__ == '__main__':
 
     # test_TimepointMetadata()
 
-    # test_analysis_params()
+    test_analysis_params()
+    test_experimental_metadata()
 
     # test_timepoint_metadata()
 
     # test_channel_metadata()
 
-    test_mmmap_metadata()
+    # test_mmmap_metadata()
 
     # tryGeneric()

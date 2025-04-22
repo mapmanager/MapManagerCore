@@ -41,8 +41,8 @@ def parseColumns(columns: List[str], prefix: str) -> Tuple[set[int], set[str]]:
         if len(parts) < 3:
             continue
 
-        logger.warning(f'=== abb column:{column} prefix:{prefix} parts:{parts}')
-        logger.warning('  abb removing -1 in channel')
+        # logger.warning('  === abb removing -1 in channel')
+        # logger.warning(f'    column:{column} prefix:{prefix} parts:{parts}')
         # channels.add(int(parts[1][2:]) - 1)
         # abb, removed -1
         channels.add(int(parts[1][2:]))
@@ -66,6 +66,7 @@ class LazyImagesGeoPandas(LazyGeoPandas):
     """A Lazy geo pandas store with image data"""
     _images: ImageLoader
 
+    # abb TODO: switch to mmMapLoader
     def __init__(self, images: ImageLoader, overrideDefault=True):
         super().__init__()
         # logger.info(f'abb creating LazyImagesGeoPandas() with images:{type(images)}')
@@ -90,6 +91,10 @@ class LazyImagesGeoPandas(LazyGeoPandas):
         weakSelf = weakref.ref(self)
 
         def wrappedFunc(frame: LazyGeoFrame[Self]):
+            # abb pending columns only contains _ch1 (after append channel, should contain _ch2)
+            # logger.error(f'    frame.pendingColumns():{frame.pendingColumns()}')
+            # logger.error(f'    name:{name}')
+
             (channels, aggregates) = parseColumns(
                 frame.pendingColumns(), name)
             if len(channels) == 0 or len(aggregates) == 0:
@@ -102,17 +107,23 @@ class LazyImagesGeoPandas(LazyGeoPandas):
             shapes["t"] = frame["t"] if timeIndexLevel is None else frame._df.index.get_level_values(
                 timeIndexLevel)
             
-            logger.error('too complicated')
-            logger.warning(f'  original channels is: {channels}')
+            # logger.error('too complicated')
+            # logger.warning(f'  original channels is: {channels}')
             
             # abb >= 1
             # FIXME: S: Channels should only be a list if there are multiple channels in which case we return a DataFrame instead of a single Series
             # if the use case for a single channel isn't needed, we can remove the check and always return a DataFrame
             # which will simplify the code base
-            channels = list(channels) if len(channels) >= 1 else next(channels)
+            # abb, 1 channel case should just be list of len 1
+            # was this
+            # channels = list(channels) if len(channels) >= 1 else next(channels)
+            channels = list(channels)
 
-            logger.warning('  abb agreed ... why is this so complicated???')
-            logger.warning(f'    channels is:{channels}')
+            # logger.warning('  abb agreed ... why is this so complicated???')
+            # logger.warning(f'    channels is:{channels}')
+            
+            # abb, what timepoint are we in???
+            # self._images.metadata
 
             # logger.error(f'post channels:{channels}')
             # logger.error(f'next(channels):{next(channels)}')
@@ -121,37 +132,87 @@ class LazyImagesGeoPandas(LazyGeoPandas):
             pixels = weakSelf().getShapePixels(
                 shapes, channel=channels, zSpread=zSpread)
 
+            # logger.info(f'  pixels  {type(pixels)}:')
+            # logger.warning(f'pixels.columns is: {len(pixels)} {pixels.columns}')
+            # print(pixels)
+
+            # here is where spine stats get created
+            # we ned to get rid of this +1 business and just use persistent channel
+            # index (name) from metadata
+            # logger.info('    USE LOADER TO GET CHANNELS -> self.loader is:')
+            # print(self.loader)
+
+            # logger.warning('!!!!!! abb futzing with _ch columns')
+            # logger.warning(f'  pixels is:{type(pixels)}')
+            # logger.warning(f'  channels:{channels}')
+
             if isinstance(pixels, pd.Series):
                 # one channel was returned
                 return pixels.apply(lambda x: pd.Series(
-                    {f"{name}_ch{pixels.name + 1}_{agg}": applyAgg(x, agg) for agg in aggregates}), index=pixels.index)
+                    # {f"{name}_ch{pixels.name + 1}_{agg}": applyAgg(x, agg) for agg in aggregates}), index=pixels.index)
+                    {f"{name}_ch{pixels.name}_{agg}": applyAgg(x, agg) for agg in aggregates}), index=pixels.index)
 
+            # logger.error(f'REMOVE {channels} -> channels = [1]')
+            # the channels processed by getShapePixels
+            _channels = list(pixels.columns)
             return pd.DataFrame({
-                f"{name}_ch{channel + 1}_{agg}": pixels[channel].apply(lambda x: getattr(np, agg)(x)) for agg in aggregates for channel in channels
+                # f"{name}_ch{channel + 1}_{agg}": pixels[channel].apply(lambda x: getattr(np, agg)(x)) for agg in aggregates for channel in channels
+                f"{name}_ch{channel}_{agg}": pixels[channel].apply(lambda x: getattr(np, agg)(x)) for agg in aggregates for channel in _channels
             }, index=pixels.index)
 
         return wrappedFunc
 
     def addSchema(self, frame: LazyGeoFrame[Self]):
-        """Add a schema frame to the store. Essentially, this adds a new data frame to the store."""
+        """Add a schema frame to the store.
+        Essentially, this adds a new data frame to the store.
+        
+        abb this creates all spine intensity analysis columns
+        abb including _ch<n>
+        abb HOW DO WE ADD _ch2 COLUMNS AFTER APPENDING A NEW CHANNEL IMAGE ???
+        """
+
+        #
+        # what timepoint are we in???
+        #        
+        # logger.error(f'-->> abb cluge for 1 timepoint')
+        # logger.error(f'  frame._schema is:{type(frame._schema)}')
+        
+        # logger.warning('!!==!! abb in store.py LazyImagesGeoPandas')
+
+        # was this
+        _possibleChannelKeys = self._images.metadata.possibleChannelKeys
+        # _tmpTimepoint = 1
+        # _possibleChannelKeys = self._images.metadata.getTimepoint(_tmpTimepoint).channelKeys
+        logger.info(f'LazyImageGeoPandas addSchema _possibleChannelKeys:{_possibleChannelKeys}')
+        # logger.info(f'  abb _firstTimepointChannelKeys:{_firstTimepointChannelKeys}')
 
         # Inject computed columns that use the image to calculate roi stats
         for method in frame._schema.__dict__.values():
+            # logger.warning(f'method:{method}')
             if not hasattr(method, "_imageComputed"):
                 continue
 
             attributes: ImageColumnAttributes = method._imageComputed
             if "_aggregate" not in attributes:
                 continue
+                        
             name = attributes["key"]
             wrappedFunc = self._genWrappedFunc(method, attributes, frame)
-            for channel in range(self._maxChannels()):
+                        
+            # abb
+            # for channel in range(self._maxChannels()):
+            for channel in _possibleChannelKeys:
                 for agg in attributes["_aggregate"]:
+                    # logger.warning(f'  !!! ADDING COLUMN ??? channel:{channel} agg:{agg}')
                     frame.addComputed(
-                        f"{name}_ch{channel + 1}_{agg}",
+                        # abb removed + 1
+                        # f"{name}_ch{channel + 1}_{agg}",
+                        f"{name}_ch{channel}_{agg}",
                         {
                             **attributes,
-                            "title": f"{name} Channel {channel + 1} - {agg.capitalize()}",
+                            # abb removed + 1
+                            # "title": f"{name} Channel {channel + 1} - {agg.capitalize()}",
+                            "title": f"{name} Channel {channel} - {agg.capitalize()}",
                         },
                         wrappedFunc,
                         skipUpdate=True
@@ -173,13 +234,6 @@ class LazyImagesGeoPandas(LazyGeoPandas):
             channel = next(iter(self._images.channels(t=t)))
         # abb all channels within a given timepoint will have the same shape
         return self._images.shape(t, channel)
-
-    def _old_getAutoContrast_qt(self, time: int, channel: int) -> Tuple[int, int]:
-        """Get the auto contrast from the entire image volume.
-
-        Used in PyQt interface.
-        """
-        return self._images.getAutoContrast_qt(time, channel)
 
     def getPixels(self,
                   time: int,
@@ -223,7 +277,7 @@ class LazyImagesGeoPandas(LazyGeoPandas):
             time ([type], optional): The time to get the pixels for. Defaults to None.
             z (int, optional): The z to get the pixels for. Defaults to None.
         """
-        logger.error(f'channel:{channel}')
+        # logger.error(f'channel:{channel}')
         return self._images.getShapePixels(shapes, channel=channel, zSpread=zSpread, time=time, z=z)
 
 

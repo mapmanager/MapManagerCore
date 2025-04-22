@@ -1,5 +1,5 @@
 import dataclasses
-from typing import List, Optional
+from typing import List, Optional, Any
 
 from mapmanagercore.exceptions import MetadataError
 
@@ -20,7 +20,7 @@ class _metadataBase:
             setattr(self, key, value)
             return True
         except (AttributeError) as e:
-            logger.warning(e)
+            logger.warning(f'AttributeError:{e}')
             return False
         
     def getValue(self, key) -> Optional[object]:
@@ -41,11 +41,89 @@ class _metadataBase:
         except (AttributeError) as e:
             logger.warning(e)
 
+    def reset_to_defaults(self):
+        """Reset all fields to default values.
+        """
+        for field_info in dataclasses.fields(self):
+            # logger.info(f'name:{field_info.name} default:{field_info.default}')
+            setattr(self, field_info.name, field_info.default)
+
+    def __getitem__(self, key: str) -> Any:
+        def _fieldNames(self) -> List[str]:
+            names = []
+            for oneField in dataclasses.fields(self):
+                names.append(oneField.name)
+            return names
+        
+        try:
+            return getattr(self, key)
+        except (AttributeError) as e:
+            logger.error(e)
+            logger.error(f'available keys are: {_fieldNames()}')
+
     def asDict(self) -> dict:
         """Get the dataclass as a python dict.
+
+        Returns key:value pairs
         """
         return dataclasses.asdict(self)
-    
+            
+    def updateDromDict(self, data: dict[str, Any]):
+        """Update fields from dict.
+
+        Dict must be just key:value pairs.
+        """
+        for key, value in data.items():
+            if hasattr(self, key):
+                setattr(self, key, value)
+            else:
+                logger.warning(f'did not find key:{key}')
+
+    def to_dict_with_metadata(self) -> dict:
+        """Get a dict of all fields.
+        
+        Returns
+        -------
+        Dict with field name keys, each key is a dict of keys:
+            currentValue
+            defaultValue
+            description
+            title
+            type
+        """
+        retDict = {}
+        for oneField in dataclasses.fields(self):
+            # print(f'oneField:{oneField}')
+            
+            name = oneField.name
+            typeStr = oneField.type.__name__  # like (int, float, bool)
+ 
+            value = self.getValue(name)
+            default = oneField.default
+            
+            # logger.warning(f'name:{name} typeStr:{typeStr} value:{value} default:{default}')
+
+            # all metadata must contain 'description' key
+            try:
+                metadata = dict(oneField.metadata)
+                # pprint(metadata)
+            except (KeyError) as e:
+                metadata = {}
+            
+            description = metadata['description'] if 'description' in metadata.keys() else ''
+            title = metadata['title'] if 'title' in metadata.keys() else ''
+            
+            retDict[name] = {
+                'currentValue': value,
+                'defaultValue': default,
+                'description': description,
+                'title': title,
+                'type': typeStr,
+            }
+            # print(name, value, _type, default, metadata)
+        
+        return retDict
+
 @dataclasses.dataclass
 class _metadataList(_metadataBase):
     """Base class for all metadata that holds a list.

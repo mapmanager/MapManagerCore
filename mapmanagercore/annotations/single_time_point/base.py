@@ -9,7 +9,7 @@ import pandas as pd
 import geopandas as gp
 
 from mapmanagercore.benchmark import timer
-from mapmanagercore.lazy_geo_pd_images.metadata import Metadata
+# from mapmanagercore.lazy_geo_pd_images.metadata import Metadata
 from ...config import SegmentId, SpineId
 from ...schemas import Segment, Spine
 from ...lazy_geo_pd_images.image_slices import ImageSlice
@@ -20,7 +20,8 @@ from .. import Annotations
 from typing import Any, Callable, Hashable, List, Self, Tuple, Union
 from copy import copy
 
-from mapmanagercore.analysis_params import AnalysisParams
+# from mapmanagercore.analysis_params import AnalysisParams
+from mapmanagercore.metadata import AnalysisParams, TimepointMetadata
 
 from mapmanagercore.logger import logger
 
@@ -251,6 +252,15 @@ class _SingleTimePointAnnotationsBase:
 
         self._t = t
 
+    # abb 202504
+    @property
+    def analysisParams(self) -> AnalysisParams:
+        return self._annotations.loader.metadata.getTimepoint(self._t).analysisParameters
+    
+    # abb 202504
+    def timepointMetadata(self) -> TimepointMetadata:
+        return self._annotations.loader.metadata.getTimepoint(self._t)
+
     def __str__(self):
         numPnts = len(self._annotations._points._rootDf)
         numSegments = len(self._annotations._segments._rootDf)
@@ -268,10 +278,10 @@ class _SingleTimePointAnnotationsBase:
 
         return self._segments
 
-    @property
-    def analysisParams(self) -> LazyGeoSeries:
-        # return self._annotations._analysisParameters
-        return self._annotations._analysisParams
+    # @property
+    # def analysisParams(self) -> LazyGeoSeries:
+    #     # return self._annotations._analysisParameters
+    #     return self._annotations._analysisParams
 
     # abb not used
     @property
@@ -313,14 +323,6 @@ class SingleTimePointAnnotationsBase(_SingleTimePointAnnotationsBase):
         """
         return self._annotations.getPixels(self._t, channel, zRange, z, zSpread, threeD)
 
-    # abb depreciated
-    def _old_getAutoContrast_qt(self, channel: int) -> Tuple[int, int]:
-        """Get the auto contrast from the entire image volume.
-
-        Used in PyQt interface.
-        """
-        return self._annotations.getAutoContrast_qt(time=self._t, channel=channel)
-    
     @property
     def shape(self) -> Tuple[int, int, int]:
         return self._annotations._images.shape(self._t)
@@ -381,8 +383,9 @@ class SingleTimePointAnnotationsBase(_SingleTimePointAnnotationsBase):
     def disconnectSegment(self, segmentKey: SegmentId):
         return self._annotations.disconnectSegment((segmentKey, self._t))
 
-    def metadata(self) -> Metadata:
-        return self._annotations._images.metadata(self._t)
+    # abb 202504 depreciated
+    # def metadata(self) -> Metadata:
+    #     return self._annotations._images.metadata(self._t)
 
     def getColors(self, colorOn: str = None, function=False) -> pd.Series:
         return Annotations.getColors(self, colorOn, function)

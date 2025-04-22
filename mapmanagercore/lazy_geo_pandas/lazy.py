@@ -39,6 +39,9 @@ class LazyGeoPandas:
         """
         Adds a data frame to the store.
         """
+        # logger.info('LazyGeoPandas frame is:')
+        # print(frame)
+        
         frame: LazyGeoFrame = frame
         frame._store = weakref.ref(self)
         key = frame._schema._key
@@ -317,9 +320,12 @@ class LazyGeoFrame(Generic[T]):
         self._computingColumns = []
         self._updateColumns()
         self._rootDf = schema.setColumnTypes(data)
-        self._store().addSchema(self)
+        # abb moved from here
+        # self._store().addSchema(self)
         self._context = context
         self._baseFilter = None
+        # abb moved to here
+        self._store().addSchema(self)
 
     def invalidateColumns(self, columns: Iterator[str] = None, ids: pd.Index = None):
         """
@@ -338,6 +344,7 @@ class LazyGeoFrame(Generic[T]):
         for attr in self._schema._attributes.values():
             if attr["key"] in self._schema._index:
                 continue
+            # logger.error(f'self._columns.append: {attr["key"]}')
             self._columns.append(attr["key"])
 
     def getStore(self) -> T:
@@ -386,6 +393,13 @@ class LazyGeoFrame(Generic[T]):
     def _df(self):
         """The filtered data frame. The mask is cached for performance."""
         # TODO: consider using a pre-filled copy of the dataframe and pushing changes to all copies if performance is an issue.
+
+        # logger.error('=== abb')
+        # logger.error(f'  self._baseFilter: {self._baseFilter}')
+        # logger.error(f'  self._filterMask: {self._filterMask}')
+        # logger.error(f'  self._state.version: {self._state.version}')
+        # logger.error(f'  self._currentVersion: {self._currentVersion}')
+        
         if self._baseFilter is None and self._filterMask is None:
             return self._rootDf
         
@@ -500,10 +514,13 @@ class LazyGeoFrame(Generic[T]):
 
     @timer
     def __getitem__(self, items):
+        # logger.warning('-->> abb [:] is way too complicated')
+        # print(f' items is: {items}')
+        
         """Modeled after the __getitem__ method of a pandas DataFrame."""
         row, key = self._parseKeyRow(items)
 
-        # logger.info(f'row:{row} key:{key}')
+        # logger.info(f'  _parseKeyRow(items) got row:{row} key:{key} {type(key)}')
 
         filtered = self
         if row is not None:
@@ -515,14 +532,26 @@ class LazyGeoFrame(Generic[T]):
             filtered._insureComputed([key])
         else:
             if not isinstance(key, list):
+                # logger.error(f'!!! key = filtered.columns, key was:{key}')
+                # logger.error(f'  items:{items}')
+                # logger.error(f'  row:{row}')
+                
+                # abb this is pulling all columns ch1, ch2, ch3 -->> error
                 key = filtered.columns
+                
+                # logger.error(f'  is now key:{key}')
+
             filtered._insureComputed(key)
 
-        # logger.warning('=== !!!')
-        # print('   key:', key)
-        # print('   filtered._getFiltered(key):', filtered._getFiltered(key))
+        # if len(key) == 44:
+        #     logger.warning('=== !!!')
+        #     print('   items:', items)
+        #     print('   key:', key)
+        #     print('   filtered._getFiltered(key):', filtered._getFiltered(key))
+        #     logger.error('44 keys')
+        #     raise
 
-        df: pd.DataFrame = filtered._getFiltered(key)
+        df: pd.DataFrame = filtered._getFiltered(key) # abb failing on channels
         if len(df) <= 1 and (len(df.shape) == 1 or df.shape[1] < 1):
             if (isinstance(row, tuple) and df.index.nlevels == len(row)) or df.index.nlevels == 1 and self._schema.isIndexType(row):
                 if df.empty:
@@ -544,12 +573,33 @@ class LazyGeoFrame(Generic[T]):
     def _getFiltered(self, keys):
         """Gets a filtered data frame with the specified keys."""
         if not self._rootDf.empty:
-            # abb channel keys
+            # abb channel keys, this is "sometimes", not "always" gets bad keys
+            # when we have 1 channel, we get all possible channel keys  "sometimes"
+            # called repeatedly to update single columns
+            # somewhere this is called with all keys, ch1, ch2, ch3 ???
+            # if len(keys) > 1:
+            # if len(keys) == 44:
+            #     logger.error(f'len keys is:{len(keys)}')
+            #     logger.error('  keys is:')
+            #     print(keys)
+            #     logger.error('raising on 44 keys !!!')
+            #     raise
+
+            # return self._df[keys]  # abb dammit, _df is a property -> is computing !!!!
+            
+            # this usually passes, at end of points[;] it gets
+            # invalidated colums (when we have 1 channel) like ch2, ch3
+            # -->> just ignore?
             try:
                 return self._df[keys]
             except (KeyError) as e:
+                logger.error(f'-->> ignoring KeyError')                
+                logger.error('  happends at end of points[:] with invalid columns for ch2, ch3, etc')
+                logger.error('  KeyError, e is:')
                 logger.error(e)
-                logger.error(f'available keys are {self._df.columns}')
+                logger.error(f'  available column keys are {self._df.columns}')
+                # logger.error('abb -->> raise')
+                # raise
 
         # Some computed keys might be missing when the root frame is empty
         # Temporary add empty series as placeholders for those computed columns
@@ -557,7 +607,7 @@ class LazyGeoFrame(Generic[T]):
 
         columns = self.columns
         if not isinstance(keys, list):
-            if keys in df.columns or not keys in columns:
+            if keys in df.columns or keys not in columns:
                 return self._df[keys]
             return pd.Series()
 
@@ -620,7 +670,7 @@ class LazyGeoFrame(Generic[T]):
         try:
             self._computingColumns.append(list(columns))
             for column in columns:
-                if not column in attributes:
+                if column not in attributes:
                     continue
 
                 attribute = attributes[column]
@@ -670,10 +720,11 @@ class LazyGeoFrame(Generic[T]):
                     try:
                         df.loc[missingIndex, column] = results
                     except (TypeError) as e:
-                        logger.error(f'missingIndex:{missingIndex}')
-                        logger.error(f'column:{column}')
-                        logger.error(f'results:{results}')
-                        logger.error(f'type results:{type(results)}')
+                        logger.error('abb')
+                        logger.error(f'  missingIndex:{missingIndex}')
+                        logger.error(f'  column:{column}')
+                        logger.error(f'  results:{results}')
+                        logger.error(f'  type results:{type(results)}')
                         # print(df.dtypes)
                         logger.error(e)
 

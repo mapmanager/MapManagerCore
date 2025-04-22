@@ -18,7 +18,7 @@ class AnnotationsSegments(SingleTimePointAnnotationsBase):
     def optimizeSegment(self, roughSegment: LineString, segment: LineString = None, updatedIdx: int = None, live: bool = False, 
                         z: int = None) -> Union[LineString, None]:
         if segment and len(roughSegment.coords) > 2:
-            logger.info(f"more than two points")
+            # logger.info(f"more than two points")
             if updatedIdx > len(roughSegment.coords) - 1:
                 logger.info(f"injecting line")
                 if updatedIdx == 0:
@@ -33,12 +33,12 @@ class AnnotationsSegments(SingleTimePointAnnotationsBase):
 
             points = []
             if left:
-                logger.info(f"going left")
+                # logger.info(f"going left")
                 leftTracing = self.brightestPath(
                     LineString([left, point]), live, z)
                 points = list(leftTracing.coords)
             if right:
-                logger.info(f"going right")
+                # logger.info(f"going right")
                 rightTracing = self.brightestPath(
                     LineString([point, right]), live, z)
                 points.extend(rightTracing.coords)
@@ -49,10 +49,10 @@ class AnnotationsSegments(SingleTimePointAnnotationsBase):
             segment = injectLine(segment, LineString(
                 points), left, right)
         else:
-            logger.info(f"here with just 2 points")
-            logger.info(f"roughSegment {roughSegment} segment {segment}")
+            # logger.info(f"here with just 2 points")
+            # logger.info(f"roughSegment {roughSegment} segment {segment}")
             if roughSegment.coords[0] == roughSegment.coords[1]: # ensure same point is not clicked/ added twiced
-                logger.info(f"returning none for optimized segment")
+                # logger.info(f"returning none for optimized segment")
                 return None
             
             segment = self.brightestPath(roughSegment, live, z)
@@ -67,24 +67,30 @@ class AnnotationsSegments(SingleTimePointAnnotationsBase):
             live: if live use brightest path tracing to return a set of points from roughSegment[0] to roughSegment[1]
             z: current z Slice
         """
-        logger.info(f"roughSegment coming in {roughSegment}")
+        # logger.info(f"roughSegment coming in {roughSegment}")
+        
         # if live:
         #     # TODO: Consider adding the mutation type along with the prior result if we can use it to speed things up
         #     return None
 
-        logger.error('abb turned off')
-        return roughSegment
+        # return roughSegment
     
-        zSpread = self.analysisParams.getValue('zSpread')
-        channel = self.analysisParams.getValue('channel')  # 1 based
+        brightestPathTracing = self.analysisParams.getValue('brightestPathTracing')
+        if not brightestPathTracing:
+            # logger.info(f'brightestPathTracing:{brightestPathTracing}')
+            return roughSegment
+        logger.error('brightest-path-tracing')
+        
+        brightestPathZSpread = self.analysisParams.getValue('brightestPathZSpread')
+        brightestPathChannel = self.analysisParams.getValue('brightestPathChannel')
 
         # 3D
-        image = self.getPixels(channel=channel,
-                               zSpread=zSpread,  # abb swapped order
+        image = self.getPixels(channel=brightestPathChannel,
+                               zSpread=brightestPathZSpread,
                                z=z,
                                threeD = True).data(flattened=False) # returning in ndarray form
 
-        logger.info(f"channel:{channel} z:{z} zSpread:{zSpread} live:{live} image.shape:{image.shape}")
+        logger.info(f"channel:{brightestPathChannel} z:{z} zSpread:{brightestPathZSpread} live:{live} image.shape:{image.shape}")
 
         x1,y1,z1 = roughSegment.coords[0] # last point added
         x2,y2,z2 = roughSegment.coords[1] # first point added
@@ -93,7 +99,7 @@ class AnnotationsSegments(SingleTimePointAnnotationsBase):
         
         # For 3D:
         # get a median index since image does not retain original segment row indexes
-        imageZ, imageX, imageY = image.shape # (z, x, y)
+        imageZ, imageY, imageX = image.shape # (z, x, y)
         reIndexZ = math.floor(imageZ/2)
         logger.info(f"reIndexZ {reIndexZ}")
 
@@ -107,7 +113,7 @@ class AnnotationsSegments(SingleTimePointAnnotationsBase):
         slices = image.shape[0]
         logger.info(f"total slices are {slices}")
         height, width = image.shape[1], image.shape[2]  # Get Y (height) and X (width)
-        top_left = (0, 0)  # Always starts at (Y=0, X=0)
+        # top_left = (0, 0)  # Always starts at (Y=0, X=0)
         newImageSize = (height - 1, width - 1)  # Last Y and X index
 
         if live:

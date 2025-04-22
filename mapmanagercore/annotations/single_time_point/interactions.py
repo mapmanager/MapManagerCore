@@ -100,8 +100,8 @@ class AnnotationsInteractions(AnnotationsSegments):
 
         brightestPathDistance = self.analysisParams[
             'brightestPathDistance']
-        channel = self.analysisParams['channel']
-        zSpread = self.analysisParams['zSpread']
+        _defaultChannel = self.analysisParams['brightestPathChannel']
+        _zSpread = self.analysisParams['brightestPathZSpread']
 
         segmentLength = int(segment.length)
         minProjection = int(minProjection)
@@ -118,7 +118,7 @@ class AnnotationsInteractions(AnnotationsSegments):
 
         # get the pixel values for each line segment
         pixels = self.getShapePixels(
-            targets, channel=channel, zSpread=zSpread)
+            targets, channel=_defaultChannel, zSpread=_zSpread)
 
         # Normalize the median brightness by the length of the path to pick the shortest brightest path
         brightest = (pixels.apply(np.median) / targets.length).idxmax()
@@ -153,9 +153,9 @@ class AnnotationsInteractions(AnnotationsSegments):
                              zSpread: int = None):
         # abb analysisparams
         if channel is None:
-            channel = self.analysisParams['channel']
+            channel = self.analysisParams['brightestPathChannel']
         if zSpread is None:
-            zSpread = self.analysisParams['zSpread']
+            zSpread = self.analysisParams['brightestPathZSpread']
 
         # abb 20241221 after s-dev merge -->> ERROR
         roi = self.points[spineId, "roi"]

@@ -18,7 +18,7 @@ install_requires = [
     'geopandas',
     'pyarrow',  # to save/load with parquet
     'scikit-image',
-    'zarr>=2.6,<2.16.0',  # 3.0 has breaking changes
+    'zarr>=2.6,<=2.18.7',  # 3.0 has breaking changes
     'async-lru',
     'asyncio',
     'platformdirs',  # to get platform specific App paths

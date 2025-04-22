@@ -53,15 +53,24 @@ class Segment(Schema):
         description="Distance from the pivot point"
     )
     
-    color: Tuple[int, int, int, int] = field(
+    color: str = field(
         # abb 202504
-        # default=(255, 0, 0),
-        default=(255, 0, 0, 0),
-        type="Tuple[int, int, int, int]",
+        default="#FF0000",
+        type="str",
         title="Segment Color",
         description="Color of the segment",
         plot=False
     )
+
+    # color: Tuple[int, int, int, int] = field(
+    #     # abb 202504
+    #     # default=(255, 0, 0),
+    #     default=(255, 0, 0, 0),
+    #     type="Tuple[int, int, int, int]",
+    #     title="Segment Color",
+    #     description="Color of the segment",
+    #     plot=False
+    # )
 
     @compute(title="Pivot Point", dependencies=["segment", "pivotDistance"])
     def pivotPoint(frame: LazyGeoFrame):
@@ -74,15 +83,13 @@ class Segment(Schema):
         Returns:
             Geoseries of ['x', 'y', 'z'] which is the segment after offset from centerline.
         """
-        # abb was missing
-        # abb todo merge leftRadius and rightRadius (just pass in switch to do one or the other)
+        # abb TODO merge leftRadius and rightRadius (just pass in switch to do one or the other)
         #  they are syymetric left/right
-        # import geopandas as gpd
 
         df = frame[["segment", "radius"]]
         df["z"] = (df['segment'].apply(lambda geom: [coord[2] for coord in geom.coords] if geom is not None else []))  
         offsettedSegment = df.apply(lambda d: calculateSegmentOffset(d["segment"], d["radius"], isPositive=False), axis=1)
-        logger.info(f"offsettedSegment is: {offsettedSegment}")
+        # logger.info(f"offsettedSegment is: {offsettedSegment}")
         df["x"] = (offsettedSegment.apply(lambda geom: [coord[0] for coord in geom.coords] if geom is not None else []))
         df["y"] = (offsettedSegment.apply(lambda geom: [coord[1] for coord in geom.coords] if geom is not None else []))
         newDF = gpd.GeoSeries(df[["x", "y", "z"]].apply(lambda ldf: LineString(Point(ldf["x"][i], ldf["y"][i], ldf["z"][i])
@@ -91,12 +98,8 @@ class Segment(Schema):
     
     @compute(title="Right Radius", dependencies=["segment", "radius"])
     def rightRadius(frame: LazyGeoFrame):
-        logger.warning('abb turned off')
-        # print(f'frame: {type(frame)}')  # lazy_geo_pandas.lazy.LazyGeoFrame
-        # print(frame)
-
-        # abb was missing
-        import geopandas as gpd
+        # abb TODO merge leftRadius and rightRadius (just pass in switch to do one or the other)
+        #  they are syymetric left/right
 
         df = frame[["segment", "radius"]]
         # logger.info(f" df[radius] {df['radius']}")
@@ -117,10 +120,8 @@ class Segment(Schema):
             len of segment in float form
         """
         segment = frame['segment'] 
-        logger.info(f" segment.length: {segment.length}")
         return segment.length
         
-
     # abb do we need this?
     # @compute(title="distance", dependencies=["segment"])
     # def distance(frame: LazyGeoFrame): # distance of each point from beginning of the segment

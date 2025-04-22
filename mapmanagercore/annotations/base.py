@@ -4,10 +4,10 @@ from io import BytesIO
 import weakref
 from typing import Any, Tuple, Union, Optional
 import zipfile
-
 import zarr.storage
-from mapmanagercore.lazy_geo_pandas.lazy import LazyGeoSeries
-from mapmanagercore.lazy_geo_pd_images.loader.base import Position
+
+# from mapmanagercore.lazy_geo_pandas.lazy import LazyGeoSeries
+# from mapmanagercore.lazy_geo_pd_images.loader.base import Position
 # abb reverting analysisparams to class (not lazy)
 # from mapmanagercore.schemas.analysis_params import AnalysisParameters
 import numpy as np
@@ -15,10 +15,11 @@ import pandas as pd
 
 from mapmanagercore.benchmark import timer
 from mapmanagercore.config import Colors, scaleColors, symbols
-from mapmanagercore.lazy_geo_pd_images.loader.imageio import MultiImageLoader
+# from mapmanagercore.lazy_geo_pd_images.loader.imageio import MultiImageLoader
 # abb depreciated
 # from mapmanagercore.lazy_geo_pd_images.loader.zarr import ZarrLoader
 from mapmanagercore.lazy_geo_pd_images.loader.mm_map_loader import mmMapLoader
+
 from ..lazy_geo_pandas import LazyGeoFrame
 from ..schemas import Segment, Spine
 from ..lazy_geo_pd_images import LazyImagesGeoPandas, ImageLoader
@@ -28,28 +29,32 @@ import warnings
 from plotly.express.colors import sample_colorscale
 import geopandas as gp
 
-from mapmanagercore.analysis_params import AnalysisParams
+# from mapmanagercore.analysis_params import AnalysisParams
 from mapmanagercore.logger import logger
 
 # abb imageImporter converting from pickle to parquet
 from ..lazy_geo_pandas.lazy import toBytes
 
 class AnnotationsBase(LazyImagesGeoPandas):
-    _images: MultiImageLoader  # abb this is either MultiImageLoader | ZarrLoader !!!
-
+    # _images: MultiImageLoader  # abb this is either MultiImageLoader | ZarrLoader !!!
+    # 202504 this is what it is now
+    # adding channel to mmMapLoader does not trigger _ch2 for points
+    _image : mmMapLoader
+    
     def __init__(self,
-                 loader: MultiImageLoader,  # abb this is either MultiImageLoader | ZarrLoader !!!
+                #  loader: MultiImageLoader,  # depreciated, this is either MultiImageLoader | ZarrLoader !!!
+                 loader: mmMapLoader,
                  lineSegments: Union[str, pd.DataFrame] = pd.DataFrame(),
                  points: Union[str, pd.DataFrame] = pd.DataFrame(),
-                 analysisParams: AnalysisParams = AnalysisParams(),
+                #  analysisParams: AnalysisParams = AnalysisParams(),
                  path: str = None,
                  lastSaveTime: str = ""):
 
         super().__init__(loader)
 
-        if analysisParams is None:
-            analysisParams = AnalysisParams()
-            # analysisParams = AnalysisParameters()
+        # if analysisParams is None:
+        #     analysisParams = AnalysisParams()
+        #     # analysisParams = AnalysisParameters()
         if lineSegments is None:
             lineSegments = pd.DataFrame()
         if points is None:
@@ -63,7 +68,6 @@ class AnnotationsBase(LazyImagesGeoPandas):
             if not isinstance(points, pd.DataFrame):
                 points = pd.read_csv(points, index_col=False)
 
-        # abj
         self._lastSaveTime = lastSaveTime
 
         # abb reverting analysisparams to class (not lazy)
@@ -71,7 +75,7 @@ class AnnotationsBase(LazyImagesGeoPandas):
         #     AnalysisParameters, store=weakref.ref(self), context=self
         # )
         # self._analysisParameters.update(analysisParams, skipLog=True)
-        self._analysisParams = analysisParams
+        # self._analysisParams = analysisParams
         
         self._segments = LazyGeoFrame(
             Segment, data=lineSegments, store=weakref.ref(self), context=self)
@@ -86,9 +90,7 @@ class AnnotationsBase(LazyImagesGeoPandas):
         # if version === 0:
         #  then we can invalidate the invalid columns by name
         # self._segments.invalidateColumns([... columns ...])
-
-    # abj
-
+    
     def getLastSaveTime(self):
         """
         """
@@ -146,9 +148,9 @@ class AnnotationsBase(LazyImagesGeoPandas):
     def points(self) -> LazyGeoFrame:
         return self._points
 
-    @property
-    def analysisParams(self) -> LazyGeoSeries:
-        return self._analysisParams
+    # @property
+    # def analysisParams(self) -> LazyGeoSeries:
+    #     return self._analysisParams
 
     def filterPoints(self, filter: Any):
         """
@@ -240,13 +242,13 @@ class AnnotationsBase(LazyImagesGeoPandas):
         else:
             lineSegments = gp.GeoDataFrame()
 
-        if "analysisParams" in loader.group.attrs:
-            analysisParams = loader.group.attrs["analysisParams"]  # this is json
-            # analysisParams = AnalysisParameters(**analysisParams)
-            analysisParams = AnalysisParams(loadedDict=analysisParams)
-        else:
-            # analysisParams = AnalysisParameters()
-            analysisParams = AnalysisParams()
+        # if "analysisParams" in loader.group.attrs:
+        #     analysisParams = loader.group.attrs["analysisParams"]  # this is json
+        #     # analysisParams = AnalysisParameters(**analysisParams)
+        #     analysisParams = AnalysisParams(loadedDict=analysisParams)
+        # else:
+        #     # analysisParams = AnalysisParameters()
+        #     analysisParams = AnalysisParams()
         
         # abb lastSaveTime will ALWAYS be in file
         # abb when using try/catch, ALWAYS name an exception, Do not use bare `except`RuffE722
@@ -255,9 +257,9 @@ class AnnotationsBase(LazyImagesGeoPandas):
         except:
             lastSaveTime = ""
 
-        _ret = cls(loader, lineSegments, points, analysisParams, path, lastSaveTime)
-        logger.warning(f'  returning {type(_ret)}')
-
+        # _ret = cls(loader, lineSegments, points, analysisParams, path, lastSaveTime)
+        _ret = cls(loader, lineSegments, points, path, lastSaveTime)
+        # logger.warning(f'  returning {type(_ret)}')
         return _ret
 
     # abb TODO put in one place (this function is repeated elsewhere)
@@ -296,15 +298,22 @@ class AnnotationsBase(LazyImagesGeoPandas):
             logger.info(f'saving to {path}')
             # if os.path.isdir(path):
             if path.endswith('.mmap'):
-                logger.info('   as a DirectoryStore')
-                fs = zarr.DirectoryStore(path)
-            # else:
+                # logger.info('   as a DirectoryStore')
+                # fs = zarr.DirectoryStore(path)
+                _zipStore = False
             elif path.endswith('.mmap.zip'):
-                fs = zarr.ZipStore(path, mode="w", compression=zipfile.ZIP_STORED)
-                logger.info('   as a ZipStore')
+                # fs = zarr.ZipStore(path, mode="w", compression=zipfile.ZIP_STORED)
+                # logger.info('   as a ZipStore')
+                _zipStore = True
+            else:
+                logger.error(f'error: expecting mmap or mmap.zip')
+                return
 
-            with fs as store:
-                group = zarr.group(store=store)
+            with zarr.ZipStore(path, mode="w", compression=zipfile.ZIP_STORED) if _zipStore \
+                 else zarr.DirectoryStore(path) as store:
+                
+                group = zarr.group(store=store)  # creates a group
+
                 # abb we need to interogate the existing mmap and
                 # see if we have some new image channels or timepoints to save
                 # # abb error on saving changes to existing mmap
@@ -323,7 +332,7 @@ class AnnotationsBase(LazyImagesGeoPandas):
 
                 # abb added overwrite=True, need to implement dirty flag for points and segments
                 # zarr.errors.ContainsArrayError: path 'points' contains an array
-                logger.warning('abb imageImporter saving points/segments as text')
+                # logger.warning('TODO: abb imageImporter saving points/segments as text')
                 # v1
                 # group.create_dataset(
                 #     "points", data=self.points.toBytes(), dtype=np.uint8, overwrite=True)
@@ -331,18 +340,27 @@ class AnnotationsBase(LazyImagesGeoPandas):
                 #     "lineSegments", data=self.segments.toBytes(), dtype=np.uint8, overwrite=True)
                 # group.attrs["version"] = 1
                 
+                # GeoDataFrame
+                # logger.error(f'self.points[:] is:{type(self.points[:])}')
+                # GeoDataFrame
+                # logger.error(f"self.points[:].set_geometry('point') is: {type(self.points[:].set_geometry('point'))}")
+                
                 # v1.1
                 _points = self.points[:].set_geometry('point')  # _points is GeoPandas, NOT our lazy
+                # logger.error(f'_points is:{type(_points)}')
                 group.create_dataset(
                     "points",
                     data=toBytes(_points),
-                    # dtype=np.uint8,
+                    # data=self.points[:].to_json(orient='index'),
+                    dtype=np.uint8,
                     overwrite=True)
+                
                 _segments = self.segments[:].set_geometry('segment')  # _segments is GeoPandas, NOT our lazy
                 group.create_dataset(
                     "lineSegments",
                     data=toBytes(_segments),
-                    # dtype=np.uint8,
+                    # data=self.segments[:].to_json(orient='index'),                    
+                    dtype=np.uint8,
                     overwrite=True)
                 group.attrs["version"] = 1.1
 
@@ -363,7 +381,7 @@ class AnnotationsBase(LazyImagesGeoPandas):
                 # group.attrs["version"] = 1.2
 
                 # abb analysisparams
-                group.attrs['analysisParams'] = self._analysisParams.getDict()
+                # group.attrs['analysisParams'] = self._analysisParams.getDict()
 
                 # abj
                 group.attrs["lastSaveTime"] = _lastSaveTime
@@ -379,6 +397,7 @@ class AnnotationsBase(LazyImagesGeoPandas):
 
     # Context manager
     def __enter__(self):
+        logger.warning('context manager')
         self._images = self._images.__enter__()
         return self
 

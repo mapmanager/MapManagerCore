@@ -1,4 +1,6 @@
 from enum import StrEnum
+from typing import List
+
 import numpy as np
 import dataclasses
 from mapmanagercore.lazy_geo_pd_images.store import LazyImagesGeoPandas
@@ -237,10 +239,24 @@ class Spine(Schema):
                 x["roiHead"], x["xBackgroundOffset"], x["yBackgroundOffset"]),
             axis=1)
 
+    # abb why is this all of a sudden an error ???
+    # frame is sometimes a pandas series???
     @compute(title="ROI", dependencies=["roiBase", "roiHead"], plot=False)
     @timer
     def roi(frame: LazyGeoFrame) -> gp.GeoSeries:
-        return union(frame["roiBase"], frame["roiHead"], grid_size=0.25)
+        import pandas as pd
+        import geopandas as gpd
+        _roiBase = frame["roiBase"]
+        if isinstance(_roiBase, pd.core.series.Series):
+            # logger.error('_roiBase is a pandas series, expecting GeoSeries ???')
+            _roiBase = gpd.GeoSeries(_roiBase)
+        _roiHead = frame["roiHead"]
+        if isinstance(_roiHead, pd.core.series.Series):
+            # logger.error('_roiHead is a pandas series, expecting GeoSeries ???')
+            _roiHead = gpd.GeoSeries(_roiHead)
+        _ret = union(_roiBase, _roiHead, grid_size=0.25)
+        # _ret = union(frame["roiBase"], frame["roiHead"], grid_size=0.25)
+        return _ret
 
     @compute(title="ROI Background", dependencies=["roiBaseBg", "roiHeadBg"], plot=False)
     @timer
@@ -271,14 +287,48 @@ class Spine(Schema):
         """
         return ~(frame["roiInBounds"] .astype(bool))
 
+    ##
     ## Image based ROI computed stats ##
+    ##
+    def _aggList() -> List[str]:
+        return ['sum', 'mean', 'min', 'max']
 
-    @computeAggregateImage(title="Roi", dependencies=["roi", "z"], aggregate=['sum', 'max'], group="ROI")
+    # union of base (dendrite) and head (spine)
+    @computeAggregateImage(title="Roi",
+                           dependencies=["roi", "z"],
+                           aggregate=_aggList(),
+                           group="ROI")
     @timer
-    def roiStats(frame: LazyGeoFrame):
+    def spineRoi(frame: LazyGeoFrame):
         return frame[["roi", "z"]]
 
-    @computeAggregateImage(title="Background Roi", dependencies=["roiBg", "z"], aggregate=['sum', 'max'], group="ROI Background")
+    # union
+    @computeAggregateImage(title="Background Roi",
+                           dependencies=["roiBg", "z"],
+                           aggregate=_aggList(),
+                           group="ROI Background")
     @timer
-    def roiStatsBg(frame: LazyGeoFrame):
+    def spineRoiBg(frame: LazyGeoFrame):
         return frame[["roiBg", "z"]]
+
+    #
+    # abb 20250416, adding dendrite (segment) roi aggregates (sum, mean, etc)
+
+    # roiBase (segment)
+    @computeAggregateImage(title="Segment Roi",
+                           dependencies=["roiBase", "z"],
+                           aggregate=_aggList(),
+                           group="Segment ROI")
+    @timer
+    def denRoi(frame: LazyGeoFrame):
+        return frame[["roiBase", "z"]]
+
+    # roiBase (segment)
+    @computeAggregateImage(title="Background Segment Roi",
+                           dependencies=["roiBaseBg", "z"],
+                           aggregate=_aggList(),
+                           group="Segment ROI Background")
+    @timer
+    def denRoiBg(frame: LazyGeoFrame):
+        return frame[["roiBaseBg", "z"]]
+

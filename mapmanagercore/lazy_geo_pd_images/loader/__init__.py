@@ -1,2 +1,2 @@
 from .base import ImageLoader
-from .imageio import MultiImageLoader
+# from .imageio import MultiImageLoader
