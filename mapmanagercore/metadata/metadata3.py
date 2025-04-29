@@ -140,7 +140,7 @@ class ChannelMetadata(_metadataBase):
 
 @dataclass_json
 @dataclasses.dataclass
-class VoxelMetadata:
+class VoxelMetadata(_metadataBase):
     """The metadata for the physical size of a voxel.
 
     Args:
@@ -155,7 +155,7 @@ class VoxelMetadata:
 
 @dataclass_json
 @dataclasses.dataclass
-class ShapeMetadata:
+class ShapeMetadata(_metadataBase):
     """The shape of the image data in pixels.
     
     Set on import and never changes.

@@ -324,6 +324,9 @@ class mmMapLoader():
         with zarr.ZipStore(self.path, mode="r") \
             if _zipStore else zarr.DirectoryStore(self.path) as store:
 
+            logger.info(f'using {store} to load path:{self.path}')
+            
+            # zarr.errors.PathNotFoundError: nothing found at path ''
             self.group: zarr.hierarchy.Group = zarr.open(store=store, mode='r')  # / zarr.hierarchy.Group
             # self.group: zarr.hierarchy.Group = zarr.group(store=store)
             """root level of zarr file (on load will contain points, segment, image folders 0,1,2,..., etc)
@@ -364,6 +367,10 @@ class mmMapLoader():
     def saveAs(self, path:str) -> Optional[bool]:
         """Save the zarr file to disk.
         """
+        if path.endswith('.mmap.zip'):
+            logger.error('can not save to .zip')
+            return
+    
         if path.endswith('.mmap'):
             _zipStore = False
         elif path.endswith('.mmap.zip'):
@@ -426,14 +433,14 @@ class mmMapLoader():
             # this is compatible with ome-zarr
             # use metadata to traverse
             for t in self.metadata.timepointKeys:
-                logger.info(f't:{t}')
+                # logger.info(f't:{t}')
                 timepointMetadata = self.metadata.getTimepoint(t)
                 channelKeys = timepointMetadata.channelKeys
                 for c in channelKeys:
                     # check if already in zarr
                     # do not save again (time and channel keys are immutable)
                     _channelPath = f'{t}/{c}'
-                    logger.info(f'  _channelPath:{_channelPath}')
+                    # logger.info(f'  _channelPath:{_channelPath}')
                     if _channelPath in group:
                         logger.info(f'    {_channelPath} already in file skipping')
                         continue
@@ -451,16 +458,13 @@ class mmMapLoader():
 
         return True
 
-    #
-    # fake inheritance
-    #
-    
     # TODO: max channels is a misnomer. Each timepoint has a number of channels
     # can be 1,2,3, etc
     def _old_maxChannels(self) -> int:
         # return 3
         return 2
     
+    # todo: depreciate, called by old MapAnnotation code
     # abb we do not need c
     # all channels in a timepoint have the same shape
     def shape(self, t: int, c:int = 0) -> Tuple[int, int, int]:

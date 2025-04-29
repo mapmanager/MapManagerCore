@@ -19,14 +19,23 @@ import pooch
 
 from mapmanagercore.logger import logger
 
-# def get202504_map() -> str:
-#     # single_timepoint_202504.mmap
-#     urlMap = 'https://github.com/mapmanager/MapManagerCore-Data/raw/main/data/202504/single_timepoint_202504.mmap'
-#     retPath = pooch.retrieve(
-#         url=urlMap,
-#         known_hash=None
-#     )
-#     return retPath
+def get202504_empty_map() -> str:
+    # single_timepoint_202504.mmap
+    urlMap = 'https://github.com/mapmanager/MapManagerCore-Data/raw/main/data/202504/empty_map_202504.mmap.zip'
+    retPath = pooch.retrieve(
+        url=urlMap,
+        known_hash=None
+    )
+    return retPath
+
+def get202504_map() -> str:
+    # single_timepoint_202504.mmap
+    urlMap = 'https://github.com/mapmanager/MapManagerCore-Data/raw/main/data/202504/single_timepoint_202504.mmap.zip'
+    retPath = pooch.retrieve(
+        url=urlMap,
+        known_hash=None
+    )
+    return retPath
 
 def getTiffChannel_1() -> str:
     urlCh1 = 'https://github.com/mapmanager/MapManagerCore-Data/raw/main/data/rr30a_s0u/t0/rr30a_s0_ch1.tif'

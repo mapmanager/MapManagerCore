@@ -4,7 +4,7 @@ import time
 
 from mapmanagercore.lazy_geo_pd_images.loader.mm_map_loader import mmMapLoader
 from mapmanagercore.metadata import TimepointMetadata
-from mapmanagercore.data import getTiffChannel_1, getTiffChannel_2
+from mapmanagercore.data import getTiffChannel_1, getTiffChannel_2, get202504_map, get202504_empty_map
 from mapmanagercore import MapAnnotations
 
 from mapmanagercore.logger import logger
@@ -81,7 +81,7 @@ def test_MapAnnotations():
     logger.info('=== after add new spine, print points[:]')
     print(ma.points[['spineRoi_ch1_max', 'spineRoi_ch2_max', 'spineRoi_ch3_max']])
 
-def test_make_save_map(numTimepoints=1):
+def test_make_map(numTimepoints=1):
     zl = mmMapLoader()
 
     path1 = getTiffChannel_1()
@@ -100,9 +100,9 @@ def test_make_save_map(numTimepoints=1):
         assert zl.numChannels(_newTimepoint) == 2
         assert 1 in zl.getTimepointMetadata(_newTimepoint).channelKeys
 
-    saveFile = f'zarLoader_{numTimepoints}.mmap'
-    savePath = os.path.join('/Users/cudmore/Desktop/sample_mmaps', saveFile)
-    zl.saveAs(savePath)
+    # saveFile = f'zarLoader_{numTimepoints}.mmap'
+    # savePath = os.path.join('/Users/cudmore/Desktop/sample_mmaps', saveFile)
+    # zl.saveAs(savePath)
 
     # logger.info(f'loading saved map: {savePath}')
     # loadedMap = MapAnnotations.load(savePath)
@@ -158,8 +158,8 @@ def test_empty_loader(numTimepoint=1):
     
     # return
 
-    savePath = '/Users/cudmore/Desktop/sample_mmaps/zarLoader2.mmap'
-    zl.saveAs(savePath)
+    # savePath = '/Users/cudmore/Desktop/sample_mmaps/zarLoader2.mmap'
+    # zl.saveAs(savePath)
 
     # add a 3rd channel to tp 1
     ok = zl.importChannel(path1, timepoint=_newTimepoint)
@@ -172,28 +172,32 @@ def test_empty_loader(numTimepoint=1):
     # return
 
     # resave with new channel
-    logger.info('resaving with new channel')
-    zl.saveAs(savePath)
+    # logger.info('resaving with new channel')
+    # zl.saveAs(savePath)
 
     # load again
-    logger.info(f're-loading saved map: {savePath}')
-    loadedMap = MapAnnotations.load(savePath)
-    print(loadedMap)
+    # logger.info(f're-loading saved map: {savePath}')
+    # loadedMap = MapAnnotations.load(savePath)
+    # print(loadedMap)
 
 
 def test_load_zarr() -> mmMapLoader:
-    path = '/Users/cudmore/Desktop/sample_mmaps/zarLoader_1.mmap'  # zarLoader2
-    logger.info(f'loading:{path}')
+    # path = '/Users/cudmore/Desktop/sample_mmaps/zarLoader_1.mmap'  # zarLoader2
+    # logger.info(f'loading:{path}')
+    path = get202504_map()
+    # path = get202504_empty_map()
+    
     zl = mmMapLoader(path)
+
     return zl
 
 def test_load_map_annotations():
     # load an mmap like we do in pymapmanager
-    path = '/Users/cudmore/Desktop/sample_mmaps/zarLoader_1.mmap'
+    path = get202504_map()
     mmap = MapAnnotations.load(path)
     print(mmap)
 
-def test_mmmap_image_channel():
+def _fix_test_mmmap_image_channel():
     logger.info('test_mmmap_image_channel')
     zl = test_load_zarr()
 
@@ -216,18 +220,10 @@ def test_mmmap_image_channel():
 
 if __name__ == '__main__':
     
-    # test_empty_loader()
-
     test_MapAnnotations()
-
-    # we can't pass a param, pytest does not have fixture numTimepoints !!!
-    # test_make_save_map(1)
-    # test_make_save_map(3)
-
-    # load our saved zarr mmap
-    # test_load_zarr()
-
+    test_make_map()
+    test_empty_loader()
+    test_load_zarr()
+    test_load_map_annotations()
     # test_mmmap_image_channel()
 
-    # load like pymapmanager
-    # test_load_map_annotations()

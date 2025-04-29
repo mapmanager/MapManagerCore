@@ -226,36 +226,49 @@ class AnnotationsBase(LazyImagesGeoPandas):
 
         # abb read_pickle() is failing if we have an older version of numpy
         # when building for pyinstaller, we end up with numpy==1.26.4
-        if "points" in loader.group:
-            # points = pd.read_pickle(
-            points = gp.read_parquet(
-                BytesIO(loader.group["points"][:].tobytes()))
-            points = gp.GeoDataFrame(points, geometry="point")
+        import os
+        if os.path.isdir(path):
+            _zipStore = False
         else:
-            points = gp.GeoDataFrame()
-
-        if "lineSegments" in loader.group:
-            # lineSegments = pd.read_pickle(
-            lineSegments = gp.read_parquet(
-                BytesIO(loader.group["lineSegments"][:].tobytes()))
-            lineSegments = gp.GeoDataFrame(lineSegments, geometry="segment")
-        else:
-            lineSegments = gp.GeoDataFrame()
-
-        # if "analysisParams" in loader.group.attrs:
-        #     analysisParams = loader.group.attrs["analysisParams"]  # this is json
-        #     # analysisParams = AnalysisParameters(**analysisParams)
-        #     analysisParams = AnalysisParams(loadedDict=analysisParams)
-        # else:
-        #     # analysisParams = AnalysisParameters()
-        #     analysisParams = AnalysisParams()
+            _zipStore = True
         
-        # abb lastSaveTime will ALWAYS be in file
-        # abb when using try/catch, ALWAYS name an exception, Do not use bare `except`RuffE722
-        try:
-            lastSaveTime = loader.group.attrs['lastSaveTime']
-        except:
-            lastSaveTime = ""
+        # logger.info(f'loading {type(store)} fom {self.path}')
+
+        with zarr.ZipStore(path, mode="r") \
+            if _zipStore else zarr.DirectoryStore(path) as store:
+
+            _group: zarr.hierarchy.Group = zarr.open(store=store, mode='r')  # / zarr.hierarchy.Group
+
+            if "points" in _group:
+                # points = pd.read_pickle(
+                points = gp.read_parquet(
+                    BytesIO(_group["points"][:].tobytes()))
+                points = gp.GeoDataFrame(points, geometry="point")
+            else:
+                points = gp.GeoDataFrame()
+
+            if "lineSegments" in loader.group:
+                # lineSegments = pd.read_pickle(
+                lineSegments = gp.read_parquet(
+                    BytesIO(_group["lineSegments"][:].tobytes()))
+                lineSegments = gp.GeoDataFrame(lineSegments, geometry="segment")
+            else:
+                lineSegments = gp.GeoDataFrame()
+
+            # if "analysisParams" in loader.group.attrs:
+            #     analysisParams = loader.group.attrs["analysisParams"]  # this is json
+            #     # analysisParams = AnalysisParameters(**analysisParams)
+            #     analysisParams = AnalysisParams(loadedDict=analysisParams)
+            # else:
+            #     # analysisParams = AnalysisParameters()
+            #     analysisParams = AnalysisParams()
+            
+            # abb lastSaveTime will ALWAYS be in file
+            # abb when using try/catch, ALWAYS name an exception, Do not use bare `except`RuffE722
+            try:
+                lastSaveTime = _group.attrs['lastSaveTime']
+            except:
+                lastSaveTime = ""
 
         # _ret = cls(loader, lineSegments, points, analysisParams, path, lastSaveTime)
         _ret = cls(loader, lineSegments, points, path, lastSaveTime)
