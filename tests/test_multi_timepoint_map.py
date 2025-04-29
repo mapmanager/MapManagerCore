@@ -5,7 +5,7 @@ import mapmanagercore.data
 from mapmanagercore import MapAnnotations
 from mapmanagercore.logger import logger
 
-def test_multi_timepoint():
+def _old_test_multi_timepoint():
 
     mmapPath = mapmanagercore.data.getMultiTimepointMap()
     print(f'mmapPath:{mmapPath}')

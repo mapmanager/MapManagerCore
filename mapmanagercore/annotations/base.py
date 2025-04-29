@@ -214,6 +214,12 @@ class AnnotationsBase(LazyImagesGeoPandas):
 
     @classmethod
     def load(cls, path: Union[str, None], lazy=False):
+        """
+        Arguments
+        =========
+        path:
+            Path to the mmap .zip file or directory or .tif file.
+        """
         # logger.warning(f'abb creating ZarrLoader from path:{path}')
         # logger.warning(f'  cls:{cls}')
 
@@ -224,6 +230,14 @@ class AnnotationsBase(LazyImagesGeoPandas):
         # logger.info(f'TODO: switch to mm_map_loader mmMapLoader !!!')
         loader = mmMapLoader(path)
 
+        if path.endswith('.tif'):
+            logger.warning(f'MapAnnotations from tif file:{path}')
+            lineSegments = gp.GeoDataFrame()
+            points = gp.GeoDataFrame()
+            lastSaveTime = ''
+            _ret = cls(loader, lineSegments, points, path, lastSaveTime)
+            return _ret
+        
         # abb read_pickle() is failing if we have an older version of numpy
         # when building for pyinstaller, we end up with numpy==1.26.4
         import os
@@ -239,19 +253,29 @@ class AnnotationsBase(LazyImagesGeoPandas):
 
             _group: zarr.hierarchy.Group = zarr.open(store=store, mode='r')  # / zarr.hierarchy.Group
 
+            import pyarrow
+            from pyarrow.lib import ArrowInvalid
             if "points" in _group:
                 # points = pd.read_pickle(
-                points = gp.read_parquet(
-                    BytesIO(_group["points"][:].tobytes()))
-                points = gp.GeoDataFrame(points, geometry="point")
+                try:
+                    points = gp.read_parquet(
+                        BytesIO(_group["points"][:].tobytes()))
+                    points = gp.GeoDataFrame(points, geometry="point")
+                except (ArrowInvalid) as e:
+                    logger.error(f'Error reading points: {e}')
+                    points = gp.GeoDataFrame()
             else:
                 points = gp.GeoDataFrame()
 
             if "lineSegments" in loader.group:
                 # lineSegments = pd.read_pickle(
-                lineSegments = gp.read_parquet(
-                    BytesIO(_group["lineSegments"][:].tobytes()))
-                lineSegments = gp.GeoDataFrame(lineSegments, geometry="segment")
+                try:
+                    lineSegments = gp.read_parquet(
+                        BytesIO(_group["lineSegments"][:].tobytes()))
+                    lineSegments = gp.GeoDataFrame(lineSegments, geometry="segment")
+                except (ArrowInvalid) as e:
+                    logger.error(f'Error reading lineSegments: {e}')
+                    lineSegments = gp.GeoDataFrame()
             else:
                 lineSegments = gp.GeoDataFrame()
 
@@ -267,7 +291,8 @@ class AnnotationsBase(LazyImagesGeoPandas):
             # abb when using try/catch, ALWAYS name an exception, Do not use bare `except`RuffE722
             try:
                 lastSaveTime = _group.attrs['lastSaveTime']
-            except:
+            except (KeyError) as e:
+                logger.error(f'KeyError: did not get "lastSaveTime":{e}')
                 lastSaveTime = ""
 
         # _ret = cls(loader, lineSegments, points, analysisParams, path, lastSaveTime)

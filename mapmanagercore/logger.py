@@ -14,7 +14,7 @@ import os
 import sys
 
 from logging.handlers import RotatingFileHandler
-from typing import Concatenate, Union
+# from typing import Concatenate, Union
 
 def setLogLevel(newLogLevel : str = 'DEBUG'):
     """Set the global logging level.

@@ -63,7 +63,7 @@ def getSingleTimepointMap() -> str:
     )
     return mapPath
 
-def getMultiTimepointMap() -> str:
+def _old_getMultiTimepointMap() -> str:
     urlMap = 'https://github.com/mapmanager/MapManagerCore-Data/raw/main/data/multi_timepoint.mmap.zip'
     mapPath = pooch.retrieve(
         url=urlMap,

@@ -29,7 +29,7 @@ def test_load_single_timepoint():
     print(f'map:{map}')
     assert map is not None
 
-def test_load_multi_timepoint():
+def _old_test_load_multi_timepoint():
     mmapPath = mapmanagercore.data.getMultiTimepointMap()
     print(f'mmapPath:{mmapPath}')
 

@@ -71,9 +71,12 @@ class mmMapLoader():
             path (str): The path to the .mmap Zarr file.
                 If None then create an empty zarr loader
         """
+        logger.info(f'mmMapLoader path:{path}')
+
         if path is not None:
             # ensure path is a directory or zip file
-            if not os.path.isdir(path) and not path.endswith('.zip'):
+            if not os.path.isdir(path) and \
+                    (not path.endswith('.zip') and not path.endswith('.tif')):
                 logger.error(f'path must be a directory or zip file {path}')
                 raise ValueError(f'path must be a directory or zip file')
 
@@ -87,7 +90,11 @@ class mmMapLoader():
         self._imageChannelDict = {}
 
         if path is not None:
-            self._load()
+            if path.endswith('.tif'):
+                self.importTimepoint(path)
+            else:
+                # load from mmap zarr
+                self._load()
 
     def deleteChannel(self, timepoint:int, channel:int):
         """Delete an image channel.
@@ -324,7 +331,7 @@ class mmMapLoader():
         with zarr.ZipStore(self.path, mode="r") \
             if _zipStore else zarr.DirectoryStore(self.path) as store:
 
-            logger.info(f'using {store} to load path:{self.path}')
+            # logger.info(f'using {store} to load path:{self.path}')
             
             # zarr.errors.PathNotFoundError: nothing found at path ''
             self.group: zarr.hierarchy.Group = zarr.open(store=store, mode='r')  # / zarr.hierarchy.Group
@@ -338,8 +345,8 @@ class mmMapLoader():
                 # logger.info(f"group.attrs['metadata']:{group.attrs['metadata']}")
                 _metadataDict: dict = self.group.attrs['metadata']
                 # _metadataDict: dict = store.attrs['metadata']
-            except (KeyError, ValueError):
-                logger.error('metadata not found in zarr file')
+            except (KeyError, ValueError) as e:
+                logger.error(f'KeyError: "{e}" not found in zarr file')
                 return
                 
             # create metadata from loaded dict
@@ -724,9 +731,16 @@ class ImageChannel():
     
         # option 2, pre allocate an nparray
         if not self._sliceIsLoaded(sliceIdx):
-            # logger.info(list(self.mapLoader.group.keys()))
-            self._imgData[sliceIdx,:,:] = self.mapLoader.group[self._channelPath][sliceIdx,:,:]
-            self._sliceLoaded[sliceIdx] = True
+            fs = self.mapLoader._getStore(self.mapLoader.path)
+            with fs as store:
+                logger.error(f'opening zar path for every slice??? sliceIdx:{sliceIdx}')
+                group: zarr.hierarchy.Group = zarr.group(store=store)
+
+                # logger.info(list(self.mapLoader.group.keys()))
+                # self._imgData[sliceIdx,:,:] = self.mapLoader.group[self._channelPath][sliceIdx,:,:]
+                self._imgData[sliceIdx,:,:] = group[self._channelPath][sliceIdx,:,:]
+                self._sliceLoaded[sliceIdx] = True
+
         return self._imgData[sliceIdx,:,:]
 
     def getVolume(self,
