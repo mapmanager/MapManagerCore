@@ -72,6 +72,28 @@ class Segment(Schema):
     #     plot=False
     # )
 
+    @compute(title="Points", dependencies=["segment", "roughTracing"])
+    def points(frame: LazyGeoFrame):
+        """ Returns the amount of points within the segment
+        """
+        # Create a column that checks if Segment is only one point
+        df = frame[["segment", "roughTracing"]]
+        df["isPoint"] = df["roughTracing"].apply(lambda roughT: isinstance(roughT, Point)).astype(int)
+
+        # only count segment when it is not just a singular point get 
+        df["pointCount"] = df[["isPoint", "segment"]].apply( lambda row: len(row["segment"].coords) if not row["isPoint"] else 1,
+            axis=1
+        )
+        return df["pointCount"]
+    
+    @compute(title="Length", dependencies=["segment", "points"])
+    def length(frame: LazyGeoFrame):
+        """ Returns the length of the segment
+        """
+        return frame['segment'].apply(
+            lambda segment: round(segment.length, 2) if segment.length > 0 else 0
+        )
+
     @compute(title="Pivot Point", dependencies=["segment", "pivotDistance"])
     def pivotPoint(frame: LazyGeoFrame):
         return interpolate(frame['segment'], frame['pivotDistance'])
