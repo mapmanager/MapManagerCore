@@ -15,6 +15,8 @@ import pandas as pd
 import geopandas as gp
 
 # from mapmanagercore.lazy_geo_pd_images.loader.base import ImageLoader
+# from mapmanagercore.annotations.base import AnnotationsBase
+# from mapmanagercore.lazy_geo_pandas.lazy import LazyGeoFrame
 from mapmanagercore.metadata import mmMapMetadata, TimepointMetadata, ChannelMetadata
 from mapmanagercore.imageImporter import getImageImporter
 
@@ -63,7 +65,10 @@ class mmMapLoader():
     as well as to load/manage/save to an mmap file.
     """
     def __init__(self,
-                 path: Optional[str] = None):
+                 path: Optional[str] = None,
+                #  mapAnnotations: "AnnotationsBase"= None # abj
+                mapAnnotations= None # "AnnotationsBase" # abj
+                 ):
         """
         Encapsulates an mmap file.
 
@@ -81,7 +86,9 @@ class mmMapLoader():
                 raise ValueError(f'path must be a directory or zip file')
 
         self.path = path
+        self.mapAnnotations = mapAnnotations
         self._metadata = mmMapMetadata()
+        self.lazyPointsFrame = None  # abj
         
         # abb depreciate
         # self._imagesSrcs: List[Dict[int, np.ndarray]] = []
@@ -100,14 +107,29 @@ class mmMapLoader():
         """Delete an image channel.
         """
         logger.warning('TODO')
-
-        # 1 metadata
+        # abj
+        # metadata
+        logger.warning('Deleting channel')
+        timepointMetadata = self.metadata.getTimepoint(timepoint)
+        timepointMetadata.deleteChannel(channel)
 
         # 2 images
+        self._imageChannelDict[timepoint].pop(channel)
 
-    def moveChannel(srcTimePoint, srcChannel, 
+    def moveChannel(self, srcTimePoint, srcChannel, 
                     destTimePoint, destChannel):
         logger.info('TODO')
+        logger.warning('moving/ swapping channel')
+
+        # 1 metadata
+        timepointMetadata = self.metadata.getTimepoint(srcTimePoint)
+        timepointMetadata.swapChannels(srcChannel, destChannel) # this swaps meta data but not image
+
+        # 2 images
+        temp = self._imageChannelDict[srcTimePoint][srcChannel]
+        self._imageChannelDict[srcTimePoint][srcChannel] = self._imageChannelDict[destTimePoint][destChannel] 
+        self._imageChannelDict[destTimePoint][destChannel] = temp
+
 
     def _pathExists(self) -> bool:
         _ret = True
@@ -166,7 +188,7 @@ class mmMapLoader():
         return _newTimepointKey
     
     def importChannel(self, path:str,
-                       timepoint:int) -> Optional[bool]:
+                       timepoint:int) ->  (Optional[int]):  # old: (Optional[bool], int):
         """Open a file and append channels to an existing timepoint.
         """
         # check that timepoint exists
@@ -211,8 +233,40 @@ class mmMapLoader():
             _imageChannel = ImageChannel(self, timepoint, _newChannelKey, imgData=imgData)
             self._imageChannelDict[timepoint][_newChannelKey] = _imageChannel
 
-        return True
+            # abj
+            # problem dont have access to annotations here 
+            # we need to update schema to have new columns for channel
+            logger.info(f"frame is: {self.lazyPointsFrame}")
+            if self.lazyPointsFrame is not None:
+                self._annotationsBase.addNewChannelSchema(frame= self.lazyPointsFrame, newChannelKeys=[_newChannelKey])
+
+        # return True, 
+        return _newChannelKey
     
+    def updateChannel(self, timepointIdx: int, channelIdx: int, channelProperty: str, propertyValue):
+        """
+        Args:
+            timepointIdx: timePoint index to update
+            channelIdx: channel index
+            channelProperty: channel property, ex: "name"
+            propertyValue: value to set channel property
+
+        """
+        logger.info(f"update channel name in mmc")
+        timepointMetadata = self.metadata.getTimepoint(timepointIdx)
+        timepointMetadata.setChannelProperty(channelIdx, channelProperty, propertyValue)
+
+    def activateChannel(self, timepointIdx: int, channelIdx: int, activate: bool):
+        """ Activate Channel to be part of automatic lazy geo pandas calculation
+        """
+        # metadata
+        timepointMetadata = self.metadata.getTimepoint(timepointIdx)
+        timepointMetadata.setChannelProperty(channelIdx, "channelActivated", activate)
+
+        logger.info(f"restricting channel after activate")
+        # update lazy geo pandas 
+        self._annotationsBase.restrictChannelCalculationsForPoints(timepointIdx)
+
     def timepointShape(self, timepoint:int) -> Optional[Tuple[int, int, int]]:
         """Get the shape of image data at a timepoint.
 
@@ -237,6 +291,22 @@ class mmMapLoader():
         """
         return self.metadata.getTimepoint(timepoint).numChannels
     
+    def activatedChannels(self, timepoint:int):
+        """ Get dict of channels that are activated
+
+        Key: Channel number
+        Val: bool that indicates whether or not its activated
+        """
+        return self.metadata.getTimepoint(timepoint).getActivatedChannels()
+    
+    def inActiveChannels(self, timepoint:int):
+        """ Get dict of channels that are activated
+
+        Key: Channel number
+        Val: bool that indicates whether or not its activated
+        """
+        return self.metadata.getTimepoint(timepoint).getInActiveChannels()
+         
     @property
     def metadata(self) -> mmMapMetadata:
         """Get the metadata.
@@ -480,7 +550,8 @@ class mmMapLoader():
     def fetchSlices(self,
                     t:int,
                     channelIdx:int,
-                    zRange:List[int]) -> np.ndarray:
+                    zRange:List[int],
+                    threeD: bool = None) -> np.ndarray:
         # channelIdx += 1
         _imageChannel = self.getImageChannel(t, channelIdx)
         
@@ -630,6 +701,22 @@ class mmMapLoader():
                 indexes.append(idx)
 
         return pd.Series(results, indexes, name=channel)
+    
+    # abj
+    # trying to give mmMapLoader access to ponits dataframe
+    def setLazyPointsFrame(self, df: "LazyGeoFrame" = None):
+        self.lazyPointsFrame = df
+        # logger.info(f"check lazyPointsFrame {df}")
+
+    def getLazyPointsFrame(self) -> "LazyGeoFrame":
+        return self.lazyPointsFrame 
+
+    def setAnnotationsBase(self, annotationsBase):
+        self._annotationsBase = annotationsBase
+    
+    def getAnnotationsBase(self):
+        return self._annotationsBase
+
 
 class ImageChannel():
     """Class to encapsulate a single color channel stack.

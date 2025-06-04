@@ -50,6 +50,7 @@ class AnnotationsBase(LazyImagesGeoPandas):
                  path: str = None,
                  lastSaveTime: str = ""):
 
+        # super().__init__(loader)
         super().__init__(loader)
 
         # if analysisParams is None:
@@ -85,12 +86,24 @@ class AnnotationsBase(LazyImagesGeoPandas):
         self.loader = loader
         self.path = path
 
+        # abj
+        self.loader.setLazyPointsFrame(self._points)
+        # self.loader.setMapLoader(self)
+        self.loader.setAnnotationsBase(self)
+
         # To invalidate columns that were miss-computed in previous version
         # we can conditionally check the version number
         # if version === 0:
         #  then we can invalidate the invalid columns by name
         # self._segments.invalidateColumns([... columns ...])
     
+    def restrictChannelCalculationsForPoints(self, t):
+        """ Get inactive channels and sets them in points LazyGeoFrame.
+        This is used to prevent the LazyGeoFrame from recalculating using these columns
+        """
+        inActiveChannels = self.getInActiveChannels(t=t)
+        self._points.restrictColumnChannels(inActiveChannels)
+
     def getLastSaveTime(self):
         """
         """
@@ -205,7 +218,8 @@ class AnnotationsBase(LazyImagesGeoPandas):
                 zRangeDf = self.points["z"]
                 zRange = (int(zRangeDf.min()),
                           int(zRangeDf.max()))
-        return super().getPixels(time, channel, zRange, threeD=threeD)
+        return super().getPixels(time, channel, zRange, z, threeD=threeD)
+        # return super().getPixels(time, channel, zRange, threeD=threeD)
 
     # Serialization
 
