@@ -38,47 +38,73 @@ class AnalysisParams(_metadataBase):
 
     # """Manually increment this when we add to this class."""
     version: float = dataclasses.field(
-        default=0.6, 
+        default=0.6, # pixels
+        # shownValue = # the actual value that is shown in the GUI
         metadata={
-            'description': 'Save metadata version.'
+            'description': 'Save metadata version.',
+            'doConversion' : False,
             })
 
     # spines
+    # TODO: change to brightestPathRange
     brightestPathDistance: int = dataclasses.field(
         default=10, 
         metadata={
-            'description': 'Points along the tracing to find spine connection (anchor).'
+            'description': 'Points along the tracing to find spine connection (anchor).',
+            'doConversion' : False
             })
 
     brightestPathChannel: int = dataclasses.field(
         default=1, 
         metadata={
-            'description': 'Image color channel to find brightest connection of spine.'
+            'description': 'Image color channel to find brightest connection of spine.',
+            'doConversion' : False
             })
     
-    brightestPathZSpread: int = dataclasses.field(default=3, metadata={'description': 
-                                                             'Number of image slices for max project to find brightest connection of spine.'
-                                                             })
-    roiExtend: int = dataclasses.field(default=4, metadata={'description': 
-                                                             'Number of pixels to extend spine head for spine ROI.'
-                                                             })
-    roiRadius: int = dataclasses.field(default=4, metadata={'description': 
-                                                             'Width of spine ROI.'
-                                                             })
+    brightestPathZSpread: int = dataclasses.field(default=3, 
+                                                  metadata={'description': 
+                                                 'Number of image slices for max project to find brightest connection of spine.',
+                                                 'doConversion' : False
+                                                    })
+    
+    # FIXME: figure out how to get shownValue to be in actual units
+    # Option 1: have GUI do the math? seems counterintuitive
+    # default has to be in actual units, to account for everytime it is reset
+
+    roiExtend: int = dataclasses.field(default=4, 
+                                       metadata={'description': 
+                                        'Number of pixels to extend spine head for spine ROI.',
+                                        'doConversion' : True,
+                                        # 'shownValue': 4 # abj: the actual value that is shown in the GUI
+                                        }) 
+    
+    # How to convert this properly
+    roiRadius: int = dataclasses.field(default=4, 
+                                       metadata={'description': 
+                                        'Width of spine ROI.',
+                                        'doConversion' : True
+                                        }) 
     
     # segments
-    segmentRadius: int = dataclasses.field(default=4, metadata={'description': 
-                                                             'Radius of segment tracing.'
-                                                             })
+    segmentRadius: int = dataclasses.field(default=4, 
+                                           metadata={'description': 
+                                            'Radius of segment tracing.',
+                                            'doConversion' : True
+                                            }) 
+    
     segmentTracingMaxDistance: int = dataclasses.field(default=90, metadata={'description': 
-                                                             'Max distance to trace a brightest path.'
-                                                             })
+                                                             'Max distance to trace a brightest path.',
+                                                            'doConversion' : True
+                                                             }) 
+    
     backgroundRoiGridPoints: int = dataclasses.field(default=5, metadata={'description': 
-                                                             'Number of points in grid (nxn) to calculate background ROI.'
+                                                             'Number of points in grid (nxn) to calculate background ROI.',
+                                                            'doConversion' : False
                                                              })
     backgroundRoiGridOverlap: float = dataclasses.field(default=0.1, metadata={'description': 
-                                                             'Overlap of background grid points.'
-                                                             })
+                                                             'Shape overlap percentage of background grid points.',
+                                                               'doConversion' : False
+                                                             }) 
     brightestPathTracing: bool = \
         dataclasses.field(default=False,
                           metadata=_getMetadata(

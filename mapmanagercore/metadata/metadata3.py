@@ -225,6 +225,54 @@ class TimepointMetadata(_metadataList):
 
     analysisParameters: AnalysisParams = dataclasses.field(default_factory=lambda: AnalysisParams())
     """The analysis parameters for this single timepoint (connected maps use a global version of this)."""
+    
+    # only call for parameters that need to be converted
+    def convertUnits(self, voxelValue, point1: Tuple[int, int] = None):
+        """ convert from real units to pixel units
+
+
+        # value is in voxels
+        # voxelMetaData holds voxel size is edited by user
+        # pixel size is defaulted as 1
+        """
+        if self.voxelMetadata is not None:
+            
+            # problem is voxelValue is a single value (physical magnitude) and not in x or y 
+            pixelValueX = voxelValue / self.voxelMetadata.xVoxel
+            pixelValueY = voxelValue / self.voxelMetadata.yVoxel
+        
+            # assuming that all dimensions are the same
+            if self.voxelMetadata.xVoxel == self.voxelMetadata.yVoxel:
+                return pixelValueX
+
+            # Main Problem! for accurate measurements in 2D, a direction must be known
+            # however these are general values that are physical units
+            
+            elif self.voxelMetadata.xVoxel != self.voxelMetadata.yVoxel:
+                # p2 = (point1[0] + pixelValueX, point1[1] + pixelValueY)
+                # # dx, dy = (point1 - p2)
+                # dx, dy = (p2 - point1)
+
+                # # Take the euclidean distance 
+                # # pixelDistance = np.sqrt((dx * pixelValueX)**2 + (dy * pixelValueY)**2)
+                # pixelDistance = np.sqrt((dx)**2 + (dy)**2)
+
+                # # approximating with geometric mean
+                # import math
+                # effective_pixel_size = math.sqrt(pixelValueX * pixelValueY)
+                # pixel_distance = voxelValue / effective_pixel_size
+
+                # Elliptical Radius
+                # pixelDistance = np.sqrt((dx * pixelValueX)**2 + (dy * pixelValueY)**2)
+                # pixelDistance = np.sqrt((dx)**2 + (dy)**2)
+                pixelDistance = np.sqrt((pixelValueX)**2 + (pixelValueY)**2)
+            
+                return pixelDistance
+            else:
+                return pixelValueX
+    
+        else:
+            logger.error(f"No physical voxel units established")
 
     def __post_init__(self):
         if isinstance(self._metadataList, dict):
@@ -466,7 +514,6 @@ class mmMapMetadata(_metadataList):
 
     timepoints: dict = dataclasses.field(default_factory=dict)
     _key = 'timepoints'
-
 
     @property
     def possibleChannelKeys(self) -> List[int]:

@@ -302,6 +302,7 @@ def calcSubLine(line: LineLayer, origin: Point, distance: int):
         root - distance, 0), end_dist=root + distance)
     return sub
 
+# abj: possible FIXME, use actual extendHead in calculation rather than scale?
 @timer
 def extend(x: LineString, origin: Point, distance: float) -> Polygon:
     scale = 1 + distance / x.length

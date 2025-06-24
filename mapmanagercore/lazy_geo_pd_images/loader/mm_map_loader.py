@@ -238,7 +238,7 @@ class mmMapLoader():
             # we need to update schema to have new columns for channel
             logger.info(f"frame is: {self.lazyPointsFrame}")
             if self.lazyPointsFrame is not None:
-                self._annotationsBase.addNewChannelSchema(frame= self.lazyPointsFrame, newChannelKeys=[_newChannelKey])
+                self._annotationsBase.addSchema(frame= self.lazyPointsFrame, newChannelKeys=[_newChannelKey])
 
         # return True, 
         return _newChannelKey

@@ -190,7 +190,7 @@ class LazyImagesGeoPandas(LazyGeoPandas):
                 # logger.info(F"old pixels")
                 try:
                     pixels =  self._recordShapePixels["pixels"]
-                    # logger.info(f"using old pixels")
+                    logger.info(f"using old pixels")
                 except:
                     logger.info(f"no old pixels, must calculate new one")
                     pixels = weakSelf().getShapePixels(
@@ -237,91 +237,104 @@ class LazyImagesGeoPandas(LazyGeoPandas):
 
         return wrappedFunc
 
-    def addSchema(self, frame: LazyGeoFrame[Self]):
-        """Add a schema frame to the store.
-        Essentially, this adds a new data frame to the store.
+    # def addSchema(self, frame: LazyGeoFrame[Self]):
+    #     """Add a schema frame to the store.
+    #     Essentially, this adds a new data frame to the store.
         
-        abb this creates all spine intensity analysis columns
-        abb including _ch<n>
-        abb HOW DO WE ADD _ch2 COLUMNS AFTER APPENDING A NEW CHANNEL IMAGE ???
+    #     abb this creates all spine intensity analysis columns
+    #     abb including _ch<n>
+    #     abb HOW DO WE ADD _ch2 COLUMNS AFTER APPENDING A NEW CHANNEL IMAGE ???
 
-        # TODO: perhaps have this be called in append Channel
-        """
+    #     # TODO: perhaps have this be called in append Channel
+    #     """
 
-        #
-        # what timepoint are we in???
-        #        
-        # logger.error(f'-->> abb cluge for 1 timepoint')
-        # logger.error(f'  frame._schema is:{type(frame._schema)}')
+    #     #
+    #     # what timepoint are we in???
+    #     #        
+    #     # logger.error(f'-->> abb cluge for 1 timepoint')
+    #     # logger.error(f'  frame._schema is:{type(frame._schema)}')
         
-        # logger.warning('!!==!! abb in store.py LazyImagesGeoPandas')
+    #     # logger.warning('!!==!! abb in store.py LazyImagesGeoPandas')
 
-        # was this
-        _possibleChannelKeys = self._images.metadata.possibleChannelKeys
-        # _tmpTimepoint = 1
-        # _possibleChannelKeys = self._images.metadata.getTimepoint(_tmpTimepoint).channelKeys
-        logger.info(f'LazyImageGeoPandas addSchema _possibleChannelKeys:{_possibleChannelKeys}')
-        # logger.info(f'  abb _firstTimepointChannelKeys:{_firstTimepointChannelKeys}')
+    #     # was this
+    #     _possibleChannelKeys = self._images.metadata.possibleChannelKeys
+    #     # _tmpTimepoint = 1
+    #     # _possibleChannelKeys = self._images.metadata.getTimepoint(_tmpTimepoint).channelKeys
+    #     logger.info(f'LazyImageGeoPandas addSchema _possibleChannelKeys:{_possibleChannelKeys}')
+    #     # logger.info(f'  abb _firstTimepointChannelKeys:{_firstTimepointChannelKeys}')
 
-        # Inject computed columns that use the image to calculate roi stats
-        # logger.info(f"frame check {frame}")
-        for method in frame._schema.__dict__.values():
-            # logger.warning(f'method:{method}')
-            if not hasattr(method, "_imageComputed"):
-                continue
+    #     # Inject computed columns that use the image to calculate roi stats
+    #     # logger.info(f"frame check {frame}")
+    #     for method in frame._schema.__dict__.values():
+    #         # logger.warning(f'method:{method}')
+    #         if not hasattr(method, "_imageComputed"):
+    #             continue
 
-            attributes: ImageColumnAttributes = method._imageComputed
+    #         attributes: ImageColumnAttributes = method._imageComputed
 
-            logger.info(f'checking attributes {attributes}')
-            if "_aggregate" not in attributes:
-                continue
-            logger.warning(f'method:{method}')
+    #         logger.info(f'checking attributes {attributes}')
+    #         if "_aggregate" not in attributes:
+    #             continue
+    #         logger.warning(f'method:{method}')
                         
-            name = attributes["key"]
-            wrappedFunc = self._genWrappedFunc(method, attributes, frame)
+    #         name = attributes["key"]
+    #         wrappedFunc = self._genWrappedFunc(method, attributes, frame)
                         
-            # abb
-            # for channel in range(self._maxChannels()):
-            for channel in _possibleChannelKeys:
-            # for channel in [1]:
-            # only add channels keys when they are activated
-            # TODO: somehow get this list of activated channels
-            # for channel in self._images.metadata.activatedChannelKeys:
-                for agg in attributes["_aggregate"]:
-                    # logger.warning(f'  !!! ADDING COLUMN ??? channel:{channel} agg:{agg}')
-                    logger.info(f"added {name}_ch{channel}_{agg}")
-                    frame.addComputed(
-                        # abb removed + 1
-                        # f"{name}_ch{channel + 1}_{agg}",
-                        f"{name}_ch{channel}_{agg}",
-                        {
-                            **attributes,
-                            # abb removed + 1
-                            # "title": f"{name} Channel {channel + 1} - {agg.capitalize()}",
-                            "title": f"{name} Channel {channel} - {agg.capitalize()}",
-                        },
-                        wrappedFunc,
-                        skipUpdate=True
-                    )
+    #         # abb
+    #         # for channel in range(self._maxChannels()):
+    #         for channel in _possibleChannelKeys:
+    #         # for channel in [1]:
+    #         # only add channels keys when they are activated
+    #         # TODO: somehow get this list of activated channels
+    #         # for channel in self._images.metadata.activatedChannelKeys:
+    #             for agg in attributes["_aggregate"]:
+    #                 # logger.warning(f'  !!! ADDING COLUMN ??? channel:{channel} agg:{agg}')
+    #                 logger.info(f"added {name}_ch{channel}_{agg}")
+    #                 frame.addComputed(
+    #                     # abb removed + 1
+    #                     # f"{name}_ch{channel + 1}_{agg}",
+    #                     f"{name}_ch{channel}_{agg}",
+    #                     {
+    #                         **attributes,
+    #                         # abb removed + 1
+    #                         # "title": f"{name} Channel {channel + 1} - {agg.capitalize()}",
+    #                         "title": f"{name} Channel {channel} - {agg.capitalize()}",
+    #                     },
+    #                     wrappedFunc,
+    #                     skipUpdate=True
+    #                 )
 
-            frame.updateComputedDependencies()
+    #         frame.updateComputedDependencies()
 
-        return super().addSchema(frame)
+    #     return super().addSchema(frame)
     
 
-    def addNewChannelSchema(self, frame: LazyGeoFrame[Self], newChannelKeys: List):
+    def addSchema(self, frame: LazyGeoFrame[Self], newChannelKeys: List = None):
         """Add a new channel schema frame to the store.
         Essentially, this adds a new data frame to the store.
         This function is called after append channel
         
         abb this creates all spine intensity analysis columns
+
+        Args:
+            frame: spine DF
+            newChannelsKeys: List of new channels that are appended
         """
 
         # TODO: check if channel schema was already added
         if frame is None:
             return
         
+        _possibleChannelKeys = self._images.metadata.possibleChannelKeys
+        logger.info(f'LazyImageGeoPandas addSchema _possibleChannelKeys:{_possibleChannelKeys}')
+
+
         logger.info(f"new channel keys: {newChannelKeys}")
+        checkChannels = _possibleChannelKeys
+
+        if newChannelKeys is not None:
+            checkChannels = newChannelKeys
+
         # _possibleChannelKeys = self._images.metadata.possibleChannelKeys
 
         # Inject computed columns that use the image to calculate roi stats
@@ -332,7 +345,6 @@ class LazyImagesGeoPandas(LazyGeoPandas):
                 continue
 
             attributes: ImageColumnAttributes = method._imageComputed
-
             logger.info(f'checking attributes {attributes}')
             if "_aggregate" not in attributes:
                 continue
@@ -342,7 +354,7 @@ class LazyImagesGeoPandas(LazyGeoPandas):
             wrappedFunc = self._genWrappedFunc(method, attributes, frame)
                         
             # abj
-            for channel in newChannelKeys:
+            for channel in checkChannels:
                 for agg in attributes["_aggregate"]:
                     # logger.warning(f'  !!! ADDING COLUMN ??? channel:{channel} agg:{agg}')
                     logger.info(f"added {name}_ch{channel}_{agg}")

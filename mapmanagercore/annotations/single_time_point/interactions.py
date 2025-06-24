@@ -253,6 +253,10 @@ class AnnotationsInteractions(AnnotationsSegments):
         # abb TODO we want our spine id(s) to be Python int, not numpy int64 ???
         spineId = int(spineId)
 
+        # FIXME
+        roiExtend = self.timepointMetadata().convertUnits(self.analysisParams["roiExtend"], (x,y))
+        roiRadius = self.timepointMetadata().convertUnits(self.analysisParams["roiRadius"], (x,y))
+        
         _spine: Spine = Spine(
             segmentID=segmentId,
             point=Point(point.x, point.y),
@@ -261,8 +265,10 @@ class AnnotationsInteractions(AnnotationsSegments):
             anchorZ=int(anchor.z),
             xBackgroundOffset=0.0,
             yBackgroundOffset=0.0,
-            roiExtend=self.analysisParams["roiExtend"],
-            roiRadius=self.analysisParams["roiRadius"]
+            roiExtend=roiExtend,
+            roiRadius=roiRadius
+            # roiExtend=self.analysisParams["roiExtend"],
+            # roiRadius=self.analysisParams["roiRadius"]
         ).defaults()
         self.updateSpine(spineId, _spine)
 
@@ -508,10 +514,12 @@ class AnnotationsInteractions(AnnotationsSegments):
         segmentId = self.newUnassignedSegmentId()
         segmentId = int(segmentId)
 
+        radius = self.timepointMetadata().convertUnits(self.analysisParams["segmentRadius"])
         _segment: Segment = Segment(
             segment=LineString([]),
             roughTracing=LineString([]),
-            radius=self.analysisParams["segmentRadius"]
+            radius=radius
+            # radius=self.analysisParams["segmentRadius"]
         ).defaults()
 
         self.updateSegment(segmentId, _segment)
@@ -591,6 +599,9 @@ class AnnotationsInteractions(AnnotationsSegments):
 
         maxTracingDistance = self.analysisParams.getValue(
             "segmentTracingMaxDistance")
+
+        # abj
+        maxTracingDistance = self.timepointMetadata().convertUnits(maxTracingDistance)
 
         # logger.warning(f'abb')
         # logger.info(F'   roughTracing;{roughTracing}')
