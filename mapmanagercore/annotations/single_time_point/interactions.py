@@ -98,8 +98,13 @@ class AnnotationsInteractions(AnnotationsSegments):
             # otherwise return anchor
             return anchor
 
+        # abb 20250519, convert v1 -> v2
+        # v1
         brightestPathDistance = self.analysisParams[
             'brightestPathDistance']
+        # v2
+        # self.timepointMetadata.getValue_pixel('brightestPathDistance')
+        
         _defaultChannel = self.analysisParams['brightestPathChannel']
         _zSpread = self.analysisParams['brightestPathZSpread']
 

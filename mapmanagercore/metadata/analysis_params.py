@@ -38,75 +38,80 @@ class AnalysisParams(_metadataBase):
 
     # """Manually increment this when we add to this class."""
     version: float = dataclasses.field(
-        default=0.6, # pixels
-        # shownValue = # the actual value that is shown in the GUI
+        # allowPixels=False,
+        default=0.6, 
         metadata={
             'description': 'Save metadata version.',
             'doConversion' : False,
             })
 
     # spines
-    # TODO: change to brightestPathRange
-    brightestPathDistance: int = dataclasses.field(
-        default=10, 
+    # v1
+    # brightestPathDistance: int = dataclasses.field(
+    #     default=10,  # is currently pixels -> will be in um
+    #     metadata={
+    #         'description': 'Points along the tracing to find spine connection (anchor).'
+    #         })
+    # v2
+    brightestPathDistance: float = dataclasses.field(
+        # allowPixels=True,
+        default=10,  # is currently pixels -> will be in um
         metadata={
-            'description': 'Points along the tracing to find spine connection (anchor).',
-            'doConversion' : False
+            'description': 'Points along the tracing to find spine connection (anchor).'
             })
 
     brightestPathChannel: int = dataclasses.field(
+        # allowPixels=False,
         default=1, 
         metadata={
             'description': 'Image color channel to find brightest connection of spine.',
             'doConversion' : False
             })
     
-    brightestPathZSpread: int = dataclasses.field(default=3, 
-                                                  metadata={'description': 
-                                                 'Number of image slices for max project to find brightest connection of spine.',
-                                                 'doConversion' : False
-                                                    })
+    brightestPathZSpread: int = dataclasses.field(
+        # allowPixels=False,
+        default=3,
+        metadata={'description': 'Number of image slices for max project to find brightest connection of spine.'
+        })
     
-    # FIXME: figure out how to get shownValue to be in actual units
-    # Option 1: have GUI do the math? seems counterintuitive
-    # default has to be in actual units, to account for everytime it is reset
-
-    roiExtend: int = dataclasses.field(default=4, 
-                                       metadata={'description': 
-                                        'Number of pixels to extend spine head for spine ROI.',
-                                        'doConversion' : True,
-                                        # 'shownValue': 4 # abj: the actual value that is shown in the GUI
-                                        }) 
-    
-    # How to convert this properly
-    roiRadius: int = dataclasses.field(default=4, 
-                                       metadata={'description': 
-                                        'Width of spine ROI.',
-                                        'doConversion' : True
-                                        }) 
+    roiExtend: int = dataclasses.field(
+        # allowPixels=True,
+        default=4,metadata={'description': 
+                                                             'Number of pixels to extend spine head for spine ROI.'
+                                                             })
+    roiRadius: int = dataclasses.field(
+        # allowPixels=True,
+        default=4,
+        metadata={'description': 
+                                                             'Width of spine ROI.'
+                                                             })
     
     # segments
-    segmentRadius: int = dataclasses.field(default=4, 
-                                           metadata={'description': 
-                                            'Radius of segment tracing.',
-                                            'doConversion' : True
-                                            }) 
-    
-    segmentTracingMaxDistance: int = dataclasses.field(default=90, metadata={'description': 
-                                                             'Max distance to trace a brightest path.',
-                                                            'doConversion' : True
-                                                             }) 
-    
-    backgroundRoiGridPoints: int = dataclasses.field(default=5, metadata={'description': 
-                                                             'Number of points in grid (nxn) to calculate background ROI.',
-                                                            'doConversion' : False
+    segmentRadius: int = dataclasses.field(
+        # allowPixels=True,
+        default=4, metadata={'description': 
+                                                             'Radius of segment tracing.'
                                                              })
-    backgroundRoiGridOverlap: float = dataclasses.field(default=0.1, metadata={'description': 
-                                                             'Shape overlap percentage of background grid points.',
-                                                               'doConversion' : False
-                                                             }) 
+    segmentTracingMaxDistance: int = dataclasses.field(
+        # allowPixels=True,
+        default=90, metadata={'description': 
+                                                             'Max distance to trace a brightest path.'
+                                                             })
+    
+    backgroundRoiGridPoints: int = dataclasses.field(
+        # allowPixels=True,
+        default=5, metadata={'description': 
+                                                             'Number of points in grid (nxn) to calculate background ROI.'
+                                                             })
+    backgroundRoiGridOverlap: float = dataclasses.field(
+        # allowPixels=True,
+        default=0.1, metadata={'description': 
+                                                             'Overlap of background grid points.'
+                                                             })
     brightestPathTracing: bool = \
-        dataclasses.field(default=False,
+        dataclasses.field(
+            # allowPixels=False,
+            default=False,
                           metadata=_getMetadata(
                               description='Turn brightest path tracing on and off',
                               title='Brightest Path Tracing',

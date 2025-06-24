@@ -51,6 +51,7 @@ else:
 """
 import os
 from typing import Tuple, List, Optional
+from abc import ABC, abstractmethod
 
 import numpy as np
 
@@ -79,10 +80,8 @@ def acceptedExtensions() -> List[str]:
         for item in report.items():
             _acceptedExtensions.append(item[0])
     else:
-        _acceptedExtensions = ['.tif']
+        _acceptedExtensions = ['.tif', '.zip']  # adding .zip to load mmap zip files
     return _acceptedExtensions
-
-from abc import ABC, abstractmethod
 
 class ImageImporter_Base(ABC):
     """Abstract base class for ImageImporter.
