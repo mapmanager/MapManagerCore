@@ -223,6 +223,24 @@ class TimepointMetadata(_metadataList):
     analysisParameters: AnalysisParams = dataclasses.field(default_factory=lambda: AnalysisParams())
     """The analysis parameters for this single timepoint (connected maps use a global version of this)."""
 
+    # abb 20250519
+    def getValue_pixel(self, key:str) -> int:
+        """Get an analysis parameter value converted from um -> pixels.
+        """
+        # we can only convert values to pixel if units is 'um'
+        # pull allowPixels bool from our metadata
+        # unitStr = 'um'  # TODO write the code to get actual unit value
+        allowPixels = True  # False:
+        if not allowPixels:
+            logger.error(f'Analysis Parameter key "{key}" cannot be converted to pixels (units are "{unitStr}")')
+            return
+        
+        # assuming xVoxel and yVoxel are the same
+        xVoxel = self.voxelMetadata.xVoxel  # um/pixel
+        valueInUm = self.analysisParameters.getValue(key)
+        valueInPixels = valueInUm / xVoxel
+        return valueInPixels
+    
     def __post_init__(self):
         if isinstance(self._metadataList, dict):
             _metadataList = copy(self._metadataList)

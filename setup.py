@@ -47,7 +47,7 @@ else:
         #'bioio @ git+ssh://git@github.com/mapmanager/bioio.git',
         'bioio',
         'bioio-tifffile',
-        'bioio-czi',
+        # 'bioio-czi',
         'bioio-nd2',
         'bioio-ome-tiff',
     ]
