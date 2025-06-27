@@ -226,15 +226,27 @@ class TimepointMetadata(_metadataList):
     analysisParameters: AnalysisParams = dataclasses.field(default_factory=lambda: AnalysisParams())
     """The analysis parameters for this single timepoint (connected maps use a global version of this)."""
     
-    # only call for parameters that need to be converted
-    def convertUnits(self, voxelValue, point1: Tuple[int, int] = None):
+    def convertUnits(self, voxelValue, paramKey):
         """ convert from real units to pixel units
 
-
-        # value is in voxels
-        # voxelMetaData holds voxel size is edited by user
-        # pixel size is defaulted as 1
+        Args:
+            voxelValue: voxel value of parameter to be convertedd to pixel value
+            paramKey: string name of the analysis parameter
         """
+
+        logger.info(f"voxel value is {voxelValue}")
+        fieldInfo = AnalysisParams.__dataclass_fields__[paramKey]  # type: dataclasses.Field
+        doConversion = fieldInfo.metadata.get("doConversion")
+
+        unitStr = VoxelMetadata.__dataclass_fields__["unit"]
+
+        # logger.info(f"field_info {fieldInfo}")
+        # logger.info(f"do_conversion {doConversion}")
+
+        if not doConversion:
+            logger.error(f'Analysis Parameter key "{paramKey}" cannot be converted to pixels (units are "{unitStr}")')
+            return
+        
         if self.voxelMetadata is not None:
             
             # problem is voxelValue is a single value (physical magnitude) and not in x or y 
@@ -274,23 +286,23 @@ class TimepointMetadata(_metadataList):
         else:
             logger.error(f"No physical voxel units established")
 
-    # abb 20250519
-    def getValue_pixel(self, key:str) -> int:
-        """Get an analysis parameter value converted from um -> pixels.
-        """
-        # we can only convert values to pixel if units is 'um'
-        # pull allowPixels bool from our metadata
-        # unitStr = 'um'  # TODO write the code to get actual unit value
-        allowPixels = True  # False:
-        if not allowPixels:
-            logger.error(f'Analysis Parameter key "{key}" cannot be converted to pixels (units are "{unitStr}")')
-            return
+    # DEFUNCT abb 20250519
+    # def getValue_pixel(self, key:str) -> int:
+    #     """Get an analysis parameter value converted from um -> pixels.
+    #     """
+    #     # we can only convert values to pixel if units is 'um'
+    #     # pull allowPixels bool from our metadata
+    #     # unitStr = 'um'  # TODO write the code to get actual unit value
+    #     allowPixels = True  # False:
+    #     if not allowPixels:
+    #         logger.error(f'Analysis Parameter key "{key}" cannot be converted to pixels (units are "{unitStr}")')
+    #         return
         
-        # assuming xVoxel and yVoxel are the same
-        xVoxel = self.voxelMetadata.xVoxel  # um/pixel
-        valueInUm = self.analysisParameters.getValue(key)
-        valueInPixels = valueInUm / xVoxel
-        return valueInPixels
+    #     # assuming xVoxel and yVoxel are the same
+    #     xVoxel = self.voxelMetadata.xVoxel  # um/pixel
+    #     valueInUm = self.analysisParameters.getValue(key)
+    #     valueInPixels = valueInUm / xVoxel
+    #     return valueInPixels
     
     def __post_init__(self):
         if isinstance(self._metadataList, dict):

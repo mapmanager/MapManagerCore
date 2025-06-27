@@ -100,11 +100,17 @@ class AnnotationsInteractions(AnnotationsSegments):
 
         # abb 20250519, convert v1 -> v2
         # v1
-        brightestPathDistance = self.analysisParams[
-            'brightestPathDistance']
+        # brightestPathDistance = self.analysisParams[
+        #     'brightestPathDistance']
+
         # v2
         # self.timepointMetadata.getValue_pixel('brightestPathDistance')
+        brightestPathDistance = self.timepointMetadata().convertUnits(self.analysisParams["brightestPathDistance"], 
+                                                                      "brightestPathDistance")
         
+        # logger.info(f"brightestPathDistance {brightestPathDistance} and type {type(brightestPathDistance)}")
+        
+        brightestPathDistance = int(brightestPathDistance) # ensure it is a int, FIXME: default is loaded in as float?
         _defaultChannel = self.analysisParams['brightestPathChannel']
         _zSpread = self.analysisParams['brightestPathZSpread']
 
@@ -174,7 +180,10 @@ class AnnotationsInteractions(AnnotationsSegments):
 
         # create a grid of points to search for the best offset
         points = self.analysisParams['backgroundRoiGridPoints']
+        # overlap = self.analysisParams['backgroundRoiGridOverlap']
+
         overlap = self.analysisParams['backgroundRoiGridOverlap']
+        overlap = self.timepointMetadata().convertUnits(overlap, "backgroundRoiGridOverlap")
 
         try:
             grid = shapeGrid(roi, points=points, overlap=overlap) # abj
@@ -258,9 +267,8 @@ class AnnotationsInteractions(AnnotationsSegments):
         # abb TODO we want our spine id(s) to be Python int, not numpy int64 ???
         spineId = int(spineId)
 
-        # FIXME
-        roiExtend = self.timepointMetadata().convertUnits(self.analysisParams["roiExtend"], (x,y))
-        roiRadius = self.timepointMetadata().convertUnits(self.analysisParams["roiRadius"], (x,y))
+        roiExtend = self.timepointMetadata().convertUnits(self.analysisParams["roiExtend"], "roiExtend")
+        roiRadius = self.timepointMetadata().convertUnits(self.analysisParams["roiRadius"], "roiRadius")
         
         _spine: Spine = Spine(
             segmentID=segmentId,
@@ -519,7 +527,7 @@ class AnnotationsInteractions(AnnotationsSegments):
         segmentId = self.newUnassignedSegmentId()
         segmentId = int(segmentId)
 
-        radius = self.timepointMetadata().convertUnits(self.analysisParams["segmentRadius"])
+        radius = self.timepointMetadata().convertUnits(self.analysisParams["segmentRadius"], "segmentRadius")
         _segment: Segment = Segment(
             segment=LineString([]),
             roughTracing=LineString([]),
@@ -606,7 +614,7 @@ class AnnotationsInteractions(AnnotationsSegments):
             "segmentTracingMaxDistance")
 
         # abj
-        maxTracingDistance = self.timepointMetadata().convertUnits(maxTracingDistance)
+        maxTracingDistance = self.timepointMetadata().convertUnits(maxTracingDistance, "segmentTracingMaxDistance")
 
         # logger.warning(f'abb')
         # logger.info(F'   roughTracing;{roughTracing}')

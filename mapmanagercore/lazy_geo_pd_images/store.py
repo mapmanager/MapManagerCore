@@ -190,7 +190,7 @@ class LazyImagesGeoPandas(LazyGeoPandas):
                 # logger.info(F"old pixels")
                 try:
                     pixels =  self._recordShapePixels["pixels"]
-                    logger.info(f"using old pixels")
+                    # logger.info(f"using old pixels")
                 except:
                     logger.info(f"no old pixels, must calculate new one")
                     pixels = weakSelf().getShapePixels(
@@ -357,7 +357,7 @@ class LazyImagesGeoPandas(LazyGeoPandas):
             for channel in checkChannels:
                 for agg in attributes["_aggregate"]:
                     # logger.warning(f'  !!! ADDING COLUMN ??? channel:{channel} agg:{agg}')
-                    logger.info(f"added {name}_ch{channel}_{agg}")
+                    # logger.info(f"added {name}_ch{channel}_{agg}")
                     frame.addComputed(
                         f"{name}_ch{channel}_{agg}",
                         {
