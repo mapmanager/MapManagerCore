@@ -179,46 +179,38 @@ class LazyImagesGeoPandas(LazyGeoPandas):
         
         # logger.warning('!!==!! abb in store.py LazyImagesGeoPandas')
 
-        # was this
-        _possibleChannelKeys = self._images.metadata.possibleChannelKeys
-        # _tmpTimepoint = 1
-        # _possibleChannelKeys = self._images.metadata.getTimepoint(_tmpTimepoint).channelKeys
-        logger.info(f'LazyImageGeoPandas addSchema _possibleChannelKeys:{_possibleChannelKeys}')
-        # logger.info(f'  abb _firstTimepointChannelKeys:{_firstTimepointChannelKeys}')
+        # abai 20250806: Use metadata3 API for current channel keys
+        currentChannelKeys = self._images.metadata.getTimepoint(1).channelKeys  # abai 20250806
 
         # Inject computed columns that use the image to calculate roi stats
         for method in frame._schema.__dict__.values():
-            # logger.warning(f'method:{method}')
             if not hasattr(method, "_imageComputed"):
                 continue
 
             attributes: ImageColumnAttributes = method._imageComputed
             if "_aggregate" not in attributes:
                 continue
-                        
+
             name = attributes["key"]
             wrappedFunc = self._genWrappedFunc(method, attributes, frame)
-                        
-            # abb
-            # for channel in range(self._maxChannels()):
-            for channel in _possibleChannelKeys:
+
+            for channel in currentChannelKeys:  # abai 20250806
                 for agg in attributes["_aggregate"]:
-                    # logger.warning(f'  !!! ADDING COLUMN ??? channel:{channel} agg:{agg}')
+                    col_name = f"{name}_ch{channel}_{agg}"  # abai 20250806
+                    # abai 20250806: Check for existing column before adding
+                    if col_name in frame.columns:  # abai 20250806
+                        continue  # abai 20250806: Skip if already present
                     frame.addComputed(
-                        # abb removed + 1
-                        # f"{name}_ch{channel + 1}_{agg}",
-                        f"{name}_ch{channel}_{agg}",
+                        col_name,
                         {
                             **attributes,
-                            # abb removed + 1
-                            # "title": f"{name} Channel {channel + 1} - {agg.capitalize()}",
                             "title": f"{name} Channel {channel} - {agg.capitalize()}",
                         },
                         wrappedFunc,
                         skipUpdate=True
                     )
 
-            frame.updateComputedDependencies()
+        frame.updateComputedDependencies()
 
         return super().addSchema(frame)
 

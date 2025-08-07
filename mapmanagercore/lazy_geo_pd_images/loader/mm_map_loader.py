@@ -211,7 +211,18 @@ class mmMapLoader():
             _imageChannel = ImageChannel(self, timepoint, _newChannelKey, imgData=imgData)
             self._imageChannelDict[timepoint][_newChannelKey] = _imageChannel
 
+        # Signal that schemas need to be refreshed due to new channels
+        self._notifyChannelAdded(timepoint)
+
         return True
+    
+    def _notifyChannelAdded(self, timepoint: int):
+        """Notify any registered listeners that a channel was added.
+        This allows schemas to be refreshed with new channel information.
+        """
+        # This method can be overridden by subclasses or used by external code
+        # to trigger schema refreshes when channels are added
+        pass
     
     def timepointShape(self, timepoint:int) -> Optional[Tuple[int, int, int]]:
         """Get the shape of image data at a timepoint.

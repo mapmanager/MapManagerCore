@@ -85,11 +85,35 @@ class AnnotationsBase(LazyImagesGeoPandas):
         self.loader = loader
         self.path = path
 
+        # Register this object as a listener for channel additions
+        if hasattr(loader, '_notifyChannelAdded'):
+            # Override the loader's notification method to include schema refresh
+            original_notify = loader._notifyChannelAdded
+            def notify_with_refresh(timepoint):
+                original_notify(timepoint)
+                self._refreshSchemasForNewChannels(timepoint)
+            loader._notifyChannelAdded = notify_with_refresh
+
         # To invalidate columns that were miss-computed in previous version
         # we can conditionally check the version number
         # if version === 0:
         #  then we can invalidate the invalid columns by name
         # self._segments.invalidateColumns([... columns ...])
+    
+    def _refreshSchemasForNewChannels(self, timepoint: int):
+        """Refresh schemas when new channels are added.
+        This ensures that computed columns that depend on image channels are updated.
+        """
+        logger.info(f'Refreshing schemas for new channels at timepoint {timepoint}')
+        
+        # Invalidate computed columns that depend on image data
+        # This will force them to be recomputed with the new channel information
+        self._segments.invalidateColumns()
+        self._points.invalidateColumns()
+        
+        # Force recomputation of image-dependent columns
+        # The schemas will automatically pick up the new channels when recomputed
+        logger.info('Schemas refreshed for new channels')
     
     def getLastSaveTime(self):
         """

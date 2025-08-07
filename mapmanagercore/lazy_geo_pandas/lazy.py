@@ -325,6 +325,7 @@ class LazyGeoFrame(Generic[T]):
         self._context = context
         self._baseFilter = None
         # abb moved to here
+        logger.info('self._store().addSchema(self)')
         self._store().addSchema(self)
 
     def invalidateColumns(self, columns: Iterator[str] = None, ids: pd.Index = None):
