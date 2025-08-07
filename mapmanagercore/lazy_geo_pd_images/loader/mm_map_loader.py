@@ -284,6 +284,7 @@ class mmMapLoader():
     def numTimepoints(self) -> int:
         """Get the number of timepoints (imaging sessions).
         """
+        # logger.info(f"metadata is {self.metadata}")
         return self.metadata.numTimepoints
     
     def numChannels(self, timepoint:int) -> Optional[int]:
@@ -400,7 +401,7 @@ class mmMapLoader():
 
         with zarr.ZipStore(self.path, mode="r") \
             if _zipStore else zarr.DirectoryStore(self.path) as store:
-
+            # logger.info(f"_zipStore {_zipStore}")
             # logger.info(f'using {store} to load path:{self.path}')
             
             # zarr.errors.PathNotFoundError: nothing found at path ''
@@ -412,8 +413,7 @@ class mmMapLoader():
             # load metadata (use this to create placeholder for t/c)
             try:
                 # fails on load zip ???
-                # logger.info(f"group.attrs['metadata']:{group.attrs['metadata']}")
-                _metadataDict: dict = self.group.attrs['metadata']
+                _metadataDict: dict = self.group.attrs['metadata'] # Fixes: AttributeError: 'DirectoryStore' object has no attribute 'attrs'
                 # _metadataDict: dict = store.attrs['metadata']
             except (KeyError, ValueError) as e:
                 logger.error(f'KeyError: "{e}" not found in zarr file')
@@ -553,11 +553,13 @@ class mmMapLoader():
                     zRange:List[int],
                     threeD: bool = None) -> np.ndarray:
         # channelIdx += 1
+        # logger.info(f"entering here for slices")
         _imageChannel = self.getImageChannel(t, channelIdx)
         
         _firstSlice = zRange[0]
-        return _imageChannel.getSlice(_firstSlice)  # lazy
-
+        # return _imageChannel.getSlice(_firstSlice)  # lazy
+        return np.max(_imageChannel.getVolume(zRange[0], zRange[1]), axis=0)
+        # return np.max(_imageChannel[zRange[0]:zRange[1]], axis=0)
 
     def timePoints(self) -> Iterator[int]:
         """

@@ -355,8 +355,8 @@ class TimepointMetadata(_metadataList):
                 # logger.error(_err)
                 raise MetadataError(_err)
         
-        # TODO: abj: when user imports channel they can set whether or not they want it to be "activated"
-        # which means to auto compute. Reminder to Pass in that boolean
+        # abj: when user imports channel they can set whether or not they want it to be "activated"
+        # which means to auto compute aggregate columns. Reminder to Pass in that boolean
         # metadataContrast = ChannelMetadata(name=name)
         metadataContrast = ChannelMetadata(name=name, channelActivated=True)
         metadataContrast._initFromImgData(imgData)
