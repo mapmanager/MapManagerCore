@@ -216,7 +216,7 @@ class mmMapLoader():
 
         return True
     
-    def _notifyChannelAdded(self, timepoint: int):
+    def _notifyChannelAdded(self, timepoint: int):  # abc 20250806
         """Notify any registered listeners that a channel was added.
         This allows schemas to be refreshed with new channel information.
         """
