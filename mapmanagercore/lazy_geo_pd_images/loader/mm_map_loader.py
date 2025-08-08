@@ -96,14 +96,49 @@ class mmMapLoader():
                 # load from mmap zarr
                 self._load()
 
-    def deleteChannel(self, timepoint:int, channel:int):
+    def deleteChannel(self, timepoint:int, channel:int) -> bool:  # abc 20250806
         """Delete an image channel.
+        
+        Args:
+            timepoint: The timepoint index
+            channel: The channel index to delete
+            
+        Returns:
+            True if channel was successfully deleted, False otherwise
         """
-        logger.warning('TODO')
-
-        # 1 metadata
-
-        # 2 images
+        logger.info(f'Deleting channel {channel} from timepoint {timepoint}')
+        
+        # Check if timepoint exists
+        if not self.metadata.timepointExists(timepoint):
+            logger.error(f'Timepoint {timepoint} does not exist')
+            return False
+            
+        # Check if channel exists
+        if not self.metadata.getTimepoint(timepoint).channelExists(channel):
+            logger.error(f'Channel {channel} does not exist in timepoint {timepoint}')
+            return False
+            
+        # Prevent deletion of channel 0 (primary channel)
+        if channel == 0:
+            logger.error('Cannot delete channel 0 (primary channel)')
+            return False
+        
+        # 1. Delete from metadata
+        deleted_metadata = self.metadata.getTimepoint(timepoint).deleteChannel(channel)
+        if deleted_metadata is None:
+            logger.error(f'Failed to delete channel {channel} from metadata')
+            return False
+            
+        # 2. Delete from image data
+        if timepoint in self._imageChannelDict and channel in self._imageChannelDict[timepoint]:
+            del self._imageChannelDict[timepoint][channel]
+            logger.info(f'Deleted image data for channel {channel}')
+        
+        # 3. Notify listeners that a channel was deleted
+        self._notifyChannelDeleted(timepoint, channel)
+        
+        logger.info(f'Successfully deleted channel {channel} from timepoint {timepoint}')
+        return True
 
     def moveChannel(srcTimePoint, srcChannel, 
                     destTimePoint, destChannel):
@@ -222,6 +257,14 @@ class mmMapLoader():
         """
         # This method can be overridden by subclasses or used by external code
         # to trigger schema refreshes when channels are added
+        pass
+    
+    def _notifyChannelDeleted(self, timepoint: int, channel: int):  # abc 20250806
+        """Notify any registered listeners that a channel was deleted.
+        This allows schemas to be cleaned up when channels are removed.
+        """
+        # This method can be overridden by subclasses or used by external code
+        # to trigger schema cleanup when channels are deleted
         pass
     
     def timepointShape(self, timepoint:int) -> Optional[Tuple[int, int, int]]:

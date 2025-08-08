@@ -87,6 +87,7 @@ class AnnotationsBase(LazyImagesGeoPandas):
 
         # Override the loader's notification method to include schema refresh
         loader._notifyChannelAdded = self._refreshSchemasForNewChannels
+        loader._notifyChannelDeleted = self._cleanupSchemasForDeletedChannels  # abc 20250806
 
         # To invalidate columns that were miss-computed in previous version
         # we can conditionally check the version number
@@ -111,6 +112,77 @@ class AnnotationsBase(LazyImagesGeoPandas):
         
         logger.info('Schemas refreshed for new channels')
     
+    def _cleanupSchemasForDeletedChannels(self, timepoint: int, deleted_channel: int):  # abc 20250806
+        """Clean up schemas when channels are deleted.
+        This removes computed columns that depend on the deleted channel.
+        """
+        logger.info(f'Cleaning up schemas for deleted channel {deleted_channel} at timepoint {timepoint}')
+        
+        # Get all computed columns that depend on the deleted channel
+        columns_to_remove = []
+        
+        # Check segments frame
+        for col in self._segments.columns:
+            if f'_ch{deleted_channel}_' in col:
+                columns_to_remove.append(col)
+        
+        # Check points frame  
+        for col in self._points.columns:
+            if f'_ch{deleted_channel}_' in col:
+                columns_to_remove.append(col)
+        
+        logger.info(f'Found {len(columns_to_remove)} columns to remove: {columns_to_remove}')
+        
+        # Remove the columns from both frames by removing them from the schema
+        if columns_to_remove:
+            # Remove from segments schema
+            segments_cols_to_remove = [col for col in columns_to_remove if col in self._segments._schema._attributes]
+            if segments_cols_to_remove:
+                for col in segments_cols_to_remove:
+                    del self._segments._schema._attributes[col]
+                logger.info(f'Removed {len(segments_cols_to_remove)} columns from segments schema')
+            
+            # Remove from points schema
+            points_cols_to_remove = [col for col in columns_to_remove if col in self._points._schema._attributes]
+            if points_cols_to_remove:
+                for col in points_cols_to_remove:
+                    del self._points._schema._attributes[col]
+                logger.info(f'Removed {len(points_cols_to_remove)} columns from points schema')
+            
+            # Update the columns list in both frames
+            self._segments._updateColumns()
+            self._points._updateColumns()
+        
+        logger.info('Schema cleanup completed for deleted channel')
+    
+    def deleteChannel(self, timepoint: int, channel: int) -> bool:  # abc 20250806
+        """Delete a color channel from a specific timepoint.
+        
+        This is a high-level API that deletes both the image data and cleans up
+        any computed columns that depend on the deleted channel.
+        
+        Args:
+            timepoint: The timepoint index
+            channel: The channel index to delete
+            
+        Returns:
+            True if channel was successfully deleted, False otherwise
+            
+        Note:
+            Channel 0 (the primary channel) cannot be deleted.
+        """
+        logger.info(f'MapAnnotations: Deleting channel {channel} from timepoint {timepoint}')
+        
+        # Delegate to the loader's deleteChannel method
+        success = self.loader.deleteChannel(timepoint, channel)
+        
+        if success:
+            logger.info(f'Successfully deleted channel {channel} from timepoint {timepoint}')
+        else:
+            logger.error(f'Failed to delete channel {channel} from timepoint {timepoint}')
+            
+        return success
+
     def getLastSaveTime(self):
         """
         """
