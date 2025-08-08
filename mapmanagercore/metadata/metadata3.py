@@ -232,7 +232,7 @@ class TimepointMetadata(_metadataList):
         # unitStr = 'um'  # TODO write the code to get actual unit value
         allowPixels = True  # False:
         if not allowPixels:
-            logger.error(f'Analysis Parameter key "{key}" cannot be converted to pixels (units are "{unitStr}")')
+            # logger.error(f'Analysis Parameter key "{key}" cannot be converted to pixels (units are "{unitStr}")')
             return
         
         # assuming xVoxel and yVoxel are the same
@@ -366,7 +366,7 @@ class TimepointMetadata(_metadataList):
             'x': self.shape[2],
         }
         
-    def setChannelProperty(self, channelIdx, key, value) -> MetadataError | object:
+    def setChannelProperty(self, channelIdx, key, value) -> MetadataError | bool:
         """Set channel property.
         """
         if not self.channelExists(channelIdx):
