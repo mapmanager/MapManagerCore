@@ -80,7 +80,7 @@ def acceptedExtensions() -> List[str]:
         for item in report.items():
             _acceptedExtensions.append(item[0])
     else:
-        _acceptedExtensions = ['.tif', '.zip']  # adding .zip to load mmap zip files
+        _acceptedExtensions = ['.tif', '.zip', '.mmap']  # adding .zip to load mmap zip files
     return _acceptedExtensions
 
 class ImageImporter_Base(ABC):

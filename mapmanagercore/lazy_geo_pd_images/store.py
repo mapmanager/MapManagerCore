@@ -7,6 +7,7 @@ from mapmanagercore.lazy_geo_pd_images.image_slices import ImageSlice
 from mapmanagercore.lazy_geo_pandas.attributes import ColumnAttributes
 from mapmanagercore.lazy_geo_pandas.lazy import LazyGeoFrame
 from mapmanagercore.lazy_geo_pd_images.loader import ImageLoader
+from mapmanagercore.lazy_geo_pd_images.loader.mm_map_loader import mmMapLoader
 from ..lazy_geo_pandas import LazyGeoPandas
 import geopandas as gp
 import pandas as pd
@@ -26,10 +27,9 @@ class ImageColumnAttributes(ColumnAttributes):
     """The time column to use when computing the pixels."""
     t: str
 
-
 def parseColumns(columns: List[str], prefix: str) -> Tuple[set[int], set[str]]:
     """Parse the roi computed columns to get the channels and aggregates."""
-    # logger.error(f'columns:{columns} prefix:{prefix}')
+    logger.error(f'columns:{columns} prefix:{prefix}')
     
     channels = set()
     aggregates = set()
@@ -51,6 +51,27 @@ def parseColumns(columns: List[str], prefix: str) -> Tuple[set[int], set[str]]:
 
     return channels, aggregates
 
+# abj
+def parseColumns2(columns: List[str], prefix: str) -> Tuple[set[int], set[str]]:
+    """Parse the roi computed columns to get the channels and aggregates.
+    Optimized to only get requested channels columns
+    """
+    # logger.error(f'columns:{columns} prefix:{prefix}')
+    
+    channels = set()
+    aggregates = set()
+    for column in columns:
+        if not column.startswith(prefix):
+            continue
+
+        parts = column.split("_")
+        if len(parts) < 3:
+            continue
+
+        # channels.add(int(parts[1][2:]))
+        aggregates.add(parts[2])
+
+    return aggregates
 
 def applyAgg(x, agg):
     """Apply an aggregate function to the data."""
@@ -64,13 +85,16 @@ def applyAgg(x, agg):
 
 class LazyImagesGeoPandas(LazyGeoPandas):
     """A Lazy geo pandas store with image data"""
-    _images: ImageLoader
+    # _images: ImageLoader
+    _image = mmMapLoader
 
     # abb TODO: switch to mmMapLoader
-    def __init__(self, images: ImageLoader, overrideDefault=True):
+    def __init__(self, images: mmMapLoader, overrideDefault=True):
         super().__init__()
         # logger.info(f'abb creating LazyImagesGeoPandas() with images:{type(images)}')
         self._images = images
+
+        self._recordShapePixels = {} # dict
 
         if overrideDefault:
             LazyGeoPandas.setDefaultStore(self)
@@ -85,6 +109,8 @@ class LazyImagesGeoPandas(LazyGeoPandas):
 
         zSpread = attributes["zSpread"] if "zSpread" in attributes else 0
         tColumn = attributes["t"] if "t" in attributes else "t"
+
+        # logger.info(f"check zSpread {zSpread} tColumn {tColumn}")
         timeIndexLevel = frame._schema._index.index(
             tColumn) if tColumn in frame._schema._index else None
 
@@ -95,7 +121,14 @@ class LazyImagesGeoPandas(LazyGeoPandas):
             # logger.error(f'    frame.pendingColumns():{frame.pendingColumns()}')
             # logger.error(f'    name:{name}')
 
-            (channels, aggregates) = parseColumns(
+            # (channels, aggregates) = parseColumns(
+            #             frame.pendingColumns(), name)        
+            # logger.error(f'    before channels are:{channels}')
+            # logger.error(f'    timeIndexLevel:{timeIndexLevel}')
+
+            channels = weakSelf().getActivatedChannels(timeIndexLevel)
+            # logger.info(f"activated channels are {channels}")
+            aggregates = parseColumns2(
                 frame.pendingColumns(), name)
             if len(channels) == 0 or len(aggregates) == 0:
                 return gp.GeoDataFrame()
@@ -104,8 +137,8 @@ class LazyImagesGeoPandas(LazyGeoPandas):
             shapeKey = shapes.columns.symmetric_difference(["t", "z"])[0]
             shapes.rename(columns={shapeKey: "shape"}, inplace=True)
 
-            shapes["t"] = frame["t"] if timeIndexLevel is None else frame._df.index.get_level_values(
-                timeIndexLevel)
+            # shapes["t"] = frame["t"] if timeIndexLevel is None else frame._df.index.get_level_values(
+            #     timeIndexLevel)
             
             # logger.error('too complicated')
             # logger.warning(f'  original channels is: {channels}')
@@ -127,10 +160,50 @@ class LazyImagesGeoPandas(LazyGeoPandas):
 
             # logger.error(f'post channels:{channels}')
             # logger.error(f'next(channels):{next(channels)}')
+            
+            # Do a simple save?
+            # Check if shapes channels and zspread is the same
+            if not len(self._recordShapePixels) == 0:
+                oldChannels = self._recordShapePixels["channels"]
+                oldShapes = self._recordShapePixels["shapes"]
+                oldZSpread = self._recordShapePixels["zSpread"]
+            else:
+                oldChannels = oldShapes = oldZSpread = None
 
             # Compute the aggregates over the pixels
-            pixels = weakSelf().getShapePixels(
-                shapes, channel=channels, zSpread=zSpread)
+
+            # logger.info(f"oldChannels {oldChannels}, channels {channels}")
+            # logger.info(f"oldZSpread {oldZSpread}, zSpread {zSpread}")
+
+            self._recordShapePixels["channels"] = channels
+            self._recordShapePixels["shapes"] = shapes
+            self._recordShapePixels["zSpread"] = zSpread
+            # issue is that shapes will have time as a second index
+
+            if oldShapes is not None:
+                # get actual shape values
+                oS = oldShapes["shape"].values
+                s = shapes["shape"].values
+                # logger.info(f"oldShapes {oS}, shapes {s}")
+
+            if oldChannels == channels and np.array_equal(oS, s) and oldZSpread == zSpread:
+                # logger.info(F"old pixels")
+                try:
+                    pixels =  self._recordShapePixels["pixels"]
+                    # logger.info(f"using old pixels")
+                except:
+                    logger.info(f"no old pixels, must calculate new one")
+                    pixels = weakSelf().getShapePixels(
+                    shapes, channel=channels, zSpread=zSpread)
+            
+            else:
+                # logger.info(F"new pixels")
+                pixels = weakSelf().getShapePixels(
+                    shapes, channel=channels, zSpread=zSpread)
+
+                
+            # self._recordShapePixels = {"channels": channels, "shapes": shapes, "zSpread": zSpread, "pixels": pixels}
+            self._recordShapePixels["pixels"] = pixels
 
             # logger.info(f'  pixels  {type(pixels)}:')
             # logger.warning(f'pixels.columns is: {len(pixels)} {pixels.columns}')
@@ -154,7 +227,9 @@ class LazyImagesGeoPandas(LazyGeoPandas):
 
             # logger.error(f'REMOVE {channels} -> channels = [1]')
             # the channels processed by getShapePixels
-            _channels = list(pixels.columns)
+            # _channels = list(pixels.columns)
+            _channels = channels
+            # logger.info(f'  _channels  {_channels}:')
             return pd.DataFrame({
                 # f"{name}_ch{channel + 1}_{agg}": pixels[channel].apply(lambda x: getattr(np, agg)(x)) for agg in aggregates for channel in channels
                 f"{name}_ch{channel}_{agg}": pixels[channel].apply(lambda x: getattr(np, agg)(x)) for agg in aggregates for channel in _channels
@@ -162,20 +237,93 @@ class LazyImagesGeoPandas(LazyGeoPandas):
 
         return wrappedFunc
 
-    def addSchema(self, frame: LazyGeoFrame[Self]):
-        """Add a schema frame to the store.
+    # def addSchema(self, frame: LazyGeoFrame[Self]):
+    #     """Add a schema frame to the store.
+    #     Essentially, this adds a new data frame to the store.
+        
+    #     abb this creates all spine intensity analysis columns
+    #     abb including _ch<n>
+    #     abb HOW DO WE ADD _ch2 COLUMNS AFTER APPENDING A NEW CHANNEL IMAGE ???
+
+    #     # TODO: perhaps have this be called in append Channel
+    #     """
+
+    #     #
+    #     # what timepoint are we in???
+    #     #        
+    #     # logger.error(f'-->> abb cluge for 1 timepoint')
+    #     # logger.error(f'  frame._schema is:{type(frame._schema)}')
+        
+    #     # logger.warning('!!==!! abb in store.py LazyImagesGeoPandas')
+
+    #     # was this
+    #     _possibleChannelKeys = self._images.metadata.possibleChannelKeys
+    #     # _tmpTimepoint = 1
+    #     # _possibleChannelKeys = self._images.metadata.getTimepoint(_tmpTimepoint).channelKeys
+    #     logger.info(f'LazyImageGeoPandas addSchema _possibleChannelKeys:{_possibleChannelKeys}')
+    #     # logger.info(f'  abb _firstTimepointChannelKeys:{_firstTimepointChannelKeys}')
+
+    #     # Inject computed columns that use the image to calculate roi stats
+    #     # logger.info(f"frame check {frame}")
+    #     for method in frame._schema.__dict__.values():
+    #         # logger.warning(f'method:{method}')
+    #         if not hasattr(method, "_imageComputed"):
+    #             continue
+
+    #         attributes: ImageColumnAttributes = method._imageComputed
+
+    #         logger.info(f'checking attributes {attributes}')
+    #         if "_aggregate" not in attributes:
+    #             continue
+    #         logger.warning(f'method:{method}')
+                        
+    #         name = attributes["key"]
+    #         wrappedFunc = self._genWrappedFunc(method, attributes, frame)
+                        
+    #         # abb
+    #         # for channel in range(self._maxChannels()):
+    #         for channel in _possibleChannelKeys:
+    #         # for channel in [1]:
+    #         # only add channels keys when they are activated
+    #         # TODO: somehow get this list of activated channels
+    #         # for channel in self._images.metadata.activatedChannelKeys:
+    #             for agg in attributes["_aggregate"]:
+    #                 # logger.warning(f'  !!! ADDING COLUMN ??? channel:{channel} agg:{agg}')
+    #                 logger.info(f"added {name}_ch{channel}_{agg}")
+    #                 frame.addComputed(
+    #                     # abb removed + 1
+    #                     # f"{name}_ch{channel + 1}_{agg}",
+    #                     f"{name}_ch{channel}_{agg}",
+    #                     {
+    #                         **attributes,
+    #                         # abb removed + 1
+    #                         # "title": f"{name} Channel {channel + 1} - {agg.capitalize()}",
+    #                         "title": f"{name} Channel {channel} - {agg.capitalize()}",
+    #                     },
+    #                     wrappedFunc,
+    #                     skipUpdate=True
+    #                 )
+
+    #         frame.updateComputedDependencies()
+
+    #     return super().addSchema(frame)
+    
+
+    def addSchema(self, frame: LazyGeoFrame[Self], newChannelKeys: List = None):
+        """Add a new channel schema frame to the store.
         Essentially, this adds a new data frame to the store.
+        This function is called after append channel
         
         abb this creates all spine intensity analysis columns
-        abb including _ch<n>
-        abb HOW DO WE ADD _ch2 COLUMNS AFTER APPENDING A NEW CHANNEL IMAGE ???
+
+        Args:
+            frame: spine DF
+            newChannelsKeys: List of new channels that are appended
         """
 
-        #
-        # what timepoint are we in???
-        #        
-        # logger.error(f'-->> abb cluge for 1 timepoint')
-        # logger.error(f'  frame._schema is:{type(frame._schema)}')
+        # TODO: check if channel schema was already added
+        if frame is None:
+            return
         
         # logger.warning('!!==!! abb in store.py LazyImagesGeoPandas')
 
@@ -183,11 +331,13 @@ class LazyImagesGeoPandas(LazyGeoPandas):
         currentChannelKeys = self._images.metadata.getTimepoint(1).channelKeys  # abai 20250806
 
         # Inject computed columns that use the image to calculate roi stats
+        # logger.info(f"frame check {frame}")
         for method in frame._schema.__dict__.values():
             if not hasattr(method, "_imageComputed"):
                 continue
 
             attributes: ImageColumnAttributes = method._imageComputed
+            logger.info(f'checking attributes {attributes}')
             if "_aggregate" not in attributes:
                 continue
 
@@ -216,6 +366,12 @@ class LazyImagesGeoPandas(LazyGeoPandas):
 
     def _maxChannels(self):
         return self._images.maxChannels()
+    
+    def getActivatedChannels(self, t):
+        return self._images.activatedChannels(t)
+
+    def getInActiveChannels(self, t):
+        return self._images.inActiveChannels(t)
 
     # abb this is overly complex, why is this using next() and iter() ???
     def imageBounds(self, t: int = None, channel: int = None) -> gp.GeoSeries:
@@ -271,7 +427,6 @@ class LazyImagesGeoPandas(LazyGeoPandas):
         """
         # logger.error(f'channel:{channel}')
         return self._images.getShapePixels(shapes, channel=channel, zSpread=zSpread, time=time, z=z)
-
 
 def computeAggregateImage(dependencies: Union[List[str], dict[str, list[str]]] = {}, aggregate: list[str] = [], **attributes: Unpack[ImageColumnAttributes]):
     """A decorator that adds image based computed column to the schema.

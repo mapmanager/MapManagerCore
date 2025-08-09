@@ -324,6 +324,8 @@ class LazyGeoFrame(Generic[T]):
         # self._store().addSchema(self)
         self._context = context
         self._baseFilter = None
+        logger.info(f"checking this instantiating of lazygeoframe")
+        self._skipColumns = []
         # abb moved to here
         logger.info('self._store().addSchema(self)')
         self._store().addSchema(self)
@@ -668,6 +670,7 @@ class LazyGeoFrame(Generic[T]):
         attributes = self._schema._attributes
         df = self._store().getFrame(self._schema._key)._df
         computed = set()
+
         try:
             self._computingColumns.append(list(columns))
             for column in columns:
@@ -681,6 +684,12 @@ class LazyGeoFrame(Generic[T]):
 
                 if column in computed:
                     continue  # Already computed
+                
+                if len(self._skipColumns) > 0:
+                    skipColumns = self._skipColumns 
+                    if any(skipColumn in column for skipColumn in skipColumns): # forced skip channel columns that dont need to be computed
+                        logger.info(f"skipping column {column}")
+                        continue
 
                 depKey = column + ".valid"
                 version = attribute["version"]
@@ -714,6 +723,7 @@ class LazyGeoFrame(Generic[T]):
                 missingIndex = invalidClone._df.index
                 if isinstance(results, pd.DataFrame):
                     computed.update(results.columns)
+                    # This depkey is not being updated with newChannel?
                     depKey = [c + ".valid" for c in results.columns]
                     df.loc[results.index, results.columns] = results.values
                 else:
@@ -759,6 +769,30 @@ class LazyGeoFrame(Generic[T]):
 
     def toBytes(self, version:int=0):
         return toBytes(self._rootDf)
+    
+    # abj
+    def restrictColumnChannels(self, inActiveChannels):
+        """
+
+        Args: 
+            inActiveChannels: list of inactive channels
+                - used to set skip columns, that wont be considered when invalidating columns
+        """
+        # check if it has _ch{channel}_
+        skipColumns = []
+        # if len(inActiveChannels) == 0: 
+        #     self.updateFrameRestrictions(skipColumns)
+        #     return
+
+        for channel in inActiveChannels:
+            skipColumns.append("_ch" + str(channel) + "_")
+        logger.info(f"restrictColumnChannels {skipColumns}")
+        self.updateFrameRestrictions(skipColumns)
+
+    def updateFrameRestrictions(self, skipColumns):
+        logger.info(f"updateFrameRestrictions activating")
+        self._skipColumns = skipColumns
+        logger.info(f"updateFrameRestrictions {self._skipColumns }")
 
 class LazyGeoSeries(LazyGeoFrame[T]):
     def __init__(self, schema: Schema, data: gp.GeoSeries = None, store: weakref.ReferenceType[T] = None, context: Any = None):

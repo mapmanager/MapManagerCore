@@ -231,11 +231,18 @@ class _metadataList(_metadataBase):
         src =  listKeys.index(srcIndex)
         dst =  listKeys.index(dstIndex)
 
+        # logger.info(f"self._metadataList {self._metadataList}")
         _tupleList = list(self._metadataList.items())
-    
+
         # swap
-        _tupleList[src], _tupleList[dst] = _tupleList[dst], _tupleList[src]
-            
+        # logger.info(f"source index {_tupleList[src][0]}, destination dict{_tupleList[dst][1]}")
+        # logger.info(f"destination index {_tupleList[dst][0]}, source dict {_tupleList[src][1]}")
+        # _tupleList[src], _tupleList[dst] = _tupleList[dst], _tupleList[src]
+        
+        # abj: maintain src index and dest index
+        _tupleList[src], _tupleList[dst] = (_tupleList[src][0], _tupleList[dst][1]), (_tupleList[dst][0], _tupleList[src][1])
+
+        # logger.info(f"revised tuplelist {_tupleList}")
         # remake with new order
         self._metadataList = dict(_tupleList)
         

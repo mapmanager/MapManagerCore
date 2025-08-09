@@ -127,50 +127,50 @@ class AnnotationsSegments(SingleTimePointAnnotationsBase):
 
             if x1 < x2 and y1 < y2: # ex: z = 32 added first: x2,y2 = (811 939) added last: x1,y1 = (729 908)
                 logger.info(f"case 1")
-                astar = brightest_path_lib.algorithm.AStarSearch(image, 
+                astar = brightest_path_lib.algorithm.NBAStarSearch(image, 
                     start_point = np.array([reIndexZ,0,0]), 
                     goal_point = np.array([reIndexZ,newImageSize[0],newImageSize[1]]))
 
             elif x1 > x2 and y1 > y2: # ex: z = 32 x2,y2 = (729 908) x1,y1 = (811 939)
                 logger.info(f"case 2")
-                astar = brightest_path_lib.algorithm.AStarSearch(image, 
+                astar = brightest_path_lib.algorithm.NBAStarSearch(image, 
                     start_point = np.array([reIndexZ,newImageSize[0],newImageSize[1]]), 
                     goal_point = np.array([reIndexZ,0,0]))
                 
             elif x1 > x2 and y1 < y2: # ex: z = 11 x2,y2 = (209, 168) x1,y1 = (250, 143) 
                 logger.info(f"case 3")
-                astar = brightest_path_lib.algorithm.AStarSearch(image, 
+                astar = brightest_path_lib.algorithm.NBAStarSearch(image, 
                         start_point = np.array([reIndexZ,0,newImageSize[1]]), # bigger y ending
                         goal_point = np.array([reIndexZ,newImageSize[0],0])) # bigger x starting
                 
             elif x1 < x2 and y1 > y2: # ex: z = 11  x2,y2 = (250, 143) x1,y1 = (209, 168)
                 logger.info(f"case 4")
-                astar = brightest_path_lib.algorithm.AStarSearch(image, 
+                astar = brightest_path_lib.algorithm.NBAStarSearch(image, 
                     start_point = np.array([reIndexZ,newImageSize[0],0]), 
                     goal_point = np.array([reIndexZ,0,newImageSize[1]])) 
                 
             elif x1 < x2 and y1 == y2: # ex: z = 20 (593,401) (584, 401))
                 logger.info(f"case 5")
                 # y = 0 = newImageSize[0]
-                astar = brightest_path_lib.algorithm.AStarSearch(image, 
+                astar = brightest_path_lib.algorithm.NBAStarSearch(image, 
                     start_point = np.array([reIndexZ,0,0]),
                     goal_point = np.array([reIndexZ,0,newImageSize[1]]))
                 
             elif x1 > x2 and y1 == y2: # ex: z = 20 (584, 401) (593,401) 
                 logger.info(f"case 6")
-                astar = brightest_path_lib.algorithm.AStarSearch(image, 
+                astar = brightest_path_lib.algorithm.NBAStarSearch(image, 
                     start_point = np.array([reIndexZ,0,newImageSize[1]]), 
                     goal_point = np.array([reIndexZ,0,0])) 
 
             elif x1 == x2 and y1 > y2: # ex: z = 25 (237,614) (237, 631))
                 logger.info(f"case 7")
-                astar = brightest_path_lib.algorithm.AStarSearch(image, 
+                astar = brightest_path_lib.algorithm.NBAStarSearch(image, 
                     start_point = np.array([reIndexZ,newImageSize[0],0]), 
                     goal_point = np.array([reIndexZ,0,0])) 
                 
             elif x1 == x2 and y1 < y2: # ex: z = 25 (237, 631)) (237,614) 
                 logger.info(f"case 8")
-                astar = brightest_path_lib.algorithm.AStarSearch(image, 
+                astar = brightest_path_lib.algorithm.NBAStarSearch(image, 
                     start_point = np.array([reIndexZ,0,0]), 
                     goal_point = np.array([reIndexZ,newImageSize[0],0])) 
                 

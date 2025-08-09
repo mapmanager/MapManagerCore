@@ -50,6 +50,7 @@ class AnnotationsBase(LazyImagesGeoPandas):
                  path: str = None,
                  lastSaveTime: str = ""):
 
+        # super().__init__(loader)
         super().__init__(loader)
 
         # if analysisParams is None:
@@ -297,7 +298,8 @@ class AnnotationsBase(LazyImagesGeoPandas):
                 zRangeDf = self.points["z"]
                 zRange = (int(zRangeDf.min()),
                           int(zRangeDf.max()))
-        return super().getPixels(time, channel, zRange, threeD=threeD)
+        return super().getPixels(time, channel, zRange, z, threeD=threeD)
+        # return super().getPixels(time, channel, zRange, threeD=threeD)
 
     # Serialization
 

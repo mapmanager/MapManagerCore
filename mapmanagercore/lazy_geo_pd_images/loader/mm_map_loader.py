@@ -15,6 +15,8 @@ import pandas as pd
 import geopandas as gp
 
 # from mapmanagercore.lazy_geo_pd_images.loader.base import ImageLoader
+# from mapmanagercore.annotations.base import AnnotationsBase
+# from mapmanagercore.lazy_geo_pandas.lazy import LazyGeoFrame
 from mapmanagercore.metadata import mmMapMetadata, TimepointMetadata, ChannelMetadata
 from mapmanagercore.imageImporter import getImageImporter
 
@@ -63,7 +65,10 @@ class mmMapLoader():
     as well as to load/manage/save to an mmap file.
     """
     def __init__(self,
-                 path: Optional[str] = None):
+                 path: Optional[str] = None,
+                #  mapAnnotations: "AnnotationsBase"= None # abj
+                mapAnnotations= None # "AnnotationsBase" # abj
+                 ):
         """
         Encapsulates an mmap file.
 
@@ -81,7 +86,9 @@ class mmMapLoader():
                 raise ValueError(f'path must be a directory or zip file')
 
         self.path = path
+        self.mapAnnotations = mapAnnotations
         self._metadata = mmMapMetadata()
+        self.lazyPointsFrame = None  # abj
         
         # abb depreciate
         # self._imagesSrcs: List[Dict[int, np.ndarray]] = []
@@ -140,9 +147,20 @@ class mmMapLoader():
         logger.info(f'Successfully deleted channel {channel} from timepoint {timepoint}')
         return True
 
-    def moveChannel(srcTimePoint, srcChannel, 
+    def moveChannel(self, srcTimePoint, srcChannel, 
                     destTimePoint, destChannel):
         logger.info('TODO')
+        logger.warning('moving/ swapping channel')
+
+        # 1 metadata
+        timepointMetadata = self.metadata.getTimepoint(srcTimePoint)
+        timepointMetadata.swapChannels(srcChannel, destChannel) # this swaps meta data but not image
+
+        # 2 images
+        temp = self._imageChannelDict[srcTimePoint][srcChannel]
+        self._imageChannelDict[srcTimePoint][srcChannel] = self._imageChannelDict[destTimePoint][destChannel] 
+        self._imageChannelDict[destTimePoint][destChannel] = temp
+
 
     def _pathExists(self) -> bool:
         _ret = True
@@ -201,7 +219,7 @@ class mmMapLoader():
         return _newTimepointKey
     
     def importChannel(self, path:str,
-                       timepoint:int) -> Optional[bool]:
+                       timepoint:int) ->  (Optional[int]):  # old: (Optional[bool], int):
         """Open a file and append channels to an existing timepoint.
         """
         # check that timepoint exists
@@ -284,6 +302,7 @@ class mmMapLoader():
     def numTimepoints(self) -> int:
         """Get the number of timepoints (imaging sessions).
         """
+        # logger.info(f"metadata is {self.metadata}")
         return self.metadata.numTimepoints
     
     def numChannels(self, timepoint:int) -> Optional[int]:
@@ -291,6 +310,22 @@ class mmMapLoader():
         """
         return self.metadata.getTimepoint(timepoint).numChannels
     
+    def activatedChannels(self, timepoint:int):
+        """ Get dict of channels that are activated
+
+        Key: Channel number
+        Val: bool that indicates whether or not its activated
+        """
+        return self.metadata.getTimepoint(timepoint).getActivatedChannels()
+    
+    def inActiveChannels(self, timepoint:int):
+        """ Get dict of channels that are activated
+
+        Key: Channel number
+        Val: bool that indicates whether or not its activated
+        """
+        return self.metadata.getTimepoint(timepoint).getInActiveChannels()
+         
     @property
     def metadata(self) -> mmMapMetadata:
         """Get the metadata.
@@ -384,7 +419,7 @@ class mmMapLoader():
 
         with zarr.ZipStore(self.path, mode="r") \
             if _zipStore else zarr.DirectoryStore(self.path) as store:
-
+            # logger.info(f"_zipStore {_zipStore}")
             # logger.info(f'using {store} to load path:{self.path}')
             
             # zarr.errors.PathNotFoundError: nothing found at path ''
@@ -396,8 +431,7 @@ class mmMapLoader():
             # load metadata (use this to create placeholder for t/c)
             try:
                 # fails on load zip ???
-                # logger.info(f"group.attrs['metadata']:{group.attrs['metadata']}")
-                _metadataDict: dict = self.group.attrs['metadata']
+                _metadataDict: dict = self.group.attrs['metadata'] # Fixes: AttributeError: 'DirectoryStore' object has no attribute 'attrs'
                 # _metadataDict: dict = store.attrs['metadata']
             except (KeyError, ValueError) as e:
                 logger.error(f'KeyError: "{e}" not found in zarr file')
@@ -534,13 +568,16 @@ class mmMapLoader():
     def fetchSlices(self,
                     t:int,
                     channelIdx:int,
-                    zRange:List[int]) -> np.ndarray:
+                    zRange:List[int],
+                    threeD: bool = None) -> np.ndarray:
         # channelIdx += 1
+        # logger.info(f"entering here for slices")
         _imageChannel = self.getImageChannel(t, channelIdx)
         
         _firstSlice = zRange[0]
-        return _imageChannel.getSlice(_firstSlice)  # lazy
-
+        # return _imageChannel.getSlice(_firstSlice)  # lazy
+        return np.max(_imageChannel.getVolume(zRange[0], zRange[1]), axis=0)
+        # return np.max(_imageChannel[zRange[0]:zRange[1]], axis=0)
 
     def timePoints(self) -> Iterator[int]:
         """
@@ -684,6 +721,22 @@ class mmMapLoader():
                 indexes.append(idx)
 
         return pd.Series(results, indexes, name=channel)
+    
+    # abj
+    # trying to give mmMapLoader access to ponits dataframe
+    def setLazyPointsFrame(self, df: "LazyGeoFrame" = None):
+        self.lazyPointsFrame = df
+        # logger.info(f"check lazyPointsFrame {df}")
+
+    def getLazyPointsFrame(self) -> "LazyGeoFrame":
+        return self.lazyPointsFrame 
+
+    def setAnnotationsBase(self, annotationsBase):
+        self._annotationsBase = annotationsBase
+    
+    def getAnnotationsBase(self):
+        return self._annotationsBase
+
 
 class ImageChannel():
     """Class to encapsulate a single color channel stack.

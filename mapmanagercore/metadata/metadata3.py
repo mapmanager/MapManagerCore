@@ -104,6 +104,9 @@ class ChannelMetadata(_metadataBase):
     name: str = 'Untitled'
     """Name of the channel."""
 
+    # abj: boolean to enable auto recalculation
+    channelActivated: bool = True
+
     def _initFromImgData(self, imgData : np.ndarray):
         """On import of an image.
 
@@ -222,10 +225,13 @@ class TimepointMetadata(_metadataList):
 
     analysisParameters: AnalysisParams = dataclasses.field(default_factory=lambda: AnalysisParams())
     """The analysis parameters for this single timepoint (connected maps use a global version of this)."""
+    
+    def convertUnits(self, voxelValue, paramKey):
+        """ convert from real units to pixel units
 
-    # abb 20250519
-    def getValue_pixel(self, key:str) -> int:
-        """Get an analysis parameter value converted from um -> pixels.
+        Args:
+            voxelValue: voxel value of parameter to be convertedd to pixel value
+            paramKey: string name of the analysis parameter
         """
         # we can only convert values to pixel if units is 'um'
         # pull allowPixels bool from our metadata
@@ -235,11 +241,62 @@ class TimepointMetadata(_metadataList):
             # logger.error(f'Analysis Parameter key "{key}" cannot be converted to pixels (units are "{unitStr}")')
             return
         
-        # assuming xVoxel and yVoxel are the same
-        xVoxel = self.voxelMetadata.xVoxel  # um/pixel
-        valueInUm = self.analysisParameters.getValue(key)
-        valueInPixels = valueInUm / xVoxel
-        return valueInPixels
+        if self.voxelMetadata is not None:
+            
+            # problem is voxelValue is a single value (physical magnitude) and not in x or y 
+            pixelValueX = voxelValue / self.voxelMetadata.xVoxel
+            pixelValueY = voxelValue / self.voxelMetadata.yVoxel
+        
+            # assuming that all dimensions are the same
+            if self.voxelMetadata.xVoxel == self.voxelMetadata.yVoxel:
+                return pixelValueX
+
+            # Main Problem! for accurate measurements in 2D, a direction must be known
+            # however these are general values that are physical units
+            
+            elif self.voxelMetadata.xVoxel != self.voxelMetadata.yVoxel:
+                # p2 = (point1[0] + pixelValueX, point1[1] + pixelValueY)
+                # # dx, dy = (point1 - p2)
+                # dx, dy = (p2 - point1)
+
+                # # Take the euclidean distance 
+                # # pixelDistance = np.sqrt((dx * pixelValueX)**2 + (dy * pixelValueY)**2)
+                # pixelDistance = np.sqrt((dx)**2 + (dy)**2)
+
+                # # approximating with geometric mean
+                # import math
+                # effective_pixel_size = math.sqrt(pixelValueX * pixelValueY)
+                # pixel_distance = voxelValue / effective_pixel_size
+
+                # Elliptical Radius
+                # pixelDistance = np.sqrt((dx * pixelValueX)**2 + (dy * pixelValueY)**2)
+                # pixelDistance = np.sqrt((dx)**2 + (dy)**2)
+                pixelDistance = np.sqrt((pixelValueX)**2 + (pixelValueY)**2)
+            
+                return pixelDistance
+            else:
+                return pixelValueX
+    
+        else:
+            logger.error(f"No physical voxel units established")
+
+    # DEFUNCT abb 20250519
+    # def getValue_pixel(self, key:str) -> int:
+    #     """Get an analysis parameter value converted from um -> pixels.
+    #     """
+    #     # we can only convert values to pixel if units is 'um'
+    #     # pull allowPixels bool from our metadata
+    #     # unitStr = 'um'  # TODO write the code to get actual unit value
+    #     allowPixels = True  # False:
+    #     if not allowPixels:
+    #         logger.error(f'Analysis Parameter key "{key}" cannot be converted to pixels (units are "{unitStr}")')
+    #         return
+        
+    #     # assuming xVoxel and yVoxel are the same
+    #     xVoxel = self.voxelMetadata.xVoxel  # um/pixel
+    #     valueInUm = self.analysisParameters.getValue(key)
+    #     valueInPixels = valueInUm / xVoxel
+    #     return valueInPixels
     
     def __post_init__(self):
         if isinstance(self._metadataList, dict):
@@ -261,7 +318,9 @@ class TimepointMetadata(_metadataList):
     
     def appendChannel(self,
                       imgData : np.ndarray,
-                      name: Optional[str] = 'Untitled') -> Optional[int]:
+                      name: Optional[str] = 'Untitled',
+                      activateChannel: bool = False
+                      ) -> Optional[int]:
         """Given img data, append a new color channel.
             Used when we are importing data.
         
@@ -289,20 +348,28 @@ class TimepointMetadata(_metadataList):
                 _err = f'expecting shape {self.shape} but got {proposedShape}'
                 # logger.error(_err)
                 raise MetadataError(_err)
-                
-        metadataContrast = ChannelMetadata(name=name)
-        metadataContrast._initFromImgData(imgData)
         
+        # abj: when user imports channel they can set whether or not they want it to be "activated"
+        # which means to auto compute aggregate columns. Reminder to Pass in that boolean
+        # metadataContrast = ChannelMetadata(name=name)
+        metadataContrast = ChannelMetadata(name=name, channelActivated=True)
+        metadataContrast._initFromImgData(imgData)
+
         # do the append
         newChannelKey = self.appendMetadataItem(metadataContrast)
-        
         logger.info(f'setting hard coded color using newChannelKey:{newChannelKey}')
+
+        # abj: testing more than 3 indexes
+        # colors = ['white', 'red', 'green', 'blue', 'magenta', 'orange']
+        # metadataContrast.color = colors[newChannelKey]
+
         if newChannelKey==1:
             metadataContrast.color = 'red'
         elif newChannelKey == 2:
             metadataContrast.color = 'green'
         elif newChannelKey == 3:
             metadataContrast.color = 'blue'
+
         return newChannelKey
     
     def deleteChannel(self, channelIdx:int) -> Optional[ChannelMetadata]:
@@ -321,6 +388,7 @@ class TimepointMetadata(_metadataList):
     def swapChannels(self, srcChannelIdx, dstChannelIdx) -> bool:
         """Move/swap color channel.
         """
+        # abj: not swappining actual images here
         ok = self.swapMetadataItems(srcChannelIdx, dstChannelIdx)
         return ok
     
@@ -373,6 +441,8 @@ class TimepointMetadata(_metadataList):
             _err = f'channel {channelIdx} does not exist, expecting one of {self.channelKeys}'
             raise MetadataError(_err)
         
+        logger.info(f"setChannelProperty channelIdx {channelIdx} key {key} value {value}")
+        
         return self._metadataList[channelIdx].setValue(key, value)
 
     def getChannelProperty(self, channelIdx, key) -> MetadataError | object:
@@ -384,6 +454,66 @@ class TimepointMetadata(_metadataList):
 
         return self._metadataList[channelIdx].getValue(key)
     
+    # abj
+    def getAllChannelProperty(self, key) -> List:
+        """ Get a list of all values within Channel dict of a given key
+
+        Example use case: get all activated channels
+        """
+        # for channel in self.channelKeys:
+        allChannelProperty = []
+        for channel in self.channelKeys:
+            channelProperty = self.getChannelProperty(channel, key)
+            allChannelProperty.append(channelProperty)
+
+        return allChannelProperty
+    
+    def getActivatedChannels(self) -> List:
+        """  get all activated channels
+
+        Example use case: get all activated channels
+        """
+        # for channel in self.channelKeys:
+        # self.getAllChannelProperty()
+        activatedChannels = []
+        for channel in self.channelKeys:
+            channelActivated = self.getChannelProperty(channel, "channelActivated")
+            # logger.info(f"channelActivated {channelActivated}")
+            if channelActivated:
+                activatedChannels.append(channel)
+                channelActivated = False # reset variable
+
+        # logger.info(f"activatedChannels {activatedChannels}")
+        return activatedChannels
+    
+    # def activateChannel(self, channelIdx, key, value):
+    #     self.setChannelProperty(channelIdx, key)
+
+    def getInActiveChannels(self) -> List:
+        """  get all inactive channels
+        """
+        inActiveChannels = []
+        for channel in self.channelKeys:
+            channelActivated = self.getChannelProperty(channel, "channelActivated")
+            if not channelActivated:
+                inActiveChannels.append(channel)
+                channelActivated = True # reset variable
+
+        logger.info(f"inActiveChannels are: {inActiveChannels}")
+        return inActiveChannels
+    
+    def getChannelNames(self) -> dict:
+        """ return dictionary of channel names where 
+        key: channel number and value = channel name
+        """
+        channelNameDict = {}
+        for channelIndex in self.channelKeys:
+            channelName= self.getChannelProperty(channelIndex, "name")
+            channelNameDict[channelIndex] = channelName
+
+        logger.info(f"channelNameDict are: {channelNameDict}")
+        return channelNameDict
+        
     @property
     def channelKeys(self) -> List[int]:
         """Get the list[int] of channel keys.
@@ -403,6 +533,7 @@ class mmMapMetadata(_metadataList):
     represents a list of independent imaging timepoints/sessions.
     """
 
+    # TODO: change this to unlimited number
     _maxChannel = 3
 
     timepoints: dict = dataclasses.field(default_factory=dict)
