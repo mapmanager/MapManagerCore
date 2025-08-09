@@ -1,0 +1,84 @@
+[build-system]
+requires = ["setuptools>=61", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mapmanagercore"
+version = "0.0.0"  # placeholder required by setuptools when using setuptools-scm
+description = "MapManagerCore is a Python package that provides the core functionality for MapManager."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "GPL-3.0-only" }
+authors = [
+  { name = "Robert H Cudmore", email = "robert.cudmore@gmail.com" },
+]
+keywords = ["bioinformatics", "scientific", "visualization", "image analysis"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Natural Language :: English",
+  "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+  "Operating System :: POSIX :: Linux",
+  "Operating System :: MacOS",
+  "Operating System :: Microsoft :: Windows",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Science/Research",
+  "Intended Audience :: End Users/Desktop",
+  "Topic :: Scientific/Engineering :: Bio-Informatics",
+  "Topic :: Scientific/Engineering :: Information Analysis",
+  "Topic :: Scientific/Engineering :: Visualization",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Topic :: Software Development :: Libraries :: Application Frameworks"
+]
+
+dependencies = [
+  "numpy",
+  "pandas",
+  "shapely",
+  "geopandas",
+  "pyarrow",
+  "scikit-image",
+  "zarr>=2.6,<=2.18.7",
+  "async-lru",
+  "asyncio",
+  "platformdirs",
+  "plotly",
+  "dataclasses-json",
+  "brightest-path-lib",
+  "pooch",
+  "imagecodecs",
+  "tifffile"
+]
+
+[project.optional-dependencies]
+tests = [
+  "tox",
+  "pytest",
+  "pytest-cov",
+  "flake8",
+  "nbformat",
+  "matplotlib"
+]
+dev = [
+  "jupyter",
+  "ipykernel",
+  "matplotlib"
+]
+docs = [
+  "mkdocs",
+  "mkdocs-material",
+  "mkdocstrings-python"
+]
+bioio = [
+  "bioio",
+  "bioio-tifffile",
+  "bioio-nd2",
+  "bioio-ome-tiff"
+]
+
+[tool.setuptools]
+packages = { find = { include = ["mapmanagercore", "mapmanagercore.*"] } }
+include-package-data = true
+
+[tool.setuptools_scm]
+version_scheme = "guess-next-dev"
+local_scheme = "node-and-date"
