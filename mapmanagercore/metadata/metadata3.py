@@ -93,6 +93,11 @@ class ChannelMetadata(_metadataBase):
     maxAutoContrast: int = 256
     """Max auto contrast from all imgData, set on import then imutable."""
 
+    minAutoContrast_rgb: int = 0
+    """Min auto contrast for RGB images."""
+    maxAutoContrast_rgb: int = 256
+    """Max auto contrast for RGB images."""
+
     #
     # the remaining fields can be set by the user.
     minUserContrast: int = 1

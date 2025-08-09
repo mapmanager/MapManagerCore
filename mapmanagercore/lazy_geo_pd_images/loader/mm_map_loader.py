@@ -230,7 +230,7 @@ class mmMapLoader():
         # get image importer from path
         ii = getImageImporter(path, loadImgData=False)  # remember to load pixels with loadData()
         if ii is None:
-            logger.error('failed')
+            logger.error(f'failed to load may not be suppoted extension for path: {path}')
             return
         
         # check incoming channel shape matches our shape (at timepoint t)
@@ -840,7 +840,7 @@ class ImageChannel():
         if not self._sliceIsLoaded(sliceIdx):
             fs = self.mapLoader._getStore(self.mapLoader.path)
             with fs as store:
-                logger.error(f'opening zar path for every slice??? sliceIdx:{sliceIdx}')
+                logger.error(f'opening zar path for every slice??? sliceIdx:{sliceIdx} {self.channel}')
                 group: zarr.hierarchy.Group = zarr.group(store=store)
 
                 # logger.info(list(self.mapLoader.group.keys()))

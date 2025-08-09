@@ -79,6 +79,8 @@ def acceptedExtensions() -> List[str]:
         report = bioio.plugins.get_plugins(use_cache=False)
         for item in report.items():
             _acceptedExtensions.append(item[0])
+        # always accept .mmap.zip for loading mmap files
+        _acceptedExtensions.append('.mmap.zip')
     else:
         _acceptedExtensions = ['.tif', '.zip', '.mmap']  # adding .zip to load mmap zip files
     return _acceptedExtensions
