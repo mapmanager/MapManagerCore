@@ -29,7 +29,6 @@ import warnings
 from plotly.express.colors import sample_colorscale
 import geopandas as gp
 
-# from mapmanagercore.analysis_params import AnalysisParams
 from mapmanagercore.logger import logger
 
 # abb imageImporter converting from pickle to parquet

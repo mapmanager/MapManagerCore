@@ -127,13 +127,3 @@ class AnalysisParams(_metadataBase):
                               units='',
                               )
         )
-
-if __name__ == '__main__':
-    _dict = _getMetadata(
-        description='xxx',
-        title='yyy',
-        units='um',
-    )
-    logger.info('main')
-    pprint(_dict)
-    pprint(_dict)

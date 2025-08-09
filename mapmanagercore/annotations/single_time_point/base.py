@@ -20,7 +20,6 @@ from .. import Annotations
 from typing import Any, Callable, Hashable, List, Self, Tuple, Union
 from copy import copy
 
-# from mapmanagercore.analysis_params import AnalysisParams
 from mapmanagercore.metadata import AnalysisParams, TimepointMetadata
 
 from mapmanagercore.logger import logger
