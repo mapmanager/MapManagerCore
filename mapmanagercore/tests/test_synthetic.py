@@ -12,6 +12,9 @@ import matplotlib.pyplot as plt
 import plotly.graph_objects as go    
 import plotly.express as px
 
+import tifffile
+
+from mapmanagercore.lazy_geo_pd_images.loader.mm_map_loader import mmMapLoader
 from mapmanagercore import MapAnnotations
 from mapmanagercore.logger import logger
 
@@ -49,7 +52,8 @@ def sinImage(sinType:SinType = SinType.horizontal):
             sine2D[i]= np.roll(sine1D,-i*_angle)  # shift the 1D sin data by -i, -i increases with rows
 
     # save sine2D to file
-    sine2D.save('sine2D.tif', format='TIFF')
+    logger.info('saving sine_2d.tif')
+    tifffile.imsave('data/sine_2d.tif', sine2D)  # when running from mapmanagercore/
     
     return sine2D
 
@@ -69,29 +73,36 @@ def addSpines(mmMap : MapAnnotations, segmentID: int):
             [750, 700],
             [800, 800],
             [850, 700],
+            [900, 800],
         ]
 
     z = 0  # 2d images require z=0 (one image slice)
 
-    tp = mmMap.getTimePoint(time=0)
+    timepointKeys = mmMap.loader.metadata.timepointKeys
+    firstTimepoint = timepointKeys[0]
+    tp = mmMap.getTimePoint(time=firstTimepoint)
 
     for idx, row in enumerate(spinePoints):
         x = row[0]
         y = row[1]
+        logger.info(f'   {idx} addSpine segment:{segmentID} x:{x} y:{y}')
         tp.addSpine(segmentID, x, y, z)
 
 def addSegment(mmMap : MapAnnotations, segmentID: int):
-    tp = mmMap.getTimePoint(time=0)
+    timepointKeys = mmMap.loader.metadata.timepointKeys
+    firstTimepoint = timepointKeys[0]
+
+    tp = mmMap.getTimePoint(time=firstTimepoint)
     
     if segmentID == 1:
         linePoints = [
             [100, 400],
+            [150, 400],
             [200, 400],
+            [250, 400],
             [300, 400],
+            [350, 400],
             [400, 400],
-            [500, 400],
-            [600, 400],
-            [700, 400],
         ]
     elif segmentID == 2:
         linePoints = [
@@ -118,20 +129,37 @@ def addSegment(mmMap : MapAnnotations, segmentID: int):
 def makeMap():
     """Make single timepoint with a synthetic image."""
     
-    imgData = sinImage(SinType.horizontal)
+    # imgData = sinImage(SinType.horizontal)
+    # imgData = tifffile.imread('data/sine_2d.tif')  # when running from mapmanagercore/
 
-    loader = MultiImageLoader()
-    loader.read(imgData, channel=0, time=0)
+    logger.info("1. Creating loader and importing first timepoint...")
+    loader = mmMapLoader()
+    timepoint_path = 'data/sine_2d.tif'
+    timepoint_key = loader.importTimepoint(timepoint_path)
+    logger.info(f"   Timepoint key: {timepoint_key}")
+    # TODO: check metadata
+    
+    # 2. Create MapAnnotations object
+    print("2. Creating MapAnnotations...")
+    map_annotations = MapAnnotations(
+        loader,
+        lineSegments=pd.DataFrame(),
+        points=pd.DataFrame()
+    )
 
-    # Create the annotation map
-    mmMap = MapAnnotations(loader,
-                         lineSegments=pd.DataFrame(),
-                         points = pd.DataFrame())
 
-    print('metadata is:')
-    pprint(mmMap.loader.metadata(t=0))
+    # loader = MultiImageLoader()
+    # loader.read(imgData, channel=0, time=0)
 
-    return mmMap
+    # # Create the annotation map
+    # mmMap = MapAnnotations(loader,
+    #                      lineSegments=pd.DataFrame(),
+    #                      points = pd.DataFrame())
+
+    # print('metadata is:')
+    # pprint(mmMap.loader.metadata(t=0))
+
+    return map_annotations
 
 @dataclasses.dataclass
 class SpinePlotQt:
@@ -226,8 +254,8 @@ def plotPlotly(mmMap: MapAnnotations):
 
     logger.warning('1) check pandas')
 
-    timepoint = 0
-    channel = 0
+    timepoint = 1
+    channel = 1
     sliceIdx = 0
     
     spinePlotQt = _getSpinePlot_Qt(mmMap, timepoint)
@@ -236,7 +264,8 @@ def plotPlotly(mmMap: MapAnnotations):
     # either this
     # imgData = mmMap._images.fetchSlices(time=0, channel=0, sliceRange=[0,1])
     # or this
-    imgData = mmMap._images.loadSlice(time=timepoint, channel=channel, slice=sliceIdx)
+    imgData = mmMap.loader.fetchSlices(t=timepoint, channelIdx=channel,zRange=(0,0))
+    # imgData = mmMap._images.loadSlice(time=timepoint, channel=channel, slice=sliceIdx)
     # or this
     # imgData = mmMap.loader._images(t=0, channel=0)
     logger.info(f'imgData:{imgData.shape} {imgData.dtype} {np.max(imgData)}')
@@ -254,6 +283,9 @@ def plotPlotly(mmMap: MapAnnotations):
     plotDf = plotDf.reset_index()  # moves segmentID into column
     plotDf = plotDf.reset_index()  # moves index into column
 
+    logger.info('plotDf is:')
+    print(plotDf)
+    
     fig = go.Figure()
 
     # segments
@@ -292,13 +324,13 @@ def plotPlotly(mmMap: MapAnnotations):
 def run():
     mmMap = makeMap()
     
-    segmentID = 1
-    newSegmentID = addSegment(mmMap, segmentID)
-    addSpines(mmMap, newSegmentID)
+    _localSegmentID = 1
+    newSegmentID1 = addSegment(mmMap, _localSegmentID)
+    addSpines(mmMap, newSegmentID1)
 
-    segmentID = 2
-    newSegmentID = addSegment(mmMap, segmentID)
-    addSpines(mmMap, newSegmentID)
+    _localSegmentID = 2
+    newSegmentID2 = addSegment(mmMap, _localSegmentID)
+    addSpines(mmMap, newSegmentID2)
 
     # from pprint import pprint
     # pprint(mmMap.points.columnsAttributes)
@@ -307,6 +339,12 @@ def run():
     # logger.warning('anchorLine is:')
     # print(mmMap.points['anchorLine'])
     
+    # check segments and spines we just added
+    logger.info(f'getNumTimepoints:{mmMap.getNumTimepoints()}')
+    logger.info(f'1 getNumSpines:{mmMap.getNumSpines(newSegmentID1)}')
+    logger.info(f'2 getNumSpines:{mmMap.getNumSpines(newSegmentID2)}')
+
+    # todo: put back in
     plotPlotly(mmMap)
 
 if __name__ == '__main__':

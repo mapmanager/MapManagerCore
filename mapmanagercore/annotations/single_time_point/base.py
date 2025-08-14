@@ -324,7 +324,10 @@ class SingleTimePointAnnotationsBase(_SingleTimePointAnnotationsBase):
 
     @property
     def shape(self) -> Tuple[int, int, int]:
-        return self._annotations._images.shape(self._t)
+        # _shape = self._annotations._images.shape(self._t)
+        # logger.info(f'shape is: {_shape}')
+        _shape = self._annotations._images.metadata.getTimepoint(self._t).shape
+        return _shape
 
     # abb convenience
     @property
@@ -334,7 +337,11 @@ class SingleTimePointAnnotationsBase(_SingleTimePointAnnotationsBase):
         # return len(self._annotations._images.channels(self._t))
         return self._annotations._images.metadata.getTimepoint(self._t).numChannels
 
-    def getShapePixels(self, shapes: gp.GeoDataFrame, channel: Union[int, List[int]] = 0, zSpread: int = 0, z: int = None) -> pd.Series:
+    def getShapePixels(self,
+                       shapes: gp.GeoDataFrame,
+                       channel: Union[int, List[int]] = 0,
+                       zSpread: int = 0,
+                       z: int = None) -> pd.Series:
         return self._annotations.getShapePixels(shapes, channel, zSpread, self._t, z=z)
 
     def _mapKeys(self, keys: Keys) -> Keys:

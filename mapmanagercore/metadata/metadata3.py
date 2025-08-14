@@ -544,6 +544,7 @@ class mmMapMetadata(_metadataList):
     timepoints: dict = dataclasses.field(default_factory=dict)
     _key = 'timepoints'
 
+    # abb TODO depreciate
     @property
     def possibleChannelKeys(self) -> List[int]:
         return list(range(1, self._maxChannel+1))

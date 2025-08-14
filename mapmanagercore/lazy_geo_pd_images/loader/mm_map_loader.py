@@ -125,9 +125,10 @@ class mmMapLoader():
             logger.error(f'Channel {channel} does not exist in timepoint {timepoint}')
             return False
             
+        # abb TODO prevent deletion when numChannels()==1
         # Prevent deletion of channel 0 (primary channel)
-        if channel == 0:
-            logger.error('Cannot delete channel 0 (primary channel)')
+        if self.numChannels(timepoint) == 1:
+            logger.error('Cannot delete when we only have one channel')
             return False
         
         # 1. Delete from metadata
@@ -149,8 +150,7 @@ class mmMapLoader():
 
     def moveChannel(self, srcTimePoint, srcChannel, 
                     destTimePoint, destChannel):
-        logger.info('TODO')
-        logger.warning('moving/ swapping channel')
+        logger.warning(f'moving channel {srcChannel} from {srcTimePoint} to {destTimePoint} as {destChannel}')
 
         # 1 metadata
         timepointMetadata = self.metadata.getTimepoint(srcTimePoint)
@@ -163,14 +163,16 @@ class mmMapLoader():
 
 
     def _pathExists(self) -> bool:
+        """We only save to a zarr folder (never to a file like zip, tif, etc).
+        """
         _ret = True
         path = self.path
         if path is None:
             _ret = False
         else:
             # ensure path is a directory or zip file
-            if not os.path.isdir(path) and not path.endswith('.zip'):
-                logger.error(f'path must be a directory or zip file')
+            if not os.path.isdir(path):
+                logger.error(f'path must be a directory (usually .mmap)')
                 # raise ValueError(f'path must be a directory or zip file')
                 _ret = False
         return _ret
@@ -219,7 +221,7 @@ class mmMapLoader():
         return _newTimepointKey
     
     def importChannel(self, path:str,
-                       timepoint:int) ->  (Optional[int]):  # old: (Optional[bool], int):
+                       timepoint:int) ->  (Optional[int]):
         """Open a file and append channels to an existing timepoint.
         """
         # check that timepoint exists
@@ -235,7 +237,7 @@ class mmMapLoader():
         
         # check incoming channel shape matches our shape (at timepoint t)
         _incomingShape = ii.channelShape
-        _existingShape = self.timepointShape(timepoint)  # abb this should use metadata ???
+        _existingShape = self.timepointShape(timepoint)
         if _incomingShape != _existingShape:
             logger.error(f' img shape mismatch, expecting:{_existingShape} but got {_incomingShape}')
             return
@@ -254,12 +256,6 @@ class mmMapLoader():
             # set metadata
             _newChannelKey = timepointMetadata.appendChannel(imgData, name=channelName)
             
-            # logger.warning(f'timepoint:{timepoint} {type(timepoint)}')
-            # logger.warning(f'_newChannelKey:{_newChannelKey} {type(_newChannelKey)}')
-            # logger.warning(f'self._imageChannelDict.keys() is: {self._imageChannelDict.keys()}')
-
-            # _timepointStr = str(timepoint)
-
             # set image data (adding a new key)
             _imageChannel = ImageChannel(self, timepoint, _newChannelKey, imgData=imgData)
             self._imageChannelDict[timepoint][_newChannelKey] = _imageChannel
@@ -366,13 +362,16 @@ class mmMapLoader():
             self._imageChannelDict[t][c] = ImageChannel(self, t, c)
         return self._imageChannelDict[t][c]
     
-    def _getStore(self, path: Optional[str]) -> zarr.DirectoryStore | zarr.ZipStore:
+    def _getStore(self, path: Optional[str]) -> zarr.DirectoryStore | zarr.ZipStore | None:
         """Get a zarr store from path.
         """
         if path is None:
             path = self.path
         
-        if os.path.isdir(path):
+        if path is None:
+            # happend when we were loaded from an image file (like tif, nd2, etc)
+            return
+        elif os.path.isdir(path):
             store = zarr.DirectoryStore(path)
         else:
             store = zarr.ZipStore(self.path, mode="r", compression=zipfile.ZIP_STORED)
@@ -668,9 +667,13 @@ class mmMapLoader():
                 # abb
                 _firstTimepointChannels = _channelKeys
                 
+                # abb 202508 constraining zSpead to image shape
+                lower_z = max(z - zSpread, 0)   
+                upper_z = min(z + zSpread + 1, self.getTimepointMetadata(t).shape[0]-1)  # !!!
+                # logger.warning(f'  v1 lower_z:{lower_z} upper_z:{upper_z} zSpread:{zSpread} shape:{self.getTimepointMetadata(t).shape}')
                 images = [self.fetchSlices(
                     #   t, c, (z - zSpread, z + zSpread + 1)) for c in channel]
-                      t, c, (z - zSpread, z + zSpread + 1)) for c in _channelKeys]
+                      t, c, (lower_z, upper_z)) for c in _channelKeys]
 
                 for idx, row in group.iterrows():
                     xLim, yLim = images[0].shape
@@ -701,8 +704,15 @@ class mmMapLoader():
             # abb
             # _channelKeys = self.metadata.getTimepoint(t).channelKeys
 
+            # abb 202508 constraining zSpead to image shape
+            lower_z = max(z - zSpread, 0)   
+            upper_z = min(z + zSpread + 1, self.getTimepointMetadata(t).shape[0]-1)  # !!!
+            # logger.warning(f'  v2 lower_z:{lower_z} upper_z:{upper_z} zSpread:{zSpread} shape:{self.getTimepointMetadata(t).shape}')
+
             image = self.fetchSlices(
-                t, channel, (z - zSpread, z + zSpread + 1))
+                # t, channel, (z - zSpread, z + zSpread + 1))
+                t, channel, (lower_z, upper_z))
+
                 # t, _channelKeys, (z - zSpread, z + zSpread + 1))
 
             for idx, row in group.iterrows():
@@ -723,18 +733,18 @@ class mmMapLoader():
         return pd.Series(results, indexes, name=channel)
     
     # abj
-    # trying to give mmMapLoader access to ponits dataframe
-    def setLazyPointsFrame(self, df: "LazyGeoFrame" = None):
+    # trying to give mmMapLoader access to points dataframe
+    def _old_setLazyPointsFrame(self, df: "LazyGeoFrame" = None):
         self.lazyPointsFrame = df
         # logger.info(f"check lazyPointsFrame {df}")
 
-    def getLazyPointsFrame(self) -> "LazyGeoFrame":
+    def _old_getLazyPointsFrame(self) -> "LazyGeoFrame":
         return self.lazyPointsFrame 
 
-    def setAnnotationsBase(self, annotationsBase):
+    def _old_setAnnotationsBase(self, annotationsBase):
         self._annotationsBase = annotationsBase
     
-    def getAnnotationsBase(self):
+    def _old_getAnnotationsBase(self):
         return self._annotationsBase
 
 
@@ -822,8 +832,13 @@ class ImageChannel():
         self._initFromMetadata()
 
     def _sliceIsLoaded(self, sliceIdx) -> bool:
-        return self._sliceLoaded[sliceIdx]
-    
+        try:
+            return self._sliceLoaded[sliceIdx]
+        except IndexError:
+            logger.error(f'sliceIdx:{sliceIdx} is out of bounds for {self.numSlices} slices')
+            # return False
+            raise
+        
     def getSlice(self, sliceIdx:int) -> np.ndarray:
         """Fetch a single image slice.
         
@@ -838,7 +853,7 @@ class ImageChannel():
     
         # option 2, pre allocate an nparray
         if not self._sliceIsLoaded(sliceIdx):
-            fs = self.mapLoader._getStore(self.mapLoader.path)
+            fs = self.mapLoader._getStore(self.mapLoader.path)  # zarr store
             with fs as store:
                 logger.error(f'opening zar path for every slice??? sliceIdx:{sliceIdx} {self.channel}')
                 group: zarr.hierarchy.Group = zarr.group(store=store)
@@ -871,10 +886,12 @@ class ImageChannel():
         else:
             # ensure all slices are loaded
             _sliceRange = np.arange(startSlice,stopSlice+1, 1)  # to include last slice
+            # logger.warning(f'_sliceRange:{_sliceRange}')
             for _sliceIdx in _sliceRange:
+                # lazy load a slice from zarr
                 self.getSlice(_sliceIdx)
             imgData = self._imgData[_sliceRange,:,:]
-        
+            # logger.warning(f'  imgData.shape:{imgData.shape}')
         return imgData
     
     def getImageData(self) -> np.ndarray:
