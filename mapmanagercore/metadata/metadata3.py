@@ -237,7 +237,28 @@ class TimepointMetadata(_metadataList):
 
     analysisParameters: AnalysisParams = dataclasses.field(default_factory=lambda: AnalysisParams())
     """The analysis parameters for this single timepoint (connected maps use a global version of this)."""
-    
+
+    # abb 202508
+    def getChannelDataForWidget(self) -> dict:
+        """Return channel data in widget-friendly format.
+        
+        Used in pymapmanager edit channel widget.
+        """
+        channel_keys = self.channelKeys
+        channels_data = {}
+        
+        for channel_key in channel_keys:
+            metadata = self.getChannelMetadata(channel_key)
+            if metadata is None:
+                raise ValueError(f"No metadata found for channel {channel_key}")
+                
+            channels_data[channel_key] = {
+                "label": metadata.name,
+                "color": metadata.color,
+            }
+        
+        return channels_data
+
     def convertUnits(self, voxelValue, paramKey):
         """ convert from real units to pixel units
 
