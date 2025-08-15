@@ -102,6 +102,9 @@ class ChannelMetadata(_metadataBase):
     # the remaining fields can be set by the user.
     minUserContrast: int = 1
     maxUserContrast: int = 1
+
+    minContrast_rgb: int = 0
+    maxContrast_rgb: int = 256
     
     color : str = "green"  # map -> 'green'
     """Color LUT for the image."""
@@ -145,6 +148,10 @@ class ChannelMetadata(_metadataBase):
     def setUserContrast(self, theMin, theMax):
         self.minUserContrast = theMin
         self.maxUserContrast = theMax
+
+    def resetAutoRgbContrast(self):
+        self.minContrast_rgb = self.minAutoContrast_rgb
+        self.maxContrast_rgb = self.maxAutoContrast_rgb
 
 @dataclass_json
 @dataclasses.dataclass

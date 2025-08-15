@@ -573,10 +573,15 @@ class mmMapLoader():
         # logger.info(f"entering here for slices")
         _imageChannel = self.getImageChannel(t, channelIdx)
         
-        _firstSlice = zRange[0]
+        # _firstSlice = zRange[0]
         # return _imageChannel.getSlice(_firstSlice)  # lazy
+
+        if threeD:
+            # Get 3D volume within range for brightest path tracing
+            vol = _imageChannel.getVolume(zRange[0], zRange[1])
+            return vol
+    
         return np.max(_imageChannel.getVolume(zRange[0], zRange[1]), axis=0)
-        # return np.max(_imageChannel[zRange[0]:zRange[1]], axis=0)
 
     def timePoints(self) -> Iterator[int]:
         """
