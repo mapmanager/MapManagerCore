@@ -60,7 +60,7 @@ from mapmanagercore.logger import logger
 try:
     import bioio
     import bioio_base.exceptions
-except (ImportError) as e:
+except (ImportError):
     bioio = None
     import tifffile
     logger.error('did not import bioio, defaulting to tifffile')

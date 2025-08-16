@@ -161,6 +161,12 @@ class VoxelMetadata(_metadataBase):
     zVoxel: float = 1.0
     unit: Literal["µm"] = "micrometer"  # abb from µm
 
+    @property
+    def shape(self) -> Tuple[int, int, int]:
+        """Get shape as (z, y, x).
+        """
+        return (self.zVoxel, self.yVoxel, self.xVoxel)
+    
 @dataclass_json
 @dataclasses.dataclass
 class ShapeMetadata(_metadataBase):

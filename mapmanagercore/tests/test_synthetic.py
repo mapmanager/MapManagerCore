@@ -195,6 +195,7 @@ def _getSpinePlot_Qt(mmMap: MapAnnotations, timepoint: int) -> SpinePlotQt:
     points = points.reset_index()  # move segmentID label into column
     points = points.reset_index()  # move spineID label into column
     print(f'points df is: {type(points)}')
+    print(points.columns)
     print(points)
 
     # print(f'points columns are:')
