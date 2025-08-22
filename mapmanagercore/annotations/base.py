@@ -103,14 +103,14 @@ class AnnotationsBase(LazyImagesGeoPandas):
         
         # Get the current channel keys to see what new channels were added
         currentChannelKeys = self.loader.metadata.getTimepoint(timepoint).channelKeys
-        logger.info(f'Current channel keys: {currentChannelKeys}')
+        # logger.info(f'Current channel keys: {currentChannelKeys}')
         
         # For each frame (segments and points), we need to add computed columns for new channels
         # We do this by calling addSchema again, which will add missing channel columns
         self._segments._store().addSchema(self._segments)
         self._points._store().addSchema(self._points)
         
-        logger.info('Schemas refreshed for new channels')
+        # logger.info('Schemas refreshed for new channels')
     
     def _cleanupSchemasForDeletedChannels(self, timepoint: int, deleted_channel: int):  # abc 20250806
         """Clean up schemas when channels are deleted.
@@ -131,7 +131,7 @@ class AnnotationsBase(LazyImagesGeoPandas):
             if f'_ch{deleted_channel}_' in col:
                 columns_to_remove.append(col)
         
-        logger.info(f'Found {len(columns_to_remove)} columns to remove: {columns_to_remove}')
+        # logger.info(f'Found {len(columns_to_remove)} columns to remove: {columns_to_remove}')
         
         # Remove the columns from both frames by removing them from the schema
         if columns_to_remove:
@@ -153,7 +153,7 @@ class AnnotationsBase(LazyImagesGeoPandas):
             self._segments._updateColumns()
             self._points._updateColumns()
         
-        logger.info('Schema cleanup completed for deleted channel')
+        # logger.info('Schema cleanup completed for deleted channel')
     
     def deleteChannel(self, timepoint: int, channel: int) -> bool:  # abc 20250806
         """Delete a color channel from a specific timepoint.
@@ -198,7 +198,8 @@ class AnnotationsBase(LazyImagesGeoPandas):
     def getPointDataFrame(self, t: Optional[int] = None) -> pd.DataFrame:
         """Get the full points dataframe.
         """
-        pointsDf = self.points[:]
+        # pointsDf = self.points[:]
+        pointsDf = self.points._rootDf
 
         if t is not None:
 
@@ -406,21 +407,20 @@ class AnnotationsBase(LazyImagesGeoPandas):
     def save(self, path: str = None):
         """Save the mmap
 
-        Parameters:
+        Parameters
+        ----------
         path : str
-            Path to save to, if a folder then save as zarr DirectoryStore, otherwise save as single file zip.
+            Path to save to.
+            If a folder then save as zarr DirectoryStore, otherwise save as single file zip.
+        
+        Notes
+        -----
+        - Never save to a .mmap.zip, the Zarr .zip format is not supported.
+        - Need to do command line zip to convert to .mmap.zip
         """
         if path is None:
             path = self.path
 
-        # if not path.endswith(".mmap"):
-        #     path += ".mmap"
-
-        # # abj - dont save if path is empty
-        # if path == ".mmap":
-        #     logger.warning(f'did not save:{path}')
-        #     return
-        
         _lastSaveTime = self.getCurrentTime()
 
         with warnings.catch_warnings():

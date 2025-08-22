@@ -295,11 +295,11 @@ Keys = Union[Key, list[Key]]
 class SingleTimePointAnnotationsBase(_SingleTimePointAnnotationsBase):
 
     def __str__(self):        
-        numTimepoints = f'single timepoint ({self._t})'
+        timepoint = f'SingleTimePointAnnotationsBase ({self._t})'
         numPnts = len(self.points)
         numSegments = len(self.segments)
                 
-        return f't:{numTimepoints}, points:{numPnts} segments:{numSegments} channels:{self.numChannels} images:{self.shape}'
+        return f'{timepoint}, points:{numPnts} segments:{numSegments} channels:{self.numChannels} images:{self.shape}'
         
     def getPixels(self,
                   channel: int,

@@ -11,6 +11,8 @@ Key = Union[SpineId, Tuple[SpineId, int]]
 Keys = Union[Key, list[Key]]
 
 
+# abb 202508 this is imported as MapAnnotations, like:
+# from mapmanagercore.annotations import MapAnnotations
 class AnnotationsBaseMut(AnnotationsBase):
     
     def deleteSpine(self, spineId: Keys, skipLog=False):
@@ -32,19 +34,24 @@ class AnnotationsBaseMut(AnnotationsBase):
             _numSpines = 0
         return _numSpines
     
-    def deleteSegment(self, segmentId: Keys, skipLog=False):
+    def deleteSegment(self, segmentId: Keys, skipLog=False, forceDelete=False):
         """
         Delete the segment with the given ID.
+        
+        If forceDelete is True, delete the segment even if it has an attached spine.
+
+        abb forceDelete is not implemented, only segment is deleted not spines!
         """
         try:
             # abb TODO use getNumSpines(segmentId)
             # abb multi timepoint error
-            if not self.points[["segmentID"]].reset_index().set_index(["segmentID", "t"]).loc[segmentId].empty:
+            if not forceDelete and not self.points[["segmentID"]].reset_index().set_index(["segmentID", "t"]).loc[segmentId].empty:
                 logger.warning(f'Cannot delete segment(s) {segmentId} as it has an attached spine(s)')
                 return False
                 # raise ValueError(
                 #     f"Cannot delete segment(s) {segmentId} as it has an attached spine(s)")
-        except KeyError:
+        except (KeyError) as e:
+            logger.error(f'deleteSegment error: {e}')
             pass
 
         self._drop("Segment", segmentId, skipLog=skipLog)

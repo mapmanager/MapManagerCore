@@ -396,18 +396,8 @@ class TimepointMetadata(_metadataList):
 
         # do the append
         newChannelKey = self.appendMetadataItem(metadataContrast)
-        logger.info(f'setting hard coded color using newChannelKey:{newChannelKey}')
-
-        # abj: testing more than 3 indexes
-        # colors = ['white', 'red', 'green', 'blue', 'magenta', 'orange']
-        # metadataContrast.color = colors[newChannelKey]
-
-        if newChannelKey==1:
-            metadataContrast.color = 'red'
-        elif newChannelKey == 2:
-            metadataContrast.color = 'green'
-        elif newChannelKey == 3:
-            metadataContrast.color = 'blue'
+        
+        metadataContrast.color = 'green'  # default to green
 
         return newChannelKey
     

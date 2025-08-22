@@ -76,19 +76,20 @@ class mmMapLoader():
             path (str): The path to the .mmap Zarr file.
                 If None then create an empty zarr loader
         """
-        logger.info(f'mmMapLoader path:{path}')
+        logger.info('-->> mmMapLoader path:')
+        logger.info(path)
 
         if path is not None:
             # ensure path is a directory or zip file
             if not os.path.isdir(path) and \
                     (not path.endswith('.zip') and not path.endswith('.tif')):
                 logger.error(f'path must be a directory or zip file {path}')
-                raise ValueError(f'path must be a directory or zip file')
+                raise ValueError('path must be a directory or zip file')
 
         self.path = path
         self.mapAnnotations = mapAnnotations
         self._metadata = mmMapMetadata()
-        self.lazyPointsFrame = None  # abj
+        # self.lazyPointsFrame = None  # abj abb 202508 depreciated
         
         # abb depreciate
         # self._imagesSrcs: List[Dict[int, np.ndarray]] = []
@@ -341,6 +342,8 @@ class mmMapLoader():
     
     def getChannelData(self, timepoint:int, channel:int) -> Optional[np.ndarray]:
         """Get the image data for a channel at a timepoint.
+
+        This does not do lazy load.
         """
         if not self.metadata.timepointExists(timepoint):
             return
@@ -398,6 +401,7 @@ class mmMapLoader():
             except (KeyError) as e:
                 # no metadata in file
                 logger.error(f'while fetching "metadata" -> {e}')
+                logger.error(f'  path is:{path}')
                 return
         return channelPathsList
     
@@ -461,6 +465,8 @@ class mmMapLoader():
     def saveAs(self, path:str) -> Optional[bool]:
         """Save the zarr file to disk.
         """
+        logger.info(f'saving to path:{path}')
+        
         if path.endswith('.mmap.zip'):
             logger.error('can not save to .zip')
             return
@@ -492,7 +498,8 @@ class mmMapLoader():
                 _existingMetadata = self._getChannelPaths(path)
                 if _existingMetadata is None:
                     # zarr exists but no metadata yet
-                    logger.info(f'no metadata in path:{path}')
+                    # abb 202508 this is saveas, there will never be metadata
+                    logger.info(f'ok on pure save as ... no metadata in path:{path}')
                 else:
                     # logger.info('from path _existingMetadata:')
                     # pprint(_existingMetadata)
@@ -539,12 +546,16 @@ class mmMapLoader():
                         logger.info(f'    {_channelPath} already in file skipping')
                         continue
                     else:
-                        #TODO: true save as will have to LOAD ALL DATA (not lazy)
+                        #TODO: true save will have to LOAD ALL DATA (not lazy)
                         if _zipStore:
                             self.getImageChannel(t, c).loadAllImageData()
                             logger.info(f'_zipStore loaded numLoaded:{self.getImageChannel(t, c).numLoaded}')
+                        # imgData = self.getChannelData(t, c)  # full image data
+                        logger.info(f'loading all stack slice images')
+
+                        self.getImageChannel(t, c).loadAllImageData()
                         imgData = self.getChannelData(t, c)  # full image data
-                        # logger.info(f"    {_channelPath} saving -> {imgData.shape}")
+                        logger.info(f"    {_channelPath} saving -> {imgData.shape} min:{imgData.min()} max:{imgData.max()}")
                         # store imgData in zarr file/folder
                         group[_channelPath] = imgData
 
@@ -858,15 +869,25 @@ class ImageChannel():
     
         # option 2, pre allocate an nparray
         if not self._sliceIsLoaded(sliceIdx):
+            
+            # debug
+            # raise Exception(f'sliceIdx:{sliceIdx} is not loaded')
+        
             fs = self.mapLoader._getStore(self.mapLoader.path)  # zarr store
             with fs as store:
-                logger.error(f'opening zar path for every slice??? sliceIdx:{sliceIdx} {self.channel}')
+                
                 group: zarr.hierarchy.Group = zarr.group(store=store)
 
                 # logger.info(list(self.mapLoader.group.keys()))
                 # self._imgData[sliceIdx,:,:] = self.mapLoader.group[self._channelPath][sliceIdx,:,:]
-                self._imgData[sliceIdx,:,:] = group[self._channelPath][sliceIdx,:,:]
+                _loadedImgData = group[self._channelPath][sliceIdx,:,:]
+                # self._imgData[sliceIdx,:,:] = group[self._channelPath][sliceIdx,:,:]
+                self._imgData[sliceIdx,:,:] = _loadedImgData
                 self._sliceLoaded[sliceIdx] = True
+
+                _min = _loadedImgData.min()
+                _max = _loadedImgData.max()
+                logger.error(f'lazy loading sliceIdx:{sliceIdx} channe:{self.channel} min:{_min} max:{_max}')
 
         return self._imgData[sliceIdx,:,:]
 

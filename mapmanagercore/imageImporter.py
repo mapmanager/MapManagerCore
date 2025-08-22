@@ -81,6 +81,7 @@ def acceptedExtensions() -> List[str]:
             _acceptedExtensions.append(item[0])
         # always accept .mmap.zip for loading mmap files
         _acceptedExtensions.append('.mmap.zip')
+        _acceptedExtensions.append('.mmap')  # folder
     else:
         _acceptedExtensions = ['.tif', '.zip', '.mmap']  # adding .zip to load mmap zip files
     return _acceptedExtensions

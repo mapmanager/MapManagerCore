@@ -324,10 +324,10 @@ class LazyGeoFrame(Generic[T]):
         # self._store().addSchema(self)
         self._context = context
         self._baseFilter = None
-        logger.info(f"checking this instantiating of lazygeoframe")
+        # logger.info(f"checking this instantiating of lazygeoframe")
         self._skipColumns = []
         # abb moved to here
-        logger.info('self._store().addSchema(self)')
+        # logger.info('self._store().addSchema(self)')
         self._store().addSchema(self)
 
     def invalidateColumns(self, columns: Iterator[str] = None, ids: pd.Index = None):
@@ -710,9 +710,11 @@ class LazyGeoFrame(Generic[T]):
                     storeClone._setFilterIndex(store._df.loc[ids].index)
                     storeClone._insureComputed(deps)
                 
+                # abb when we load a mmap zarr directory store and call points[:]
+                # all stats are computed???
                 # super usefull !!!
                 # logger.debug(
-                    # f'Computing column "{column}" for num invalid: {len(invalidClone)}')
+                #     f'_insureComputed is computing column "{column}" for num invalid: {len(invalidClone)}')
                 
                 func = attribute["_func"]
                 if func.__code__.co_argcount == 1:

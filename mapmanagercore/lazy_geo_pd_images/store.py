@@ -191,10 +191,14 @@ class LazyImagesGeoPandas(LazyGeoPandas):
                 try:
                     pixels =  self._recordShapePixels["pixels"]
                     # logger.info(f"using old pixels")
-                except:
-                    logger.info(f"no old pixels, must calculate new one")
+                except (KeyError) as e:  # abb 202508
+                    logger.error(e)
+                    logger.warning(f"  no old pixels, must calculate new one")
+                    logger.warning(f"  shapes is: {shapes}")
+                    logger.warning(f"  channels is: {channels}")
+                    logger.warning(f"  zSpread is: {zSpread}")
                     pixels = weakSelf().getShapePixels(
-                    shapes, channel=channels, zSpread=zSpread)
+                        shapes, channel=channels, zSpread=zSpread)
             
             else:
                 # logger.info(F"new pixels")
@@ -337,7 +341,7 @@ class LazyImagesGeoPandas(LazyGeoPandas):
                 continue
 
             attributes: ImageColumnAttributes = method._imageComputed
-            logger.info(f'checking attributes {attributes}')
+            # logger.info(f'checking attributes {attributes}')
             if "_aggregate" not in attributes:
                 continue
 

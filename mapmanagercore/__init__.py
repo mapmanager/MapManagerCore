@@ -33,7 +33,7 @@ def canImportPath(path) -> bool:
     return canLoad
 
 def canLoadPath(path) -> bool:
-    """Return True if we can import a folder (require .mmap)
+    """Return True if we can load a folder (.mmap) or a .mmap.zip
     """
     canLoad = False
     for importExt in LOAD_SAVE_EXTENSIONS:
