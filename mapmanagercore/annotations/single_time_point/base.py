@@ -64,6 +64,8 @@ class SingleTimePointFrame(LazyGeoFrame):
     @timer
     def __getitem__(self, items: Any) -> Any:
 
+        # logger.warning(f'SingleTimePointFrame items:{items} type:{type(items)}')
+
         result = self._root[items]
                 
         isDataFrame = isinstance(result, pd.DataFrame) or isinstance(result, gp.GeoDataFrame)

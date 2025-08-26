@@ -91,26 +91,30 @@ class ImageImporter_Base(ABC):
     """
 
     @abstractmethod
-    def __init__(self, path:str, loadImgData:bool=False):
-        # check if file exists (does not work for url like http).
-        try:
-            with open(path) as _file:
-                pass
-        except FileNotFoundError as e:
-            logger.error(e)
-            raise e
+    def __init__(self, 
+                 path:str = None,
+                 imgData: np.ndarray = None,
+                 loadImgData:bool=False):
 
-        self._path = path
-
-        # self._img = None
-        # self._img: bioio.BioImage = bioio.BioImage(path, reader=None) 
-        """BioImage that provides metadata info and lazy loading of pixels."""
-        
         self._imgDataList: List[np.ndarray] = []
         """List of np.ndarray, one index per color channel. See loadData()"""
 
-        self._timepointMetadata: TimepointMetadata = None
+        self._timepointMetadata: TimepointMetadata = TimepointMetadata()
         """TimepointMeta data including info on each color channel."""
+
+        if imgData is not None:
+            self._imgDataList.append(imgData)
+        
+        else:
+            # check if file exists (does not work for url like http).
+            try:
+                with open(path) as _file:
+                    pass
+            except FileNotFoundError as e:
+                logger.error(e)
+                raise e
+
+        self._path = path        
 
         if loadImgData:
             self.loadData()
@@ -201,6 +205,16 @@ class ImageImporter_Base(ABC):
 
         return self._timepointMetadata
 
+class ImageImporter_ndarray(ImageImporter_Base):
+    """Import image data from in memory np array.
+    """
+    def __init__(self, imgData: np.ndarray):
+        super().__init__(path=None, imgData=imgData, loadImgData=True)
+
+    def loadData(self) -> List[np.ndarray]:
+        # when we load from np ndarray we already have the img data loaded.
+        pass
+
 class ImageImporter_tiff(ImageImporter_Base):
     """Import image data from tiff file.
     """
@@ -208,8 +222,6 @@ class ImageImporter_tiff(ImageImporter_Base):
         """Loading from tiff will always set loadImgData=True.
         """
         super().__init__(path, loadImgData=True)
-
-        # self.loadData()
 
     def loadData(self) -> List[np.ndarray]:
         if len(self._imgDataList) > 0:
@@ -245,7 +257,7 @@ class ImageImporter_bioio(ImageImporter_Base):
         self._img: bioio.BioImage = bioio.BioImage(path, reader=_reader) 
         """BioImage that provides metadata info and lazy loading of pixels."""
 
-        super().__init__(path, loadImgData)
+        super().__init__(path=path, loadImgData=loadImgData)
 
         # check if file exists (does not work for url like http).
         # try:
@@ -402,7 +414,9 @@ class ImageImporter_bioio(ImageImporter_Base):
 
         return self._timepointMetadata
     
-def getImageImporter(path:str, loadImgData:bool=False) -> Optional[ImageImporter_Base]:
+def getImageImporter(path:str = None,
+                     imgData:np.ndarray = None,
+                     loadImgData:bool=False) -> Optional[ImageImporter_Base]:
     """Get an ImageImporter from a path.
     
     Args:
@@ -415,6 +429,10 @@ def getImageImporter(path:str, loadImgData:bool=False) -> Optional[ImageImporter
     Notes:
         Will fail (return None) when extension is not supported or file does not exist.
     """
+    if imgData is not None:
+        ii = ImageImporter_ndarray(imgData)
+        return ii
+
     _, _ext = os.path.splitext(path)
     if _ext not in acceptedExtensions():
         logger.error(f'extension "{_ext}" not supported, accepted extensions are: {acceptedExtensions()}')

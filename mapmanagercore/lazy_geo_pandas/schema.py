@@ -215,7 +215,7 @@ class Schema:
                     values.pop(key)
 
         for key, value in values.items():
-            if not key in typeColumns:
+            if key not in typeColumns:
                 raise ValueError(f"Invalid column {key}")
             expectedType = typeColumns[key]
             if not isInstanceExtended(value, expectedType):

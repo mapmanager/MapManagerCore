@@ -258,6 +258,7 @@ class ImageLoader:
         else:
             _ret = np.max(self._images(time, channel)[sliceRange[0]:sliceRange[1]], axis=0)
         
+        logger.warning(f'!!! SHOULD NOT BE CALLED: use mm_map_loader')
         logger.warning(f'abb time:{time} channel:{channel} sliceRange:{sliceRange} threeD:{threeD} self._images:{type(self._images)} got shape:{_ret.shape}')
 
         return _ret
@@ -324,6 +325,8 @@ class ImageLoader:
         Returns:
             pd.Series: Series containing the image slices corresponding to the shape.
         """
+        logger.warning(f'!!! SHOULD NOT BE CALLED: use mm_map_loader')
+        
         results = []
         indexes = []
 

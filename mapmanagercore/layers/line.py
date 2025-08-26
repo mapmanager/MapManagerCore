@@ -297,6 +297,10 @@ def getRunningDistance(segmentLine: LineString):
 
 @timer
 def calcSubLine(line: LineLayer, origin: Point, distance: int):
+    """Extract a portin of a line +/- distance starting from the position where origin intersects the line.
+    
+    abb: We could ad a bounds check with min(root + distance, line_length)
+    """
     root = line.project(origin)
     sub = substring(line, start_dist=max(
         root - distance, 0), end_dist=root + distance)

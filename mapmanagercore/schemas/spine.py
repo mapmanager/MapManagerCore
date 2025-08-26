@@ -153,6 +153,7 @@ class Spine(Schema):
     @compute(title="Spine Length", dependencies=["anchor", "point"])
     @timer
     def spineLength(frame: LazyGeoFrame):
+        logger.warning('!!! DEBUG 20250825 CALCULATING SPINE LENGTH !!!')
         return gp.GeoSeries(frame["anchor"]).distance(frame["point"])
 
     @compute(title="Spine Position", dependencies={
@@ -205,8 +206,17 @@ class Spine(Schema):
         df = frame[["segmentID", "anchor"]].join(
             ctx.segments[["segment", "radius"]], on=["segmentID", "t"])
 
-        return df.apply(lambda d: calcSubLine(d["segment"], d["anchor"], distance=8), axis=1).buffer(df["radius"], cap_style='flat')
+        _df = df.apply(lambda d: calcSubLine(d["segment"], d["anchor"], distance=8), axis=1).buffer(df["radius"], cap_style='flat')
 
+        # logger.info('roiBase _df is:')
+        # print(_df)
+        """
+        spineID  t
+        1        1    POLYGON ((152 196, 152 204, 168 204, 168 196, ...
+        """
+        
+        return _df
+    
     @compute(title="ROI Base Background", dependencies=["roiBase", "xBackgroundOffset", "yBackgroundOffset"], plot=False)
     @timer
     def roiBaseBg(frame: LazyGeoFrame) -> gp.GeoSeries:
@@ -229,7 +239,10 @@ class Spine(Schema):
                 return Polygon()
             return head
 
-        return frame[["point", "anchor", "roiExtend", "roiRadius", "roiBase"]].apply(computeRoiHead, axis=1)
+        _df = frame[["point", "anchor", "roiExtend", "roiRadius", "roiBase"]].apply(computeRoiHead, axis=1)
+        # logger.info('roiHead _df is:')
+        # print(_df)
+        return _df
 
     @compute(title="ROI Head Background", dependencies=["roiHead", "xBackgroundOffset", "yBackgroundOffset"], plot=False)
     @timer
@@ -291,7 +304,12 @@ class Spine(Schema):
     ## Image based ROI computed stats ##
     ##
     def _aggList() -> List[str]:
-        return ['sum', 'mean', 'min', 'max']
+        # abb was this before 20250825
+        # return ['sum', 'mean', 'min', 'max']
+        
+        # now, 20250825 we want this, on load existing mmMap we get update errrors
+        # e.g. for example, angle and side are not even calculated
+        return ['size','sum', 'mean', 'std', 'min', 'max', 'median']
 
     # union of base (dendrite) and head (spine)
     @computeAggregateImage(title="Roi",
@@ -300,7 +318,11 @@ class Spine(Schema):
                            group="ROI")
     @timer
     def spineRoi(frame: LazyGeoFrame):
-        return frame[["roi", "z"]]
+        # combined spine head and base !!! !!!
+        _ret = frame[["roi", "z"]]
+        # logger.info('spineRoi _ret is:')
+        # print(_ret)
+        return _ret
 
     # union
     @computeAggregateImage(title="Background Roi",

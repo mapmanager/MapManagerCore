@@ -175,6 +175,11 @@ class LazyGeoPandas:
 
         value = {key: val for key, val in vars(
             value).items() if not isinstance(val, MISSING_VALUE_CLASS)}
+        
+        # logger.warning('202508 _update() value is:')
+        # for _k, _v in value.items():
+        #     logger.warning(f'   {_k}: {_v}')
+
         store._schema.validateColumns(value, dropIndex=False)
 
         df = store._df

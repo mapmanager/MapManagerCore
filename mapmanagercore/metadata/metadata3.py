@@ -113,6 +113,7 @@ class ChannelMetadata(_metadataBase):
     """Name of the channel."""
 
     # abj: boolean to enable auto recalculation
+    # abb this was to get channels that have roi intensity metrics like _ch1_sum
     channelActivated: bool = True
 
     def _initFromImgData(self, imgData : np.ndarray):
@@ -484,7 +485,8 @@ class TimepointMetadata(_metadataList):
         return self._metadataList[channelIdx].getValue(key)
     
     # abj
-    def getAllChannelProperty(self, key) -> List:
+    # abb removed
+    def _old_getAllChannelProperty(self, key) -> List:
         """ Get a list of all values within Channel dict of a given key
 
         Example use case: get all activated channels
@@ -497,7 +499,8 @@ class TimepointMetadata(_metadataList):
 
         return allChannelProperty
     
-    def getActivatedChannels(self) -> List:
+    # abb depreciate this, we now add/delete columns from schema on import channel and delete
+    def _old_getActivatedChannels(self) -> List:
         """  get all activated channels
 
         Example use case: get all activated channels
@@ -512,13 +515,13 @@ class TimepointMetadata(_metadataList):
                 activatedChannels.append(channel)
                 channelActivated = False # reset variable
 
-        # logger.info(f"activatedChannels {activatedChannels}")
+        # logger.info(f"abj activatedChannels {activatedChannels}")
         return activatedChannels
     
     # def activateChannel(self, channelIdx, key, value):
     #     self.setChannelProperty(channelIdx, key)
 
-    def getInActiveChannels(self) -> List:
+    def _old_getInActiveChannels(self) -> List:
         """  get all inactive channels
         """
         inActiveChannels = []
@@ -528,7 +531,7 @@ class TimepointMetadata(_metadataList):
                 inActiveChannels.append(channel)
                 channelActivated = True # reset variable
 
-        logger.info(f"inActiveChannels are: {inActiveChannels}")
+        logger.info(f"abj inActiveChannels are: {inActiveChannels}")
         return inActiveChannels
     
     def getChannelNames(self) -> dict:

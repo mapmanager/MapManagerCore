@@ -86,7 +86,12 @@ def addSpines(mmMap : MapAnnotations, segmentID: int):
         x = row[0]
         y = row[1]
         logger.info(f'   {idx} addSpine segment:{segmentID} x:{x} y:{y}')
-        tp.addSpine(segmentID, x, y, z)
+        newSpineID = tp.addSpine(segmentID, x, y, z)
+
+    # move the last spine
+    lastSpineID = newSpineID
+    logger.info(f'moving last spine {lastSpineID} from [900, 800] to [100, 100]')
+    tp.moveSpine(spineId=lastSpineID, x=100, y=100, z=0) # from [900, 800]
 
 def addSegment(mmMap : MapAnnotations, segmentID: int):
     timepointKeys = mmMap.loader.metadata.timepointKeys
@@ -135,7 +140,7 @@ def makeMap():
     logger.info("1. Creating loader and importing first timepoint...")
     loader = mmMapLoader()
     timepoint_path = 'data/sine_2d.tif'
-    timepoint_key = loader.importTimepoint(timepoint_path)
+    timepoint_key = loader.importTimepoint(path=timepoint_path)
     logger.info(f"   Timepoint key: {timepoint_key}")
     # TODO: check metadata
     
@@ -345,8 +350,24 @@ def run():
     logger.info(f'1 getNumSpines:{mmMap.getNumSpines(newSegmentID1)}')
     logger.info(f'2 getNumSpines:{mmMap.getNumSpines(newSegmentID2)}')
 
+    # check points columns
+    # columns like below are nan until we specifically call mmMap.points['spineLength']
+    # _debugColumns = ['spineLength', 'spineAngle', 'spineSide', 'z']
+    # print(mmMap.points['spineLength'])
+    # print(mmMap.points[_debugColumns])
+
+    # logger.info('mmMap.points._rootDf is:')
+    # print(mmMap.points._rootDf[_debugColumns])
+    # print(mmMap.points._df[_debugColumns])
+    # print(mmMap.points._rootDf[_debugColumns])
+    print(mmMap.points._rootDf.columns)
+    print(mmMap.points._rootDf)
+
+    # logger.info('mmMap.points._rootDf is:')
+    # print(mmMap.points._rootDf)
+
     # todo: put back in
-    plotPlotly(mmMap)
+    # plotPlotly(mmMap)
 
 if __name__ == '__main__':
     # sin = sinImage(SinType.horizontal)

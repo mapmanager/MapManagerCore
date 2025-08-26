@@ -76,8 +76,8 @@ class mmMapLoader():
             path (str): The path to the .mmap Zarr file.
                 If None then create an empty zarr loader
         """
-        logger.info('-->> mmMapLoader path:')
-        logger.info(path)
+        # logger.info('-->> mmMapLoader path:')
+        # logger.info(path)
 
         if path is not None:
             # ensure path is a directory or zip file
@@ -184,12 +184,14 @@ class mmMapLoader():
             for c,cv in tv.items():
                 print(f'  c:{c} {cv}')
 
-    def importTimepoint(self, path) -> Optional[int]:
+    def importTimepoint(self,
+                        path:str = None,
+                        imgData:np.ndarray = None) -> Optional[int]:
         """Import and append a new timepoint from file (can be multiple channels).
         """
         
         # load all data from path
-        imageImporter = getImageImporter(path, loadImgData=True)
+        imageImporter = getImageImporter(path=path, imgData=imgData, loadImgData=True)
         if imageImporter is None:
             logger.error(f'did not get image importer for path:{path}')
             return
@@ -307,7 +309,7 @@ class mmMapLoader():
         """
         return self.metadata.getTimepoint(timepoint).numChannels
     
-    def activatedChannels(self, timepoint:int):
+    def _old_activatedChannels(self, timepoint:int):
         """ Get dict of channels that are activated
 
         Key: Channel number
@@ -315,7 +317,7 @@ class mmMapLoader():
         """
         return self.metadata.getTimepoint(timepoint).getActivatedChannels()
     
-    def inActiveChannels(self, timepoint:int):
+    def _old_inActiveChannels(self, timepoint:int):
         """ Get dict of channels that are activated
 
         Key: Channel number
@@ -629,15 +631,18 @@ class mmMapLoader():
 
         Returns:
             pd.Series: Series containing the image slices corresponding to the shape.
+
+        Notes:
+            abb: This is at least called on addSpine for nearestAnchor and snapBackgroundOffset.
         """
-        # logger.info('TODO: FIX')
-        # print(f'  shape is:')
+
+        # logger.info('=== entering mm_map_loader.getShapePixels() ===')
+        # logger.info(f'  shape is type: {type(shape)} len: {len(shape)}')
         # print(shape)
-        # print(f'  zSpread:{zSpread}')
-        # print(f'  channel:{channel}')
-        # print(f'  time:{time}')
-        # print(f'  z:{z}')
-        
+
+        # import traceback
+        # traceback.print_stack() # Prints the call stack at this point
+
         results = []
         indexes = []
 
@@ -647,6 +652,7 @@ class mmMapLoader():
         if isinstance(shape, pd.Series) or isinstance(shape, gp.GeoSeries):
             shape = shape.to_frame("shape")
 
+        # print(f'shape.index.names:{shape.index.names}')  # [None]
         if "t" in shape.index.names:
             # logger.info(f"'t' is in shape.index.names ... why is this important???")
             if "t" not in shape.columns:
@@ -666,10 +672,20 @@ class mmMapLoader():
             if z is None:
                 coords = shape["shape"].get_coordinates(include_z=True)
                 shape["z"] = coords["z"].groupby(coords.index).mean()
+                # TODO: 202508 check this for 3d image
+                # logger.info('shape["z"] is now:')
+                # print(shape["z"])
             else:
                 shape["z"] = z
 
         shape["z"] = shape["z"].astype(int)
+
+        # print(f'=== shape is len {len(shape)} type {type(shape)}:')  # geopandas.geoseries.GeoSeries
+        # print(shape)
+        # print(f'  zSpread:{zSpread}')
+        # print(f'  channel:{channel} {type(channel)}')
+        # print(f'  time:{time}')
+        # print(f'  z:{z}')
 
         _firstTimepointChannels = channel
         if isinstance(channel, list):
@@ -707,6 +723,10 @@ class mmMapLoader():
                         [np.where(inBounds, image[ys, xs], np.nan) for image in images]) 
                     indexes.append(idx)
             
+                    # logger.info(f'202508 get image mask from results:')
+                    # logger.info('{results}')
+
+
             # abb this is tricky, sometimes `channel` is int, sometimes list ???
             # print(len(results))
             # print(len(indexes))
@@ -714,11 +734,12 @@ class mmMapLoader():
             # return pd.DataFrame(results, indexes, columns=channel)
             # logger.warning(f'  -->> _firstTimepointChannels:{_firstTimepointChannels}')
             return pd.DataFrame(results, indexes, columns=_firstTimepointChannels)
-
-        # logger.info(f"shape {shape}")
+        
         for (t, z), group in shape.groupby(by=["t", "z"]):
-            # abb
-            # _channelKeys = self.metadata.getTimepoint(t).channelKeys
+
+            # logger.warning(f'202508 after shape.groupby()')
+            # print(f't:{t} z:{z} group:')
+            # print(group)
 
             # abb 202508 constraining zSpead to image shape
             lower_z = max(z - zSpread, 0)   
@@ -733,7 +754,7 @@ class mmMapLoader():
 
             for idx, row in group.iterrows():
                 xLim, yLim = image.shape
-                xs, ys = shapeIndexes(row["shape"])
+                xs, ys = shapeIndexes(row["shape"])  # Get the x and y indexes of the pixels in a shape.
                 # Clip the coordinates to the image bounds.
                 inBounds = (xs >= 0) & (xs < xLim) & (ys >= 0) & (ys < yLim)
                 xs = np.clip(xs, 0, xLim - 1)
@@ -743,8 +764,12 @@ class mmMapLoader():
                 # results.append(np.where(inBounds, image[xs, ys], np.nan))
 
                 # abj: accounting for pixels being inverted when plotting by switching ys and xs
-                results.append(np.where(inBounds, image[ys, xs], np.nan)) 
+                _thesePixels = np.where(inBounds, image[ys, xs], np.nan)
+                results.append(_thesePixels) 
                 indexes.append(idx)
+
+        # logger.info(f'202508 getShapePixels results:')
+        # logger.info(f'results: {len(results)} type {type(results)}')
 
         return pd.Series(results, indexes, name=channel)
     
@@ -887,7 +912,7 @@ class ImageChannel():
 
                 _min = _loadedImgData.min()
                 _max = _loadedImgData.max()
-                logger.error(f'lazy loading sliceIdx:{sliceIdx} channe:{self.channel} min:{_min} max:{_max}')
+                logger.error(f'lazy loaded sliceIdx:{sliceIdx} channe:{self.channel} min:{_min} max:{_max}')
 
         return self._imgData[sliceIdx,:,:]
 
