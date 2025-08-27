@@ -366,3 +366,107 @@ class AnnotationsBaseMut(AnnotationsBase):
             _ = self.segments[list(missing_segment_columns)]  # This triggers computation
         elif missing_segment_columns:
             logger.info(f'No segment data to compute {len(missing_segment_columns)} missing columns')
+
+    # abc 20250806 - Enhanced saving methods with computed columns
+    def save_with_computed_columns(self, path: str = None):
+        """
+        Save the mmap with all computed columns pre-computed.
+        
+        This ensures that all computed columns are calculated and saved to the file,
+        making loading more efficient and ensuring backward compatibility.
+        
+        Args:
+            path: Path to save to (if None, uses self.path)
+        """
+        logger.info(f'Saving with computed columns to: {path or self.path}')
+        
+        # 1. Trigger computation of all computed columns
+        self._compute_all_computed_columns()
+        
+        # 2. Call the existing save method
+        self.save(path)
+        
+        logger.info('Successfully saved with computed columns')
+
+    def _compute_all_computed_columns(self):
+        """
+        Force computation of all computed columns in both points and segments.
+        This ensures all computed data is available for saving.
+        """
+        logger.info('Computing all computed columns before save...')
+        
+        # Get all computed columns from schemas
+        computed_point_columns = Spine.getColumnNames(include_computed=True, include_basic=False)
+        computed_segment_columns = Segment.getColumnNames(include_computed=True, include_basic=False)
+        
+        total_computed = 0
+        
+        # Trigger computation for points
+        if computed_point_columns and len(self.points) > 0:
+            logger.info(f'Computing {len(computed_point_columns)} point columns before save: {computed_point_columns}')
+            _ = self.points[computed_point_columns]  # This triggers computation
+            total_computed += len(computed_point_columns)
+        elif computed_point_columns:
+            logger.info(f'No point data to compute {len(computed_point_columns)} columns')
+        
+        # Trigger computation for segments  
+        if computed_segment_columns and len(self.segments) > 0:
+            logger.info(f'Computing {len(computed_segment_columns)} segment columns before save: {computed_segment_columns}')
+            _ = self.segments[computed_segment_columns]  # This triggers computation
+            total_computed += len(computed_segment_columns)
+        elif computed_segment_columns:
+            logger.info(f'No segment data to compute {len(computed_segment_columns)} columns')
+        
+        logger.info(f'Completed computation of {total_computed} computed columns')
+
+    def _get_computed_columns_status(self):
+        """
+        Get the status of computed columns for debugging and verification.
+        
+        Returns:
+            dict: Status information about computed columns
+        """
+        # Get all computed columns from schemas
+        computed_point_columns = Spine.getColumnNames(include_computed=True, include_basic=False)
+        computed_segment_columns = Segment.getColumnNames(include_computed=True, include_basic=False)
+        
+        # Check which computed columns are currently available
+        available_point_columns = set(self.points.columns) if len(self.points) > 0 else set()
+        available_segment_columns = set(self.segments.columns) if len(self.segments) > 0 else set()
+        
+        # Find missing computed columns
+        missing_point_columns = set(computed_point_columns) - available_point_columns
+        missing_segment_columns = set(computed_segment_columns) - available_segment_columns
+        
+        status = {
+            'total_computed_point_columns': len(computed_point_columns),
+            'total_computed_segment_columns': len(computed_segment_columns),
+            'available_point_columns': len(available_point_columns),
+            'available_segment_columns': len(available_segment_columns),
+            'missing_point_columns': list(missing_point_columns),
+            'missing_segment_columns': list(missing_segment_columns),
+            'all_computed_available': len(missing_point_columns) == 0 and len(missing_segment_columns) == 0
+        }
+        
+        return status
+
+    def verify_computed_columns_before_save(self):
+        """
+        Verify that all computed columns are available before saving.
+        This is useful for debugging and ensuring data integrity.
+        
+        Returns:
+            bool: True if all computed columns are available, False otherwise
+        """
+        status = self._get_computed_columns_status()
+        
+        if status['all_computed_available']:
+            logger.info('All computed columns are available for saving')
+            return True
+        else:
+            logger.warning('Some computed columns are missing before save:')
+            if status['missing_point_columns']:
+                logger.warning(f'  Missing point columns: {status["missing_point_columns"]}')
+            if status['missing_segment_columns']:
+                logger.warning(f'  Missing segment columns: {status["missing_segment_columns"]}')
+            return False
