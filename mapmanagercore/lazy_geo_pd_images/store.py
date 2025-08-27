@@ -256,6 +256,7 @@ class LazyImagesGeoPandas(LazyGeoPandas):
         # logger.warning('!!==!! abb in store.py LazyImagesGeoPandas')
 
         # abai 20250806: Use metadata3 API for current channel keys
+        logger.warning('TODO fix this, we hard coded getTimepoint(1)')
         currentChannelKeys = self._images.metadata.getTimepoint(1).channelKeys  # abai 20250806
 
         # Inject computed columns that use the image to calculate roi stats

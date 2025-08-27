@@ -228,6 +228,39 @@ class Schema:
                     print(e)
                     raise ValueError(f"Invalid type for column {key}")
 
+    @classmethod
+    def getColumnNames(cls, include_computed: bool = True, include_basic: bool = True) -> List[str]:
+        """
+        Gets all column names from this schema class.
+        
+        Args:
+            include_computed (bool): Whether to include computed columns (default: True)
+            include_basic (bool): Whether to include basic/non-computed columns (default: True)
+        
+        Returns:
+            List[str]: List of column names
+        """
+        if not include_computed and not include_basic:
+            return []
+        
+        if include_computed and include_basic:
+            # Return all columns
+            return list(cls._annotations.keys())
+        
+        if include_computed and not include_basic:
+            # Return only computed columns
+            return [name for name, attr in cls._attributes.items() 
+                    if "_func" in attr]
+        
+        if include_basic and not include_computed:
+            # Return only basic columns (non-computed)
+            return [name for name, attr in cls._attributes.items() 
+                    if "_func" not in attr]
+        
+        return []
+
+
+
 
 def isInstanceExtended(value, expectedType):
     """

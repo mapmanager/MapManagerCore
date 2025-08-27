@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Union, List
 import numpy as np
 from shapely.geometry import Point
 import shapely
@@ -804,3 +804,87 @@ class AnnotationsInteractions(AnnotationsSegments):
 
     def onDelete(self):
         return False
+
+    # Column computation methods
+    def computeAllSpineColumns(self, spineIds: Union[SpineId, List[SpineId], None] = None):
+        """
+        Computes all computed columns for specified spines or all spines.
+        More efficient version that triggers computation for all columns at once.
+        """
+        # Get all computed columns from the Spine schema
+        computed_columns = Spine.getColumnNames(include_computed=True, include_basic=False)
+        
+        if not computed_columns:
+            logger.info("No computed columns found in Spine schema")
+            return True
+        
+        logger.info(f"Computing {len(computed_columns)} columns: {computed_columns}")
+        
+        if spineIds is None:
+            # Compute for all spines (if any exist)
+            if len(self.points) > 0:
+                # Trigger computation for all computed columns at once
+                _ = self.points[computed_columns]
+                logger.info(f"Computed {len(computed_columns)} columns for all spines")
+            else:
+                logger.info("No spines exist to compute columns for")
+        else:
+            # Compute for specific spine(s)
+            if isinstance(spineIds, (int, np.integer)):
+                spineIds = [spineIds]
+            
+            for spineId in spineIds:
+                if spineId in self.points.index.get_level_values(0):
+                    # Trigger computation for all computed columns for this spine
+                    _ = self.points[spineId, computed_columns]
+                    logger.info(f"Computed {len(computed_columns)} columns for spine {spineId}")
+                else:
+                    logger.warning(f"Spine {spineId} not found")
+        
+        return True
+
+    def computeAllSegmentColumns(self, segmentIds: Union[SegmentId, List[SegmentId], None] = None):
+        """
+        Computes all computed columns for specified segments or all segments.
+        More efficient version that triggers computation for all columns at once.
+        """
+        # Get all computed columns from the Segment schema
+        computed_columns = Segment.getColumnNames(include_computed=True, include_basic=False)
+        
+        if not computed_columns:
+            logger.info("No computed columns found in Segment schema")
+            return True
+        
+        logger.info(f"Computing {len(computed_columns)} columns: {computed_columns}")
+        
+        if segmentIds is None:
+            # Compute for all segments (if any exist)
+            if len(self.segments) > 0:
+                # Trigger computation for all computed columns at once
+                _ = self.segments[computed_columns]
+                logger.info(f"Computed {len(computed_columns)} columns for all segments")
+            else:
+                logger.info("No segments exist to compute columns for")
+        else:
+            # Compute for specific segment(s)
+            if isinstance(segmentIds, (int, np.integer)):
+                segmentIds = [segmentIds]
+            
+            for segmentId in segmentIds:
+                if segmentId in self.segments.index.get_level_values(0):
+                    # Trigger computation for all computed columns for this segment
+                    _ = self.segments[segmentId, computed_columns]
+                    logger.info(f"Computed {len(computed_columns)} columns for segment {segmentId}")
+                else:
+                    logger.warning(f"Segment {segmentId} not found")
+        
+        return True
+
+    # Convenience methods for column names
+    def getSpineColumnNames(self, include_computed: bool = True, include_basic: bool = True) -> List[str]:
+        """Gets all column names from the Spine schema."""
+        return Spine.getColumnNames(include_computed, include_basic)
+
+    def getSegmentColumnNames(self, include_computed: bool = True, include_basic: bool = True) -> List[str]:
+        """Gets all column names from the Segment schema."""
+        return Segment.getColumnNames(include_computed, include_basic)
