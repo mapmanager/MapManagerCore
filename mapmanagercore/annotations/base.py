@@ -210,12 +210,6 @@ class AnnotationsBase(LazyImagesGeoPandas):
 
         return pointsDf
 
-    # abj
-    # def getChannelTotal(self, t : Optional[int] = None) -> int:
-    #     """Get total number of channel
-    #     """
-    #     return self._images.channels()
-
     # abb convenience
     def __str__(self):
         """Print info about the map.
@@ -240,10 +234,6 @@ class AnnotationsBase(LazyImagesGeoPandas):
     @property
     def points(self) -> LazyGeoFrame:
         return self._points
-
-    # @property
-    # def analysisParams(self) -> LazyGeoSeries:
-    #     return self._analysisParams
 
     def filterPoints(self, filter: Any):
         """
@@ -299,225 +289,6 @@ class AnnotationsBase(LazyImagesGeoPandas):
                 zRange = (int(zRangeDf.min()),
                           int(zRangeDf.max()))
         return super().getPixels(time, channel, zRange, z, threeD=threeD)
-        # return super().getPixels(time, channel, zRange, threeD=threeD)
-
-    # Serialization
-
-    def merge(self, loader: ImageLoader):
-        self.loader.merge(loader)
-
-    @classmethod
-    def load(cls, path: Union[str, None], lazy=False):
-        """
-        Arguments
-        =========
-        path:
-            Path to the mmap .zip file or directory or .tif file.
-        """
-        # logger.warning(f'abb creating ZarrLoader from path:{path}')
-        # logger.warning(f'  cls:{cls}')
-
-        # abb was this
-        # from mapmanagercore.lazy_geo_pd_images.loader.zarr import ZarrLoader
-        # loader = ZarrLoader(path, lazy=lazy)
-        # now this 20250317
-        # logger.info(f'TODO: switch to mm_map_loader mmMapLoader !!!')
-        loader = mmMapLoader(path)
-
-        if path.endswith('.tif'):
-            logger.warning(f'MapAnnotations from tif file:{path}')
-            lineSegments = gp.GeoDataFrame()
-            points = gp.GeoDataFrame()
-            lastSaveTime = ''
-            _ret = cls(loader, lineSegments, points, path, lastSaveTime)
-            return _ret
-        
-        # abb read_pickle() is failing if we have an older version of numpy
-        # when building for pyinstaller, we end up with numpy==1.26.4
-        import os
-        if os.path.isdir(path):
-            _zipStore = False
-        else:
-            _zipStore = True
-        
-        # logger.info(f'loading {type(store)} fom {self.path}')
-
-        with zarr.ZipStore(path, mode="r") \
-            if _zipStore else zarr.DirectoryStore(path) as store:
-
-            _group: zarr.hierarchy.Group = zarr.open(store=store, mode='r')  # / zarr.hierarchy.Group
-
-            import pyarrow
-            from pyarrow.lib import ArrowInvalid
-            if "points" in _group:
-                # points = pd.read_pickle(
-                try:
-                    points = gp.read_parquet(
-                        BytesIO(_group["points"][:].tobytes()))
-                    points = gp.GeoDataFrame(points, geometry="point")
-                except (ArrowInvalid) as e:
-                    logger.error(f'Error reading points: {e}')
-                    points = gp.GeoDataFrame()
-            else:
-                points = gp.GeoDataFrame()
-
-            if "lineSegments" in loader.group:
-                # lineSegments = pd.read_pickle(
-                try:
-                    lineSegments = gp.read_parquet(
-                        BytesIO(_group["lineSegments"][:].tobytes()))
-                    lineSegments = gp.GeoDataFrame(lineSegments, geometry="segment")
-                except (ArrowInvalid) as e:
-                    logger.error(f'Error reading lineSegments: {e}')
-                    lineSegments = gp.GeoDataFrame()
-            else:
-                lineSegments = gp.GeoDataFrame()
-
-            # if "analysisParams" in loader.group.attrs:
-            #     analysisParams = loader.group.attrs["analysisParams"]  # this is json
-            #     # analysisParams = AnalysisParameters(**analysisParams)
-            #     analysisParams = AnalysisParams(loadedDict=analysisParams)
-            # else:
-            #     # analysisParams = AnalysisParameters()
-            #     analysisParams = AnalysisParams()
-            
-            # abb lastSaveTime will ALWAYS be in file
-            # abb when using try/catch, ALWAYS name an exception, Do not use bare `except`RuffE722
-            try:
-                lastSaveTime = _group.attrs['lastSaveTime']
-            except (KeyError) as e:
-                logger.error(f'KeyError: did not get "lastSaveTime":{e}')
-                lastSaveTime = ""
-
-        # _ret = cls(loader, lineSegments, points, analysisParams, path, lastSaveTime)
-        _ret = cls(loader, lineSegments, points, path, lastSaveTime)
-        # logger.warning(f'  returning {type(_ret)}')
-        return _ret
-
-    # abb TODO put in one place (this function is repeated elsewhere)
-    def _group_exists(self, store, group_path) -> bool:
-        """Check if a zarr group exists.
-        """
-        try:
-            with zarr.open_group(store, mode='r', path=group_path):
-                return True
-        except (zarr.errors.GroupNotFoundError, KeyError):
-            return False
-
-    def save(self, path: str = None):
-        """Save the mmap
-
-        Parameters
-        ----------
-        path : str
-            Path to save to.
-            If a folder then save as zarr DirectoryStore, otherwise save as single file zip.
-        
-        Notes
-        -----
-        - Never save to a .mmap.zip, the Zarr .zip format is not supported.
-        - Need to do command line zip to convert to .mmap.zip
-        """
-        if path is None:
-            path = self.path
-
-        _lastSaveTime = self.getCurrentTime()
-
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-
-            logger.info(f'saving to {path}')
-            # if os.path.isdir(path):
-            if path.endswith('.mmap'):
-                # logger.info('   as a DirectoryStore')
-                # fs = zarr.DirectoryStore(path)
-                _zipStore = False
-            elif path.endswith('.mmap.zip'):
-                # fs = zarr.ZipStore(path, mode="w", compression=zipfile.ZIP_STORED)
-                # logger.info('   as a ZipStore')
-                _zipStore = True
-            else:
-                logger.error(f'error: expecting mmap or mmap.zip')
-                return
-
-            with zarr.ZipStore(path, mode="w", compression=zipfile.ZIP_STORED) if _zipStore \
-                 else zarr.DirectoryStore(path) as store:
-                
-                group = zarr.group(store=store)  # creates a group
-
-                # abb we need to interogate the existing mmap and
-                # see if we have some new image channels or timepoints to save
-                # # abb error on saving changes to existing mmap
-                # zarr.errors.ContainsGroupError: path 'images' contains a group
-                # if not self._group_exists(store, "images"):
-                
-                # v1, replaced by ZarrLoader2
-                # if "images" not in group.keys():
-                #     images = group.create_group("images")
-                # else:
-                #     images = zarr.group(store=store)['images']
-                # self._images.saveTo(images)
-                
-                #v2
-                self._images.saveAs(path)
-
-                # abb added overwrite=True, need to implement dirty flag for points and segments
-                # zarr.errors.ContainsArrayError: path 'points' contains an array
-                # logger.warning('TODO: abb imageImporter saving points/segments as text')
-                # v1
-                # group.create_dataset(
-                #     "points", data=self.points.toBytes(), dtype=np.uint8, overwrite=True)
-                # group.create_dataset(
-                #     "lineSegments", data=self.segments.toBytes(), dtype=np.uint8, overwrite=True)
-                # group.attrs["version"] = 1
-                
-                # GeoDataFrame
-                # logger.error(f'self.points[:] is:{type(self.points[:])}')
-                # GeoDataFrame
-                # logger.error(f"self.points[:].set_geometry('point') is: {type(self.points[:].set_geometry('point'))}")
-                
-                # v1.1
-                _points = self.points[:].set_geometry('point')  # _points is GeoPandas, NOT our lazy
-                # logger.error(f'_points is:{type(_points)}')
-                group.create_dataset(
-                    "points",
-                    data=toBytes(_points),
-                    # data=self.points[:].to_json(orient='index'),
-                    dtype=np.uint8,
-                    overwrite=True)
-                
-                _segments = self.segments[:].set_geometry('segment')  # _segments is GeoPandas, NOT our lazy
-                group.create_dataset(
-                    "lineSegments",
-                    data=toBytes(_segments),
-                    # data=self.segments[:].to_json(orient='index'),                    
-                    dtype=np.uint8,
-                    overwrite=True)
-                group.attrs["version"] = 1.1
-
-                # # v1.2
-                # _rootDf = self.points[:]  #self.points._rootDf  # or use self.points[:]
-                # # _rootDf = _rootDf.set_geometry('point')
-                # logger.warning(f'_rootDf is: {type(_rootDf)}')
-                # print(_rootDf.columns)
-                # print(_rootDf)
-                # # logger.warning(f'   _rootDf.geometry.name:{_rootDf.geometry.name}')
-                # _pointJson = _rootDf.to_json()
-                # logger.warning('_pointJson is:')
-                # print(_pointJson)
-                # group.create_dataset(
-                #     "points", data=self.points.toBytes(), dtype=np.uint8, overwrite=True)
-                # group.create_dataset(
-                #     "lineSegments", data=self.segments.toBytes(), dtype=np.uint8, overwrite=True)
-                # group.attrs["version"] = 1.2
-
-                # abb analysisparams
-                # group.attrs['analysisParams'] = self._analysisParams.getDict()
-
-                # abj
-                group.attrs["lastSaveTime"] = _lastSaveTime
-
-        self._lastSaveTime = _lastSaveTime
 
     def getCurrentTime(self):
         currentTime = datetime.now()
@@ -642,6 +413,263 @@ class AnnotationsBase(LazyImagesGeoPandas):
             return lambda x: symbols_[x]
 
         return values.apply(lambda x: symbols_[x])
+
+    # Serialization
+
+    def merge(self, loader: ImageLoader):
+        self.loader.merge(loader)
+
+    @classmethod
+    def load(cls, path: Union[str, None], lazy=False):
+        """
+        Arguments
+        =========
+        path:
+            Path to the mmap .zip file or directory or .tif file.
+        """
+        # logger.warning(f'abb creating ZarrLoader from path:{path}')
+        # logger.warning(f'  cls:{cls}')
+
+        # abb was this
+        # from mapmanagercore.lazy_geo_pd_images.loader.zarr import ZarrLoader
+        # loader = ZarrLoader(path, lazy=lazy)
+        # now this 20250317
+        # logger.info(f'TODO: switch to mm_map_loader mmMapLoader !!!')
+        loader = mmMapLoader(path)
+
+        if path.endswith('.tif'):
+            logger.warning(f'MapAnnotations from tif file:{path}')
+            lineSegments = gp.GeoDataFrame()
+            points = gp.GeoDataFrame()
+            lastSaveTime = ''
+            _ret = cls(loader, lineSegments, points, path, lastSaveTime)
+            return _ret
+        
+        # abb read_pickle() is failing if we have an older version of numpy
+        # when building for pyinstaller, we end up with numpy==1.26.4
+        import os
+        if os.path.isdir(path):
+            _zipStore = False
+        else:
+            _zipStore = True
+        
+        # logger.info(f'loading {type(store)} fom {self.path}')
+
+        with zarr.ZipStore(path, mode="r") \
+            if _zipStore else zarr.DirectoryStore(path) as store:
+
+            _group: zarr.hierarchy.Group = zarr.open(store=store, mode='r')  # / zarr.hierarchy.Group
+
+            import pyarrow
+            from pyarrow.lib import ArrowInvalid
+            if "points" in _group:
+                # points = pd.read_pickle(
+                try:
+                    points = gp.read_parquet(
+                        BytesIO(_group["points"][:].tobytes()))
+                    points = gp.GeoDataFrame(points, geometry="point")
+                except (ArrowInvalid) as e:
+                    logger.error(f'Error reading points: {e}')
+                    points = gp.GeoDataFrame()
+            else:
+                points = gp.GeoDataFrame()
+
+            if "lineSegments" in loader.group:
+                # lineSegments = pd.read_pickle(
+                try:
+                    lineSegments = gp.read_parquet(
+                        BytesIO(_group["lineSegments"][:].tobytes()))
+                    lineSegments = gp.GeoDataFrame(lineSegments, geometry="segment")
+                except (ArrowInvalid) as e:
+                    logger.error(f'Error reading lineSegments: {e}')
+                    lineSegments = gp.GeoDataFrame()
+            else:
+                lineSegments = gp.GeoDataFrame()
+
+            # if "analysisParams" in loader.group.attrs:
+            #     analysisParams = loader.group.attrs["analysisParams"]  # this is json
+            #     # analysisParams = AnalysisParameters(**analysisParams)
+            #     analysisParams = AnalysisParams(loadedDict=analysisParams)
+            # else:
+            #     # analysisParams = AnalysisParameters()
+            #     analysisParams = AnalysisParams()
+            
+            # abb lastSaveTime will ALWAYS be in file
+            # abb when using try/catch, ALWAYS name an exception, Do not use bare `except`RuffE722
+            try:
+                lastSaveTime = _group.attrs['lastSaveTime']
+            except (KeyError) as e:
+                logger.error(f'KeyError: did not get "lastSaveTime":{e}')
+                lastSaveTime = ""
+
+        # _ret = cls(loader, lineSegments, points, analysisParams, path, lastSaveTime)
+        _ret = cls(loader, lineSegments, points, path, lastSaveTime)
+        # logger.warning(f'  returning {type(_ret)}')
+        return _ret
+
+    # abb TODO put in one place (this function is repeated elsewhere)
+    def _group_exists(self, store, group_path) -> bool:
+        """Check if a zarr group exists.
+        """
+        try:
+            with zarr.open_group(store, mode='r', path=group_path):
+                return True
+        except (zarr.errors.GroupNotFoundError, KeyError):
+            return False
+
+    def save(self, path: str = None, auto_compute: bool = True):
+        """Save the mmap
+
+        Parameters
+        ----------
+        path : str
+            Path to save to.
+            If a folder then save as zarr DirectoryStore, otherwise save as single file zip.
+        auto_compute : bool, default True
+            If True, compute all computed columns before saving to ensure actual values are saved.
+            If False, only save currently computed columns (may save placeholder values).
+
+        Notes
+        -----
+        - Never save to a .mmap.zip, the Zarr .zip format is not supported.
+        - Need to do command line zip to convert to .mmap.zip
+        """
+        if path is None:
+            path = self.path
+
+        # Compute all computed columns if requested
+        if auto_compute:
+            self._compute_all_computed_columns()
+
+        _lastSaveTime = self.getCurrentTime()
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+
+            logger.info(f'saving to {path}')
+            # if os.path.isdir(path):
+            if path.endswith('.mmap'):
+                # logger.info('   as a DirectoryStore')
+                # fs = zarr.DirectoryStore(path)
+                _zipStore = False
+            elif path.endswith('.mmap.zip'):
+                # fs = zarr.ZipStore(path, mode="w", compression=zipfile.ZIP_STORED)
+                # logger.info('   as a ZipStore')
+                _zipStore = True
+            else:
+                logger.error(f'error: expecting mmap or mmap.zip')
+                return
+
+            with zarr.ZipStore(path, mode="w", compression=zipfile.ZIP_STORED) if _zipStore \
+                 else zarr.DirectoryStore(path) as store:
+                
+                group = zarr.group(store=store)  # creates a group
+
+                # abb we need to interogate the existing mmap and
+                # see if we have some new image channels or timepoints to save
+                # # abb error on saving changes to existing mmap
+                # zarr.errors.ContainsGroupError: path 'images' contains a group
+                # if not self._group_exists(store, "images"):
+                
+                # v1, replaced by ZarrLoader2
+                # if "images" not in group.keys():
+                #     images = group.create_group("images")
+                # else:
+                #     images = zarr.group(store=store)['images']
+                # self._images.saveTo(images)
+                
+                #v2
+                self._images.saveAs(path)
+
+                # abb added overwrite=True, need to implement dirty flag for points and segments
+                # zarr.errors.ContainsArrayError: path 'points' contains an array
+                # logger.warning('TODO: abb imageImporter saving points/segments as text')
+                # v1
+                # group.create_dataset(
+                #     "points", data=self.points.toBytes(), dtype=np.uint8, overwrite=True)
+                # group.create_dataset(
+                #     "lineSegments", data=self.segments.toBytes(), dtype=np.uint8, overwrite=True)
+                # group.attrs["version"] = 1
+                
+                # GeoDataFrame
+                # logger.error(f'self.points[:] is:{type(self.points[:])}')
+                # GeoDataFrame
+                # logger.error(f"self.points[:].set_geometry('point') is: {type(self.points[:].set_geometry('point'))}")
+                
+                # v1.1
+                _points = self.points[:].set_geometry('point')  # _points is GeoPandas, NOT our lazy
+                # logger.error(f'_points is:{type(_points)}')
+                group.create_dataset(
+                    "points",
+                    data=toBytes(_points),
+                    # data=self.points[:].to_json(orient='index'),
+                    dtype=np.uint8,
+                    overwrite=True)
+                
+                _segments = self.segments[:].set_geometry('segment')  # _segments is GeoPandas, NOT our lazy
+                group.create_dataset(
+                    "lineSegments",
+                    data=toBytes(_segments),
+                    # data=self.segments[:].to_json(orient='index'),                    
+                    dtype=np.uint8,
+                    overwrite=True)
+                group.attrs["version"] = 1.1
+
+                # # v1.2
+                # _rootDf = self.points[:]  #self.points._rootDf  # or use self.points[:]
+                # # _rootDf = _rootDf.set_geometry('point')
+                # logger.warning(f'_rootDf is: {type(_rootDf)}')
+                # print(_rootDf.columns)
+                # print(_rootDf)
+                # # logger.warning(f'   _rootDf.geometry.name:{_rootDf.geometry.name}')
+                # _pointJson = _rootDf.to_json()
+                # logger.warning('_pointJson is:')
+                # print(_pointJson)
+                # group.create_dataset(
+                #     "points", data=self.points.toBytes(), dtype=np.uint8, overwrite=True)
+                # group.create_dataset(
+                #     "lineSegments", data=self.segments.toBytes(), dtype=np.uint8, overwrite=True)
+                # group.attrs["version"] = 1.2
+
+                # abb analysisparams
+                # group.attrs['analysisParams'] = self._analysisParams.getDict()
+
+                # abj
+                group.attrs["lastSaveTime"] = _lastSaveTime
+
+        self._lastSaveTime = _lastSaveTime
+
+    def _compute_all_computed_columns(self):
+        """
+        Force computation of all computed columns in both points and segments.
+        This ensures all computed data is available for saving.
+        """
+        logger.info('Computing all computed columns before save...')
+        
+        # Get all computed columns from schemas
+        from ..schemas import Spine, Segment
+        computed_point_columns = Spine.getColumnNames(include_computed=True, include_basic=False)
+        computed_segment_columns = Segment.getColumnNames(include_computed=True, include_basic=False)
+        
+        total_computed = 0
+        
+        # Trigger computation for points
+        if computed_point_columns and len(self.points) > 0:
+            logger.info(f'Computing {len(computed_point_columns)} point columns...')
+            for col in computed_point_columns:
+                if col in self.points.columns:
+                    _ = self.points[col]  # Trigger computation
+                    total_computed += 1
+        
+        # Trigger computation for segments
+        if computed_segment_columns and len(self.segments) > 0:
+            logger.info(f'Computing {len(computed_segment_columns)} segment columns...')
+            for col in computed_segment_columns:
+                if col in self.segments.columns:
+                    _ = self.segments[col]  # Trigger computation
+                    total_computed += 1
+        
+        logger.info(f'Completed computation of {total_computed} computed columns')
 
     # abj
     # def loadInNewChannel(self, path: Union[str, np.ndarray], time: int = 0, channel: int = 0):

@@ -21,7 +21,7 @@ class TestLoadBackwardCompatible(unittest.TestCase):
         """
         # Load the old map file using backward compatibility
         path = get202504_map()
-        mmap = MapAnnotations.load_with_hybrid_backward_compatibility(path)
+        mmap = MapAnnotations.load_backward_compatible(path)
         
         # Verify the map loaded successfully
         self.assertIsNotNone(mmap)
@@ -80,7 +80,7 @@ class TestLoadBackwardCompatible(unittest.TestCase):
         path = get202504_map()
         
         # Load with backward compatibility
-        mmap_backward = MapAnnotations.load_with_hybrid_backward_compatibility(path)
+        mmap_backward = MapAnnotations.load_backward_compatible(path)
         
         # Load with regular method
         mmap_regular = MapAnnotations.load(path)

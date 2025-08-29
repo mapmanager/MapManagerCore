@@ -202,7 +202,7 @@ class AnnotationsBaseMut(AnnotationsBase):
 
     # abc 20250806 - Backward compatibility loading methods
     @classmethod
-    def load_with_hybrid_backward_compatibility(cls, path: Union[str, None], lazy=False):
+    def load_backward_compatible(cls, path: Union[str, None], lazy=False):
         """
         Load MapAnnotations with hybrid backward compatibility for schema changes.
         
@@ -288,7 +288,7 @@ class AnnotationsBaseMut(AnnotationsBase):
 
                     points = gp.GeoDataFrame(points, geometry="point")
                     logger.info(f'Loaded points GeoDataFrame with {len(points)} rows and {len(points.columns)} columns')
-                    print(list(points.columns))
+                    # print(list(points.columns))
                 except (ArrowInvalid) as e:
                     logger.error(f'Error reading points: {e}')
                     points = gp.GeoDataFrame()
@@ -302,7 +302,7 @@ class AnnotationsBaseMut(AnnotationsBase):
                     lineSegments = gp.read_parquet(BytesIO(_group["lineSegments"][:].tobytes()))
                     lineSegments = gp.GeoDataFrame(lineSegments, geometry="segment")
                     logger.info(f'Loaded lineSegments GeoDataFrame with {len(lineSegments)} rows and {len(lineSegments.columns)} columns')
-                    print(list(lineSegments.columns))
+                    # print(list(lineSegments.columns))
                 except (ArrowInvalid) as e:
                     logger.error(f'Error reading lineSegments: {e}')
                     lineSegments = gp.GeoDataFrame()
@@ -350,7 +350,7 @@ class AnnotationsBaseMut(AnnotationsBase):
         current_computed_columns = Spine.getColumnNames(include_computed=True, include_basic=False) if schema_name == "Spine" else Segment.getColumnNames(include_computed=True, include_basic=False)
         current_image_columns = self._get_expected_image_columns(lazy_frame, schema_name)
         
-        logger.info(f'Current basic columns: {current_basic_columns}')
+        # logger.info(f'Current basic columns: {current_basic_columns}')
         logger.info(f'Current computed columns: {len(current_computed_columns)} expected')
         logger.info(f'Current image columns: {len(current_image_columns)} expected')
         
@@ -448,58 +448,32 @@ class AnnotationsBaseMut(AnnotationsBase):
 
     def _trigger_missing_computed_columns(self):
         """
-        Handle computed columns after loading:
-        1. Mark columns that were loaded from file as computed (set .valid flag)
-        2. Trigger computation for columns not in file
+        Trigger computation of missing computed columns after loading.
+        This ensures all computed columns are available even if they weren't in the saved file.
         """
         # Get all computed columns from schemas
         computed_point_columns = Spine.getColumnNames(include_computed=True, include_basic=False)
         computed_segment_columns = Segment.getColumnNames(include_computed=True, include_basic=False)
         
-        # Handle points
-        if len(self.points) > 0:
-            self._mark_loaded_computed_columns_as_valid(self.points, computed_point_columns)
-            missing_point_columns = set(computed_point_columns) - set(self.points.columns)
-            if missing_point_columns:
-                logger.info(f'Computing {len(missing_point_columns)} missing point columns: {missing_point_columns}')
-                _ = self.points[list(missing_point_columns)]  # This triggers computation
-        else:
-            logger.info('No point data to process')
+        # Find missing computed columns
+        missing_point_columns = set(computed_point_columns) - set(self.points.columns)
+        missing_segment_columns = set(computed_segment_columns) - set(self.segments.columns)
         
-        # Handle segments
-        if len(self.segments) > 0:
-            self._mark_loaded_computed_columns_as_valid(self.segments, computed_segment_columns)
-            missing_segment_columns = set(computed_segment_columns) - set(self.segments.columns)
-            if missing_segment_columns:
-                logger.info(f'Computing {len(missing_segment_columns)} missing segment columns: {missing_segment_columns}')
-                _ = self.segments[list(missing_segment_columns)]  # This triggers computation
-        else:
-            logger.info('No segment data to process')
-
-    def _mark_loaded_computed_columns_as_valid(self, frame, computed_columns):
-        """Mark computed columns that were loaded from file as valid."""
-        df = frame._rootDf
-        attributes = frame._schema._attributes
-        marked_columns = []
+        # Trigger computation for points
+        if missing_point_columns and len(self.points) > 0:
+            logger.info(f'Computing {len(missing_point_columns)} missing point columns:')
+            print(missing_point_columns)
+            _ = self.points[list(missing_point_columns)]  # This triggers computation
+        elif missing_point_columns:
+            logger.info(f'No point data to compute {len(missing_point_columns)} missing columns')
         
-        for column_name in computed_columns:
-            # Check if this computed column exists in loaded data
-            if column_name not in df.columns:
-                continue
-                
-            # Check if column has valid data (not all NaN)
-            if df[column_name].isna().all():
-                continue
-                
-            # Mark as valid by setting version
-            if column_name in attributes and "version" in attributes[column_name]:
-                version = attributes[column_name]["version"]
-                dep_key = f"{column_name}.valid"
-                df.loc[:, dep_key] = version
-                marked_columns.append(column_name)
-        
-        if marked_columns:
-            logger.info(f'Marked {len(marked_columns)} loaded computed columns as valid: {marked_columns}')
+        # Trigger computation for segments
+        if missing_segment_columns and len(self.segments) > 0:
+            logger.info(f'Computing {len(missing_segment_columns)} missing segment columns:')
+            print(missing_segment_columns)
+            _ = self.segments[list(missing_segment_columns)]  # This triggers computation
+        elif missing_segment_columns:
+            logger.info(f'No segment data to compute {len(missing_segment_columns)} missing columns')
 
     # abc 20250806 - Enhanced saving methods with computed columns
     def save_with_computed_columns(self, path: str = None):
@@ -584,25 +558,45 @@ class AnnotationsBaseMut(AnnotationsBase):
         
         return status
 
+    def columnIsComputed(self, column: str, frame_type: str = "points") -> bool:
+        """
+        Check if a column is computed (has valid data) or needs computation.
+        
+        Args:
+            column: Name of the column to check
+            frame_type: Either "points" or "segments"
+            
+        Returns:
+            bool: True if column is computed (valid), False if needs computation
+        """
+        if frame_type == "points":
+            frame = self.points
+        elif frame_type == "segments":
+            frame = self.segments
+        else:
+            raise ValueError(f"frame_type must be 'points' or 'segments', got {frame_type}")
+        
+        if frame is None or len(frame) == 0:
+            return False
+            
+        df = frame._rootDf
+        valid_key = f"{column}.valid"
+        
+        # Check if the .valid column exists and has values
+        if valid_key in df.columns:
+            # Column is computed if .valid column exists and has non-null values
+            return not df[valid_key].isna().all()
+        
+        return False
+
     def verify_computed_columns_before_save(self):
         """
         Verify that all computed columns are available before saving.
-        This is useful for debugging and ensuring data integrity.
+        This is a debugging method to check the status of computed columns.
         
         Returns:
-            bool: True if all computed columns are available, False otherwise
+            dict: Status information about computed columns
         """
-        status = self._get_computed_columns_status()
-        
-        if status['all_computed_available']:
-            logger.info('All computed columns are available for saving')
-            return True
-        else:
-            logger.warning('Some computed columns are missing before save:')
-            if status['missing_point_columns']:
-                logger.warning(f'  Missing point columns: {status["missing_point_columns"]}')
-            if status['missing_segment_columns']:
-                logger.warning(f'  Missing segment columns: {status["missing_segment_columns"]}')
-            return False
+        return self._get_computed_columns_status()
 
 

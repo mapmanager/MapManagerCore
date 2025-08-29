@@ -912,7 +912,8 @@ class ImageChannel():
 
                 _min = _loadedImgData.min()
                 _max = _loadedImgData.max()
-                logger.error(f'lazy loaded sliceIdx:{sliceIdx} channe:{self.channel} min:{_min} max:{_max}')
+                
+                logger.warning(f'lazy loaded sliceIdx:{sliceIdx} channe:{self.channel} min:{_min} max:{_max}')
 
         return self._imgData[sliceIdx,:,:]
 
