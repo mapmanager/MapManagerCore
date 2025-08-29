@@ -1,6 +1,6 @@
 # Adds image slices to lazy geo pandas
 
-from typing import Callable, List, Self, Tuple, Union, Unpack, Set
+from typing import Callable, List, Self, Tuple, Union, Unpack, Set, Dict
 import weakref
 import numpy as np
 from mapmanagercore.lazy_geo_pd_images.image_slices import ImageSlice
@@ -9,17 +9,64 @@ from mapmanagercore.lazy_geo_pandas.lazy import LazyGeoFrame
 from mapmanagercore.lazy_geo_pd_images.loader import ImageLoader
 from mapmanagercore.lazy_geo_pd_images.loader.mm_map_loader import mmMapLoader
 from ..lazy_geo_pandas import LazyGeoPandas
+from ..aggregates import DEFAULT_AGGREGATES, legacy_aggregate_to_dict, AggregatesDict
+
 import geopandas as gp
 import pandas as pd
 
 from mapmanagercore.logger import logger
 
+# # abc 20250806 - New aggregate function system
+# AggregateFunc = Callable[[np.ndarray], float | int]
+# AggregatesDict = Dict[str, AggregateFunc]
+
+# def _safe_std(arr: np.ndarray) -> float:
+#     """Safe standard deviation that handles edge cases."""
+#     n = arr.size
+#     if n <= 1:
+#         return 0.0
+#     return float(np.std(arr, ddof=1))
+
+# def _safe_cv(arr: np.ndarray) -> float:
+#     """Coefficient of variation (std/mean) with safe handling of zero mean."""
+#     mean = float(np.mean(arr))
+#     if mean == 0.0:
+#         return float('nan')
+#     return _safe_std(arr) / mean
+
+# DEFAULT_AGGREGATES: AggregatesDict = {
+#     "count": lambda arr: int(arr.size),
+#     "sum":   lambda arr: float(np.sum(arr)),
+#     "mean":  lambda arr: float(np.mean(arr)),
+#     "median": lambda arr: float(np.median(arr)),
+#     "min":   lambda arr: float(np.min(arr)),
+#     "max":   lambda arr: float(np.max(arr)),
+#     "std":   _safe_std,
+#     "cv":    _safe_cv,
+# }
+
+# abc 20250806 - Legacy support for backward compatibility
+def _legacy_aggregate_to_dict(agg_list: List[str]) -> AggregatesDict:
+    """Convert legacy aggregate list to new dict format."""
+    result = {}
+    for agg in agg_list:
+        if agg in DEFAULT_AGGREGATES:
+            result[agg] = DEFAULT_AGGREGATES[agg]
+        else:
+            # Fallback to numpy function if not in defaults
+            try:
+                result[agg] = lambda arr, func=agg: float(getattr(np, func)(arr))
+            except AttributeError:
+                logger.warning(f"Unknown aggregate function: {agg}")
+                result[agg] = lambda arr: float('nan')
+    return result
+
 
 class ImageColumnAttributes(ColumnAttributes):
     """Attributes for image computed columns."""
 
-    """The list of aggregates function names to compute."""
-    _aggregate: list[str]
+    """The aggregates to compute. Can be either a list of strings (legacy) or a dict of functions."""
+    _aggregate: Union[list[str], AggregatesDict]
 
     """The z spread to use when computing the pixels."""
     zSpread: int
@@ -71,13 +118,26 @@ def parseColumns2(columns: List[str],
 
     return aggregates
 
-def applyAgg(x, agg):
-    """Apply an aggregate function to the data."""
+def applyAgg(x, agg_func):
+    """Apply an aggregate function to the data.
+    
+    Args:
+        x: The data to aggregate
+        agg_func: Either a string (legacy) or a callable function
+    """
     try:
-        return getattr(np, agg)(x)
-    except (ValueError) as e:
-        logger.error(f'ValueError: {e}')
-        logger.error(f'  x:{x} agg:{agg}')
+        if isinstance(agg_func, str):
+            # Legacy support - treat as numpy function name
+            return getattr(np, agg_func)(x)
+        elif callable(agg_func):
+            # New system - call the function directly
+            return agg_func(x)
+        else:
+            logger.error(f'Invalid aggregate function type: {type(agg_func)}')
+            return np.nan
+    except (ValueError, TypeError) as e:
+        logger.error(f'Error applying aggregate function: {e}')
+        logger.error(f'  x:{x} agg_func:{agg_func}')
         return np.nan
 
 
@@ -128,14 +188,20 @@ class LazyImagesGeoPandas(LazyGeoPandas):
             channels = weakSelf()._images.metadata.getTimepoint(timeIndexLevel).channelKeys  # List[int]
             # print(f'channels:{channels} type:{type(channels)}')
             
-            # abb 20250825, instead of this, get aggregates from attributes parameter
-            # aggregates = parseColumns2(
-            #     frame.pendingColumns(), name)
-            # attributes['_aggregate'] which is like ['size', 'sum', 'mean', 'min', 'max']
-            aggregates = attributes['_aggregate'] 
+            # abc 20250806 - Handle both legacy list and new dict aggregate formats
+            aggregates = attributes['_aggregate']
+            
+            # Convert legacy list format to dict format for processing
+            if isinstance(aggregates, list):
+                aggregates_dict = _legacy_aggregate_to_dict(aggregates)
+            elif isinstance(aggregates, dict):
+                aggregates_dict = aggregates
+            else:
+                logger.error(f'Invalid aggregate format: {type(aggregates)}')
+                return gp.GeoDataFrame()
                                     
-            if len(channels) == 0 or len(aggregates) == 0:
-                # nothin to update
+            if len(channels) == 0 or len(aggregates_dict) == 0:
+                # nothing to update
                 return gp.GeoDataFrame()
 
             # logger.warning('202508 _genWrappedFunc() called with:')
@@ -206,8 +272,8 @@ class LazyImagesGeoPandas(LazyGeoPandas):
             if isinstance(pixels, pd.Series):
                 # one channel was returned
                 return pixels.apply(lambda x: pd.Series(
-                    # {f"{name}_ch{pixels.name + 1}_{agg}": applyAgg(x, agg) for agg in aggregates}), index=pixels.index)
-                    {f"{name}_ch{pixels.name}_{agg}": applyAgg(x, agg) for agg in aggregates}), index=pixels.index)
+                    {f"{name}_ch{pixels.name}_{agg_name}": applyAgg(x, agg_func) 
+                     for agg_name, agg_func in aggregates_dict.items()}), index=pixels.index)
 
             # logger.error(f'REMOVE {channels} -> channels = [1]')
             # the channels processed by getShapePixels
@@ -221,15 +287,15 @@ class LazyImagesGeoPandas(LazyGeoPandas):
             #     f"{name}_ch{channel}_{agg}": pixels[channel].apply(lambda x: getattr(np, agg)(x)) for agg in aggregates for channel in _channels
             # }, index=pixels.index)
 
-            # v2
+            # abc 20250806 - Updated to handle new aggregate dict system
             result_dict = {}
-            for agg in aggregates:
+            for agg_name, agg_func in aggregates_dict.items():
                 for channel in _channels:
                     # Create descriptive column name
-                    column_name = f"{name}_ch{channel}_{agg}"
+                    column_name = f"{name}_ch{channel}_{agg_name}"
                     
                     # Apply the aggregation function to the channel data
-                    aggregated_values = pixels[channel].apply(lambda x: getattr(np, agg)(x))
+                    aggregated_values = pixels[channel].apply(lambda x: applyAgg(x, agg_func))
                     
                     # Store in result dictionary
                     result_dict[column_name] = aggregated_values
@@ -273,9 +339,19 @@ class LazyImagesGeoPandas(LazyGeoPandas):
             name = attributes["key"]
             wrappedFunc = self._genWrappedFunc(method, attributes, frame)
 
+            # abc 20250806 - Handle both legacy list and new dict aggregate formats
+            aggregates = attributes["_aggregate"]
+            if isinstance(aggregates, list):
+                aggregates_dict = _legacy_aggregate_to_dict(aggregates)
+            elif isinstance(aggregates, dict):
+                aggregates_dict = aggregates
+            else:
+                logger.error(f'Invalid aggregate format in addSchema: {type(aggregates)}')
+                continue
+
             for channel in currentChannelKeys:  # abai 20250806
-                for agg in attributes["_aggregate"]:
-                    col_name = f"{name}_ch{channel}_{agg}"  # abai 20250806
+                for agg_name in aggregates_dict.keys():
+                    col_name = f"{name}_ch{channel}_{agg_name}"  # abai 20250806
                     # abai 20250806: Check for existing column before adding
                     if col_name in frame.columns:  # abai 20250806
                         continue  # abai 20250806: Skip if already present
@@ -283,7 +359,7 @@ class LazyImagesGeoPandas(LazyGeoPandas):
                         col_name,
                         {
                             **attributes,
-                            "title": f"{name} Channel {channel} - {agg.capitalize()}",
+                            "title": f"{name} Channel {channel} - {agg_name.capitalize()}",
                         },
                         wrappedFunc,
                         skipUpdate=True
@@ -337,7 +413,7 @@ class LazyImagesGeoPandas(LazyGeoPandas):
         
         # Get image methods and aggregates from the schema
         image_methods = []
-        agg_list = []
+        agg_dicts = []
         
         # Look for methods with @computeAggregateImage decorator
         for method_name, method in schema_class.__dict__.items():
@@ -345,15 +421,24 @@ class LazyImagesGeoPandas(LazyGeoPandas):
                 attributes = method._imageComputed
                 if "_aggregate" in attributes:
                     image_methods.append(attributes["key"])
-                    agg_list = attributes["_aggregate"]
-                    # logger.debug(f'Found image method: {attributes["key"]} with aggregates: {attributes["_aggregate"]}')
+                    # Handle both legacy list and new dict formats
+                    aggregates = attributes["_aggregate"]
+                    if isinstance(aggregates, list):
+                        agg_dict = _legacy_aggregate_to_dict(aggregates)
+                    elif isinstance(aggregates, dict):
+                        agg_dict = aggregates
+                    else:
+                        logger.warning(f'Invalid aggregate format in {method_name}: {type(aggregates)}')
+                        continue
+                    agg_dicts.append(agg_dict)
+                    # logger.debug(f'Found image method: {attributes["key"]} with aggregates: {list(agg_dict.keys())}')
         
         # Generate column names
         column_names = []
-        for method in image_methods:
+        for method, agg_dict in zip(image_methods, agg_dicts):
             for channel in channels:
-                for agg in agg_list:
-                    column_name = f"{method}_ch{channel}_{agg}"
+                for agg_name in agg_dict.keys():
+                    column_name = f"{method}_ch{channel}_{agg_name}"
                     column_names.append(column_name)
         
         return column_names
@@ -410,7 +495,7 @@ class LazyImagesGeoPandas(LazyGeoPandas):
 
 def computeAggregateImage(dependencies: Union[List[str],
                                               dict[str, list[str]]] = {},
-                                              aggregate: list[str] = [],
+                                              aggregate: Union[list[str], AggregatesDict] = [],
                                               **attributes: Unpack[ImageColumnAttributes]):
     """A decorator that adds image based computed column to the schema.
 
@@ -422,9 +507,12 @@ def computeAggregateImage(dependencies: Union[List[str],
             The dependencies for the computed column. Defaults to {}.
             The dictionary can be used to specify dependencies across different schemas.
             {"schemaName": ["column1", "column2"], "schemaName2": ["column3", "column4"]}
-        aggregate (list[str], optional): The aggregates to compute. Defaults to [].
-            Aggregates must be numpy functions.
-            For example, ["mean", "std", "min", "max"]
+        aggregate (Union[list[str], AggregatesDict], optional): The aggregates to compute. Defaults to [].
+            Can be either:
+            - A list of strings (legacy): Aggregates must be numpy function names.
+              For example, ["mean", "std", "min", "max"]
+            - A dict of functions (new): Keys are column names, values are callable functions.
+              For example, {"mean": lambda arr: float(np.mean(arr)), "cv": _safe_cv}
         title (str): The title of the column.
         categorical (bool): Indicates whether the column is categorical or not.
         divergent (bool): Indicates whether the column is divergent or not.
@@ -440,7 +528,6 @@ def computeAggregateImage(dependencies: Union[List[str],
     Returns:
         A function that returns a geo pandas data frame with a shape column with any name along with a z column.
     """
-    # TODO: extend aggregates to allow user defined functions as well. Use the function name as the name of the aggregate
     def wrapper(func: Callable[[], Union[pd.Series, pd.DataFrame]]):
         func._imageComputed = {
             "key": func.__name__,

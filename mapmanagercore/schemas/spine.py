@@ -12,6 +12,9 @@ from ..lazy_geo_pandas import schema, field, compute, LazyGeoFrame, Schema
 import geopandas as gp
 from shapely.geometry import LineString, MultiPolygon, Polygon, Point
 from ..lazy_geo_pd_images import computeAggregateImage
+from ..lazy_geo_pd_images.store import AggregatesDict
+from ..aggregates import get_spine_aggregates
+
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -304,6 +307,7 @@ class Spine(Schema):
     ## Image based ROI computed stats ##
     ##
     def _aggList() -> List[str]:
+        # abc 20250806 - Legacy function for backward compatibility
         # abb was this before 20250825
         # return ['sum', 'mean', 'min', 'max']
         
@@ -311,10 +315,32 @@ class Spine(Schema):
         # e.g. for example, angle and side are not even calculated
         return ['size','sum', 'mean', 'std', 'min', 'max', 'median']
 
+    def _aggDict() -> AggregatesDict:
+        return get_spine_aggregates()
+
+    # def _aggDict() -> AggregatesDict:
+    #     # abc 20250806 - New flexible aggregate system
+    #     from mapmanagercore.lazy_geo_pd_images.store import DEFAULT_AGGREGATES
+        
+    #     # Use default aggregates but customize as needed
+    #     custom_aggregates = DEFAULT_AGGREGATES.copy()
+        
+    #     # Example of custom aggregate function
+    #     def _custom_percentile_95(arr: np.ndarray) -> float:
+    #         """95th percentile of the data."""
+    #         if arr.size == 0:
+    #             return float('nan')
+    #         return float(np.percentile(arr, 95))
+        
+    #     # Add custom aggregate
+    #     custom_aggregates["p95"] = _custom_percentile_95
+        
+    #     return custom_aggregates
+
     # union of base (dendrite) and head (spine)
     @computeAggregateImage(title="Roi",
                            dependencies=["roi", "z"],
-                           aggregate=_aggList(),
+                           aggregate=_aggDict(),  # abc 20250806 - Using new dict system
                            group="ROI")
     @timer
     def spineRoi(frame: LazyGeoFrame):
