@@ -3,6 +3,7 @@ from typing import Tuple, Union, List
 
 from ..schemas import Spine, Segment
 from ..config import SegmentId, SpineId
+from ..lazy_geo_pandas import LazyGeoFrame
 from .base import AnnotationsBase
 
 from mapmanagercore.logger import logger
@@ -202,21 +203,30 @@ class AnnotationsBaseMut(AnnotationsBase):
 
     # abc 20250806 - Backward compatibility loading methods
     @classmethod
-    def load_backward_compatible(cls, path: Union[str, None], lazy=False):
+    def load_backward_compatible(cls, path: str, lazy: bool = False) -> 'AnnotationsBaseMut':
         """
-        Load MapAnnotations with hybrid backward compatibility for schema changes.
+        Load MapAnnotations with hybrid backward compatibility for schema evolution.
         
-        This method handles:
-        1. Loading data from older file formats that may be missing current columns
-        2. Filtering out deprecated columns that are no longer in the current schema
-        3. Automatically computing missing computed columns after load
+        This method handles loading data from older file formats by:
+        1. Loading raw data with enhanced error handling
+        2. Filtering to current schema (removing deprecated columns, adding missing ones)
+        3. Marking loaded computed columns as valid
+        4. Triggering computation of missing computed columns
         
         Args:
-            path: Path to the .mmap file
-            lazy: Whether to use lazy loading (currently unused but kept for compatibility)
+            path: Path to the .mmap file (required)
+            lazy: Whether to use lazy loading (currently unused, kept for compatibility)
             
         Returns:
-            MapAnnotations instance with up-to-date schema
+            AnnotationsBaseMut: Fully loaded MapAnnotations instance with up-to-date schema
+            
+        Raises:
+            FileNotFoundError: If the specified path doesn't exist
+            ValueError: If the file format is invalid or corrupted
+            
+        Example:
+            >>> mmap = MapAnnotations.load_backward_compatible("old_file.mmap")
+            >>> print(f"Loaded {len(mmap.points)} points and {len(mmap.segments)} segments")
         """
         logger.info(f'Loading with hybrid backward compatibility from: {path}')
         
@@ -233,12 +243,24 @@ class AnnotationsBaseMut(AnnotationsBase):
         return annotations
 
     @classmethod
-    def _load_raw_data_with_backward_compatibility(cls, path: Union[str, None], lazy=False):
+    def _load_raw_data_with_backward_compatibility(cls, path: str, lazy: bool = False) -> 'AnnotationsBaseMut':
         """
-        Load raw data from file using existing load logic but with enhanced error handling.
+        Load raw data from file with enhanced error handling for backward compatibility.
         
-        This is essentially the same as the existing load() method but with better
-        error handling and logging for backward compatibility scenarios.
+        This is the core loading method that handles the actual file I/O operations.
+        It provides better error handling and logging compared to the standard load() method.
+        
+        Args:
+            path: Path to the .mmap file (required)
+            lazy: Whether to use lazy loading (currently unused, kept for compatibility)
+            
+        Returns:
+            AnnotationsBaseMut: Partially loaded instance (schema evolution not yet applied)
+            
+        Raises:
+            FileNotFoundError: If the specified path doesn't exist
+            ArrowInvalid: If the parquet data is corrupted
+            KeyError: If required file attributes are missing
         """
         from ..lazy_geo_pd_images.loader.mm_map_loader import mmMapLoader
         import os
@@ -319,11 +341,21 @@ class AnnotationsBaseMut(AnnotationsBase):
 
         return cls(loader, lineSegments, points, path, lastSaveTime)
 
-    def _filter_to_current_schema(self):
+    def _filter_to_current_schema(self) -> None:
         """
-        Single-pass schema evolution: classify each column and apply appropriate action.
-        This handles both missing columns (by adding them with None values) and
-        deprecated columns (by removing them).
+        Apply single-pass schema evolution to both points and segments.
+        
+        This method performs schema evolution by:
+        1. Removing deprecated columns that are no longer in the current schema
+        2. Adding missing basic columns with None values
+        3. Adding missing image columns using the store's addSchema method
+        
+        The evolution is applied to both points (Spine schema) and segments (Segment schema)
+        in a single pass for efficiency.
+        
+        Note:
+            This method modifies the underlying DataFrames in-place.
+            It should be called after loading raw data but before accessing computed columns.
         """
         logger.info('Performing single-pass schema evolution...')
         
@@ -335,13 +367,25 @@ class AnnotationsBaseMut(AnnotationsBase):
         if len(self.segments) > 0:
             self._evolve_schema_single_pass(self.segments, "Segment")
 
-    def _evolve_schema_single_pass(self, lazy_frame, schema_name: str):
+    def _evolve_schema_single_pass(self, lazy_frame: LazyGeoFrame, schema_name: str) -> None:
         """
-        Single-pass schema evolution: classify each column and apply appropriate action.
+        Perform single-pass schema evolution on a specific frame.
+        
+        This method classifies each column in the frame and applies the appropriate action:
+        - Keep basic schema columns (preserve values)
+        - Keep stored computed columns (preserve pre-computed values)
+        - Keep image columns (preserve values)
+        - Remove deprecated columns (no longer in current schema)
+        - Add missing basic columns (with None values)
+        - Add missing image columns (using store's addSchema)
         
         Args:
             lazy_frame: The LazyGeoFrame to evolve (points or segments)
             schema_name: The schema name ("Spine" or "Segment")
+            
+        Note:
+            This method modifies the lazy_frame._rootDf in-place.
+            Index columns are preserved and not duplicated.
         """
         logger.info(f'Evolving schema for {schema_name} with single-pass approach...')
         
@@ -401,9 +445,22 @@ class AnnotationsBaseMut(AnnotationsBase):
         
         # logger.info(f'Completed {schema_name} schema evolution: {len(current_df.columns)} total columns')
 
-    def _get_expected_image_columns(self, lazy_frame, schema_name: str) -> List[str]:
+    def _get_expected_image_columns(self, lazy_frame: LazyGeoFrame, schema_name: str) -> List[str]:
         """
-        Get expected image columns for a given schema.
+        Get the list of expected image columns for a given schema.
+        
+        This method queries the store to determine what image columns should exist
+        for the given schema (Spine or Segment) based on the available channels.
+        
+        Args:
+            lazy_frame: The LazyGeoFrame to check (points or segments)
+            schema_name: The schema name ("Spine" or "Segment")
+            
+        Returns:
+            List[str]: List of expected image column names for the schema
+            
+        Note:
+            Returns empty list if the store doesn't support getImageColumnNames.
         """
         store = lazy_frame.getStore()
         if hasattr(store, 'getImageColumnNames'):
@@ -411,9 +468,22 @@ class AnnotationsBaseMut(AnnotationsBase):
             return store.getImageColumnNames(schema_class)
         return []
 
-    def _add_missing_image_columns(self, lazy_frame, schema_name: str):
+    def _add_missing_image_columns(self, lazy_frame: LazyGeoFrame, schema_name: str) -> None:
         """
-        Add missing image columns using the existing addSchema logic.
+        Add missing image columns to a frame using the store's addSchema method.
+        
+        This method uses the store's addSchema functionality to create missing image columns
+        (like spineRoi_ch1_sum, spineRoi_ch1_mean, etc.) based on the available channels
+        in the metadata.
+        
+        Args:
+            lazy_frame: The LazyGeoFrame to add columns to (points or segments)
+            schema_name: The schema name ("Spine" or "Segment")
+            
+        Note:
+            This method requires the store to have an addSchema method.
+            It uses the first timepoint's channel keys from the metadata.
+            If no timepoints or channels are available, the operation is skipped.
         """
         store = lazy_frame.getStore()
         if hasattr(store, 'addSchema'):
@@ -446,10 +516,21 @@ class AnnotationsBaseMut(AnnotationsBase):
     # - _restore_image_values()
     # - _get_expected_columns()
 
-    def _trigger_missing_computed_columns(self):
+    def _trigger_missing_computed_columns(self) -> None:
         """
         Trigger computation of missing computed columns after loading.
-        This ensures all computed columns are available even if they weren't in the saved file.
+        
+        This method ensures all computed columns are available by:
+        1. Identifying computed columns that are missing from the loaded data
+        2. Triggering their computation through the lazy system
+        3. Logging which columns are being computed
+        
+        The method handles both points (Spine schema) and segments (Segment schema).
+        Only columns that are missing (not in the loaded data) are computed.
+        
+        Note:
+            This method should be called after schema evolution is complete.
+            It only computes columns that weren't loaded from the file.
         """
         # Get all computed columns from schemas
         computed_point_columns = Spine.getColumnNames(include_computed=True, include_basic=False)
@@ -475,31 +556,22 @@ class AnnotationsBaseMut(AnnotationsBase):
         elif missing_segment_columns:
             logger.info(f'No segment data to compute {len(missing_segment_columns)} missing columns')
 
-    # abc 20250806 - Enhanced saving methods with computed columns
-    def save_with_computed_columns(self, path: str = None):
-        """
-        Save the mmap with all computed columns pre-computed.
-        
-        This ensures that all computed columns are calculated and saved to the file,
-        making loading more efficient and ensuring backward compatibility.
-        
-        Args:
-            path: Path to save to (if None, uses self.path)
-        """
-        logger.info(f'Saving with computed columns to: {path or self.path}')
-        
-        # 1. Trigger computation of all computed columns
-        self._compute_all_computed_columns()
-        
-        # 2. Call the existing save method
-        self.save(path)
-        
-        logger.info('Successfully saved with computed columns')
 
-    def _compute_all_computed_columns(self):
+    def _compute_all_computed_columns(self) -> None:
         """
         Force computation of all computed columns in both points and segments.
-        This ensures all computed data is available for saving.
+        
+        This method ensures all computed data is available for saving by:
+        1. Getting all computed columns from both Spine and Segment schemas
+        2. Triggering computation of all computed columns (not just missing ones)
+        3. Logging the computation progress and results
+        
+        Unlike _trigger_missing_computed_columns(), this method computes ALL computed
+        columns regardless of whether they were loaded from the file or not.
+        
+        Note:
+            This method is typically called before saving to ensure all computed
+            values are written to the file rather than placeholder values.
         """
         logger.info('Computing all computed columns before save...')
         
@@ -527,12 +599,26 @@ class AnnotationsBaseMut(AnnotationsBase):
         
         logger.info(f'Completed computation of {total_computed} computed columns')
 
-    def _get_computed_columns_status(self):
+    def _get_computed_columns_status(self) -> dict:
         """
-        Get the status of computed columns for debugging and verification.
+        Get comprehensive status information about computed columns.
+        
+        This method provides debugging and verification information about the state
+        of computed columns in both points and segments frames.
         
         Returns:
-            dict: Status information about computed columns
+            dict: Status information containing:
+                - total_computed_point_columns: Number of computed columns expected for points
+                - total_computed_segment_columns: Number of computed columns expected for segments
+                - available_point_columns: Number of columns currently available in points
+                - available_segment_columns: Number of columns currently available in segments
+                - missing_point_columns: List of missing computed columns for points
+                - missing_segment_columns: List of missing computed columns for segments
+                - all_computed_available: Boolean indicating if all computed columns are available
+                
+        Example:
+            >>> status = mmap._get_computed_columns_status()
+            >>> print(f"Missing point columns: {status['missing_point_columns']}")
         """
         # Get all computed columns from schemas
         computed_point_columns = Spine.getColumnNames(include_computed=True, include_basic=False)
@@ -560,14 +646,27 @@ class AnnotationsBaseMut(AnnotationsBase):
 
     def columnIsComputed(self, column: str, frame_type: str = "points") -> bool:
         """
-        Check if a column is computed (has valid data) or needs computation.
+        Check if a specific column is computed (has valid data) or needs computation.
+        
+        This method checks the lazy system's version tracking to determine if a column
+        has been computed and is up-to-date. It looks for the corresponding `.valid`
+        column that contains version information.
         
         Args:
-            column: Name of the column to check
-            frame_type: Either "points" or "segments"
+            column: Name of the column to check (e.g., 'spineLength', 'spineRoi_ch1_sum')
+            frame_type: Frame to check - either "points" or "segments"
             
         Returns:
-            bool: True if column is computed (valid), False if needs computation
+            bool: True if column is computed and valid, False if it needs computation
+            
+        Raises:
+            ValueError: If frame_type is not "points" or "segments"
+            
+        Example:
+            >>> mmap.columnIsComputed('spineLength', 'points')
+            True
+            >>> mmap.columnIsComputed('spineRoi_ch1_shape', 'points')
+            False
         """
         if frame_type == "points":
             frame = self.points
@@ -589,13 +688,21 @@ class AnnotationsBaseMut(AnnotationsBase):
         
         return False
 
-    def verify_computed_columns_before_save(self):
+    def verify_computed_columns_before_save(self) -> dict:
         """
-        Verify that all computed columns are available before saving.
-        This is a debugging method to check the status of computed columns.
+        Verify the status of computed columns before saving.
+        
+        This is a debugging method that provides detailed information about the state
+        of computed columns to help diagnose issues before saving.
         
         Returns:
-            dict: Status information about computed columns
+            dict: Comprehensive status information about computed columns
+                (same format as _get_computed_columns_status())
+                
+        Example:
+            >>> status = mmap.verify_computed_columns_before_save()
+            >>> if not status['all_computed_available']:
+            ...     print(f"Missing columns: {status['missing_point_columns']}")
         """
         return self._get_computed_columns_status()
 

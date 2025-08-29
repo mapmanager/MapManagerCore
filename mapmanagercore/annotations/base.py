@@ -517,13 +517,13 @@ class AnnotationsBase(LazyImagesGeoPandas):
         except (zarr.errors.GroupNotFoundError, KeyError):
             return False
 
-    def save(self, path: str = None, auto_compute: bool = True):
-        """Save the mmap
+    def save(self, path: Optional[str] = None, auto_compute: bool = True) -> None:
+        """Save the MapAnnotations to a file.
 
         Parameters
         ----------
-        path : str
-            Path to save to.
+        path : str, optional
+            Path to save to. If None, uses self.path.
             If a folder then save as zarr DirectoryStore, otherwise save as single file zip.
         auto_compute : bool, default True
             If True, compute all computed columns before saving to ensure actual values are saved.
@@ -533,6 +533,13 @@ class AnnotationsBase(LazyImagesGeoPandas):
         -----
         - Never save to a .mmap.zip, the Zarr .zip format is not supported.
         - Need to do command line zip to convert to .mmap.zip
+        - The method automatically handles both .mmap (directory) and .mmap.zip (file) formats
+        - When auto_compute=True, all computed columns are forced to compute before saving
+        
+        Raises
+        ------
+        ValueError
+            If path doesn't end with .mmap or .mmap.zip
         """
         if path is None:
             path = self.path
@@ -639,10 +646,22 @@ class AnnotationsBase(LazyImagesGeoPandas):
 
         self._lastSaveTime = _lastSaveTime
 
-    def _compute_all_computed_columns(self):
+    def _compute_all_computed_columns(self) -> None:
         """
         Force computation of all computed columns in both points and segments.
-        This ensures all computed data is available for saving.
+        
+        This method ensures all computed data is available for saving by:
+        1. Getting all computed columns from both Spine and Segment schemas
+        2. Triggering computation of all computed columns (not just missing ones)
+        3. Logging the computation progress and results
+        
+        Unlike _trigger_missing_computed_columns(), this method computes ALL computed
+        columns regardless of whether they were loaded from the file or not.
+        
+        Note:
+            This method is typically called before saving to ensure all computed
+            values are written to the file rather than placeholder values.
+            It iterates through each column individually to trigger computation.
         """
         logger.info('Computing all computed columns before save...')
         
