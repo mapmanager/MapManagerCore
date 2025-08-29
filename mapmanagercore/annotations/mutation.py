@@ -1,4 +1,4 @@
-from typing import Tuple, Union
+from typing import Tuple, Union, List
 # from shapely.geometry import Point
 
 from ..schemas import Spine, Segment
@@ -272,8 +272,23 @@ class AnnotationsBaseMut(AnnotationsBase):
             if "points" in _group:
                 try:
                     points = gp.read_parquet(BytesIO(_group["points"][:].tobytes()))
+                    
+                    # debug load
+                    # logger.error('checking loaded points geodataframe (loaded from old file)')
+                    # print('points is:')
+                    # print(points)
+                    # print('points.columns is:')
+                    # print(points.columns)
+                    # print('points.index is:')
+                    # print(points.index)
+                    # print('points.geometry is:')
+                    # print(points.geometry)
+                    # sys.exit(1)
+                    # end debug load
+
                     points = gp.GeoDataFrame(points, geometry="point")
-                    logger.info(f'Loaded points with {len(points)} rows and columns: {list(points.columns)}')
+                    logger.info(f'Loaded points GeoDataFrame with {len(points)} rows and {len(points.columns)} columns')
+                    print(list(points.columns))
                 except (ArrowInvalid) as e:
                     logger.error(f'Error reading points: {e}')
                     points = gp.GeoDataFrame()
@@ -286,7 +301,8 @@ class AnnotationsBaseMut(AnnotationsBase):
                 try:
                     lineSegments = gp.read_parquet(BytesIO(_group["lineSegments"][:].tobytes()))
                     lineSegments = gp.GeoDataFrame(lineSegments, geometry="segment")
-                    logger.info(f'Loaded segments with {len(lineSegments)} rows and columns: {list(lineSegments.columns)}')
+                    logger.info(f'Loaded lineSegments GeoDataFrame with {len(lineSegments)} rows and {len(lineSegments.columns)} columns')
+                    print(list(lineSegments.columns))
                 except (ArrowInvalid) as e:
                     logger.error(f'Error reading lineSegments: {e}')
                     lineSegments = gp.GeoDataFrame()
@@ -305,67 +321,185 @@ class AnnotationsBaseMut(AnnotationsBase):
 
     def _filter_to_current_schema(self):
         """
-        Filter loaded data to only include columns that are in the current runtime schema.
+        Single-pass schema evolution: classify each column and apply appropriate action.
         This handles both missing columns (by adding them with None values) and
         deprecated columns (by removing them).
         """
-        # Get current runtime schema columns (basic columns only)
-        current_point_columns = Spine.getColumnNames(include_computed=False)
-        current_segment_columns = Segment.getColumnNames(include_computed=False)
+        logger.info('Performing single-pass schema evolution...')
         
-        logger.info(f'Current point schema columns: {current_point_columns}')
-        logger.info(f'Current segment schema columns: {current_segment_columns}')
-        
-        # Filter points to current schema
+        # Single-pass evolution for points
         if len(self.points) > 0:
-            # Find deprecated columns (in loaded data but not in current schema)
-            deprecated_point_columns = set(self.points.columns) - set(current_point_columns)
-            if deprecated_point_columns:
-                logger.warning(f'Removing deprecated point columns: {deprecated_point_columns}')
-            
-            # Use reindex to handle missing columns gracefully (adds None values)
-            filtered_points = self.points.reindex(columns=current_point_columns, fill_value=None)
-            self.points.loadData(filtered_points)
-            logger.info(f'Filtered points to {len(filtered_points.columns)} columns')
+            self._evolve_schema_single_pass(self.points, "Spine")
         
-        # Filter segments to current schema
+        # Single-pass evolution for segments  
         if len(self.segments) > 0:
-            # Find deprecated columns (in loaded data but not in current schema)
-            deprecated_segment_columns = set(self.segments.columns) - set(current_segment_columns)
-            if deprecated_segment_columns:
-                logger.warning(f'Removing deprecated segment columns: {deprecated_segment_columns}')
+            self._evolve_schema_single_pass(self.segments, "Segment")
+
+    def _evolve_schema_single_pass(self, lazy_frame, schema_name: str):
+        """
+        Single-pass schema evolution: classify each column and apply appropriate action.
+        
+        Args:
+            lazy_frame: The LazyGeoFrame to evolve (points or segments)
+            schema_name: The schema name ("Spine" or "Segment")
+        """
+        logger.info(f'Evolving schema for {schema_name} with single-pass approach...')
+        
+        # 1. Get current schema expectations
+        current_basic_columns = Spine.getColumnNames(include_computed=False) if schema_name == "Spine" else Segment.getColumnNames(include_computed=False)
+        current_computed_columns = Spine.getColumnNames(include_computed=True, include_basic=False) if schema_name == "Spine" else Segment.getColumnNames(include_computed=True, include_basic=False)
+        current_image_columns = self._get_expected_image_columns(lazy_frame, schema_name)
+        
+        logger.info(f'Current basic columns: {current_basic_columns}')
+        logger.info(f'Current computed columns: {len(current_computed_columns)} expected')
+        logger.info(f'Current image columns: {len(current_image_columns)} expected')
+        
+        # 2. Get the DataFrame and index columns to avoid duplicates
+        current_df = lazy_frame._rootDf.copy()
+        index_columns = list(current_df.index.names) if hasattr(current_df, 'index') and current_df.index.names else []
+        logger.info(f'Index columns: {index_columns}')
+        
+        # 3. Classify each loaded column and build new DataFrame
+        columns_to_remove = []
+        columns_to_keep = []
+        
+        for column in current_df.columns:
+            if column in current_basic_columns:
+                # Keep basic schema columns
+                columns_to_keep.append(column)
+            elif column in current_computed_columns:
+                # Keep stored computed columns (preserve pre-computed values)
+                columns_to_keep.append(column)
+                # logger.info(f'Preserving stored computed column: {column}')
+            elif column in current_image_columns:
+                # Keep image columns (preserve values)
+                columns_to_keep.append(column)
+            else:
+                # Remove deprecated columns
+                columns_to_remove.append(column)
+        
+        # 4. Remove deprecated columns
+        if columns_to_remove:
+            logger.warning(f'Removing {len(columns_to_remove)} deprecated {schema_name} columns: {columns_to_remove}')
+            current_df = current_df.drop(columns=columns_to_remove)
+        
+        # 5. Add missing basic columns (but avoid index columns that already exist in index)
+        missing_basic_columns = set(current_basic_columns) - set(current_df.columns)
+        # Filter out index columns that are already in the index
+        missing_basic_columns = missing_basic_columns - set(index_columns)
+        
+        if missing_basic_columns:
+            logger.warning(f'Adding {len(missing_basic_columns)} missing basic {schema_name} columns: {missing_basic_columns}')
+            for column in missing_basic_columns:
+                current_df[column] = None
+        
+        # 6. Add missing image columns using addSchema()
+        self._add_missing_image_columns(lazy_frame, schema_name)
+        
+        # 7. Update the DataFrame
+        lazy_frame._rootDf = current_df
+        
+        # logger.info(f'Completed {schema_name} schema evolution: {len(current_df.columns)} total columns')
+
+    def _get_expected_image_columns(self, lazy_frame, schema_name: str) -> List[str]:
+        """
+        Get expected image columns for a given schema.
+        """
+        store = lazy_frame.getStore()
+        if hasattr(store, 'getImageColumnNames'):
+            schema_class = Spine if schema_name == "Spine" else Segment
+            return store.getImageColumnNames(schema_class)
+        return []
+
+    def _add_missing_image_columns(self, lazy_frame, schema_name: str):
+        """
+        Add missing image columns using the existing addSchema logic.
+        """
+        store = lazy_frame.getStore()
+        if hasattr(store, 'addSchema'):
+            # Get channel keys from the metadata
+            # Get the first timepoint from the metadata
+            timepoints = list(self.loader.timePoints())
+            if timepoints:
+                timepoint = timepoints[0]
+                # Get channel keys for this timepoint
+                channelKeys = self.loader.metadata.getTimepoint(timepoint).channelKeys
+                logger.info(f'Using timepoint {timepoint} with {len(channelKeys)} channels from metadata for {schema_name}')
+            else:
+                logger.warning(f'No timepoints in metadata for {schema_name}')
+                channelKeys = []
             
-            # Use reindex to handle missing columns gracefully (adds None values)
-            filtered_segments = self.segments.reindex(columns=current_segment_columns, fill_value=None)
-            self.segments.loadData(filtered_segments)
-            logger.info(f'Filtered segments to {len(filtered_segments.columns)} columns')
+            if channelKeys:
+                # logger.info(f'Adding missing image columns for {schema_name} using addSchema...')
+                store.addSchema(lazy_frame, channelKeys)
+            else:
+                logger.warning(f'No channel keys available for {schema_name}, skipping addSchema')
+        else:
+            logger.warning(f'Store does not have addSchema method for {schema_name}')
+
+    # OLD COMPLEX METHODS - REMOVED
+    # The following methods have been replaced by the simplified single-pass approach:
+    # - _filter_basic_schema_columns()
+    # - _regenerate_image_columns_with_values() 
+    # - _remove_remaining_deprecated_columns()
+    # - _capture_existing_image_values()
+    # - _restore_image_values()
+    # - _get_expected_columns()
 
     def _trigger_missing_computed_columns(self):
         """
-        Trigger computation of missing computed columns after loading.
-        This ensures all computed columns are available even if they weren't in the saved file.
+        Handle computed columns after loading:
+        1. Mark columns that were loaded from file as computed (set .valid flag)
+        2. Trigger computation for columns not in file
         """
         # Get all computed columns from schemas
         computed_point_columns = Spine.getColumnNames(include_computed=True, include_basic=False)
         computed_segment_columns = Segment.getColumnNames(include_computed=True, include_basic=False)
         
-        # Find missing computed columns
-        missing_point_columns = set(computed_point_columns) - set(self.points.columns)
-        missing_segment_columns = set(computed_segment_columns) - set(self.segments.columns)
+        # Handle points
+        if len(self.points) > 0:
+            self._mark_loaded_computed_columns_as_valid(self.points, computed_point_columns)
+            missing_point_columns = set(computed_point_columns) - set(self.points.columns)
+            if missing_point_columns:
+                logger.info(f'Computing {len(missing_point_columns)} missing point columns: {missing_point_columns}')
+                _ = self.points[list(missing_point_columns)]  # This triggers computation
+        else:
+            logger.info('No point data to process')
         
-        # Trigger computation for points
-        if missing_point_columns and len(self.points) > 0:
-            logger.info(f'Computing {len(missing_point_columns)} missing point columns: {missing_point_columns}')
-            _ = self.points[list(missing_point_columns)]  # This triggers computation
-        elif missing_point_columns:
-            logger.info(f'No point data to compute {len(missing_point_columns)} missing columns')
+        # Handle segments
+        if len(self.segments) > 0:
+            self._mark_loaded_computed_columns_as_valid(self.segments, computed_segment_columns)
+            missing_segment_columns = set(computed_segment_columns) - set(self.segments.columns)
+            if missing_segment_columns:
+                logger.info(f'Computing {len(missing_segment_columns)} missing segment columns: {missing_segment_columns}')
+                _ = self.segments[list(missing_segment_columns)]  # This triggers computation
+        else:
+            logger.info('No segment data to process')
+
+    def _mark_loaded_computed_columns_as_valid(self, frame, computed_columns):
+        """Mark computed columns that were loaded from file as valid."""
+        df = frame._rootDf
+        attributes = frame._schema._attributes
+        marked_columns = []
         
-        # Trigger computation for segments
-        if missing_segment_columns and len(self.segments) > 0:
-            logger.info(f'Computing {len(missing_segment_columns)} missing segment columns: {missing_segment_columns}')
-            _ = self.segments[list(missing_segment_columns)]  # This triggers computation
-        elif missing_segment_columns:
-            logger.info(f'No segment data to compute {len(missing_segment_columns)} missing columns')
+        for column_name in computed_columns:
+            # Check if this computed column exists in loaded data
+            if column_name not in df.columns:
+                continue
+                
+            # Check if column has valid data (not all NaN)
+            if df[column_name].isna().all():
+                continue
+                
+            # Mark as valid by setting version
+            if column_name in attributes and "version" in attributes[column_name]:
+                version = attributes[column_name]["version"]
+                dep_key = f"{column_name}.valid"
+                df.loc[:, dep_key] = version
+                marked_columns.append(column_name)
+        
+        if marked_columns:
+            logger.info(f'Marked {len(marked_columns)} loaded computed columns as valid: {marked_columns}')
 
     # abc 20250806 - Enhanced saving methods with computed columns
     def save_with_computed_columns(self, path: str = None):
@@ -470,3 +604,5 @@ class AnnotationsBaseMut(AnnotationsBase):
             if status['missing_segment_columns']:
                 logger.warning(f'  Missing segment columns: {status["missing_segment_columns"]}')
             return False
+
+

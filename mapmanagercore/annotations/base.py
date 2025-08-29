@@ -107,8 +107,8 @@ class AnnotationsBase(LazyImagesGeoPandas):
         
         # For each frame (segments and points), we need to add computed columns for new channels
         # We do this by calling addSchema again, which will add missing channel columns
-        self._segments._store().addSchema(self._segments)
-        self._points._store().addSchema(self._points)
+        self._segments._store().addSchema(self._segments, currentChannelKeys)
+        self._points._store().addSchema(self._points, currentChannelKeys)
         
         # logger.info('Schemas refreshed for new channels')
     

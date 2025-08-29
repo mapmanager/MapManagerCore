@@ -149,7 +149,8 @@ class LazyImagesGeoPandas(LazyGeoPandas):
             shapes: gp.GeoDataFrame = func(frame)
             shapeKey = shapes.columns.symmetric_difference(["t", "z"])[0]
             
-            # abb 202508 this is triggering SettingWithCopyWarning
+            # Create a copy to avoid SettingWithCopyWarning
+            shapes = shapes.copy()
             shapes.rename(columns={shapeKey: "shape"}, inplace=True)
             
             # abb channels is always a list
@@ -237,7 +238,7 @@ class LazyImagesGeoPandas(LazyGeoPandas):
 
         return wrappedFunc
 
-    def addSchema(self, frame: LazyGeoFrame[Self], newChannelKeys: List = None):
+    def addSchema(self, frame: LazyGeoFrame[Self], channelKeys: List[int]):
         """Add a new channel schema frame to the store.
         Essentially, this adds a new data frame to the store.
         This function is called after append channel
@@ -246,7 +247,7 @@ class LazyImagesGeoPandas(LazyGeoPandas):
 
         Args:
             frame: spine DF
-            newChannelsKeys: List of new channels that are appended
+            channelKeys: List of channel keys to create computed columns for
         """
 
         # TODO: check if channel schema was already added
@@ -255,9 +256,8 @@ class LazyImagesGeoPandas(LazyGeoPandas):
         
         # logger.warning('!!==!! abb in store.py LazyImagesGeoPandas')
 
-        # abai 20250806: Use metadata3 API for current channel keys
-        logger.warning('TODO fix this, we hard coded getTimepoint(1)')
-        currentChannelKeys = self._images.metadata.getTimepoint(1).channelKeys  # abai 20250806
+        # Use the provided channel keys directly
+        currentChannelKeys = channelKeys
 
         # Inject computed columns that use the image to calculate roi stats
         # logger.info(f"frame check {frame}")
@@ -312,6 +312,51 @@ class LazyImagesGeoPandas(LazyGeoPandas):
             channel = next(iter(self._images.channels(t=t)))
         # abb all channels within a given timepoint will have the same shape
         return self._images.shape(t, channel)
+
+    def getImageColumnNames(self, schema_class=None, timepoint: int = 1) -> List[str]:
+        """
+        Get the list of image column names that would be generated for a given schema.
+        
+        Args:
+            schema_class: The schema class (e.g., Spine, Segment) to get columns for
+            timepoint: The timepoint to get channel information from (default: 1)
+        
+        Returns:
+            List[str]: List of image column names that would be generated
+        """
+        if schema_class is None:
+            # If no schema provided, return all possible image columns
+            return []
+        
+        # Get current channels from metadata
+        try:
+            channels = self._images.metadata.getTimepoint(timepoint).channelKeys
+        except (KeyError, AttributeError):
+            logger.warning(f"Could not get channel information for timepoint {timepoint}")
+            return []
+        
+        # Get image methods and aggregates from the schema
+        image_methods = []
+        agg_list = []
+        
+        # Look for methods with @computeAggregateImage decorator
+        for method_name, method in schema_class.__dict__.items():
+            if hasattr(method, "_imageComputed"):
+                attributes = method._imageComputed
+                if "_aggregate" in attributes:
+                    image_methods.append(attributes["key"])
+                    agg_list = attributes["_aggregate"]
+                    # logger.debug(f'Found image method: {attributes["key"]} with aggregates: {attributes["_aggregate"]}')
+        
+        # Generate column names
+        column_names = []
+        for method in image_methods:
+            for channel in channels:
+                for agg in agg_list:
+                    column_name = f"{method}_ch{channel}_{agg}"
+                    column_names.append(column_name)
+        
+        return column_names
 
     def getPixels(self,
                   time: int,

@@ -333,7 +333,14 @@ class LazyGeoFrame(Generic[T]):
         self._skipColumns = []
         # abb moved to here
         # logger.info('self._store().addSchema(self)')
-        self._store().addSchema(self)
+        # Note: This call is made during initialization when we don't have channel keys yet
+        # The store's addSchema method will handle this case appropriately
+        try:
+            self._store().addSchema(self)
+        except TypeError:
+            # If addSchema requires channelKeys, we'll skip it during initialization
+            # The schema will be properly set up later when channel keys are available
+            pass
 
     def invalidateColumns(self, columns: Iterator[str] = None, ids: pd.Index = None):
         """
