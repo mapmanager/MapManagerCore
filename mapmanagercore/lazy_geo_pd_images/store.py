@@ -288,17 +288,35 @@ class LazyImagesGeoPandas(LazyGeoPandas):
             # }, index=pixels.index)
 
             # abc 20250806 - Updated to handle new aggregate dict system
+            
+            # Process all aggregates for a channel at once
+            def process_channel_batch(pixel_data, aggregates_dict):
+                results = {}
+                for agg_name, agg_func in aggregates_dict.items():
+                    # Still use apply() but batch the operations
+                    results[agg_name] = pixel_data.apply(lambda x: applyAgg(x, agg_func))
+                return results
+            
+            # abc 20250806 - Batch processing optimization
             result_dict = {}
-            for agg_name, agg_func in aggregates_dict.items():
-                for channel in _channels:
-                    # Create descriptive column name
+            for channel in _channels:
+                channel_results = process_channel_batch(pixels[channel], aggregates_dict)
+                for agg_name, values in channel_results.items():
                     column_name = f"{name}_ch{channel}_{agg_name}"
-                    
-                    # Apply the aggregation function to the channel data
-                    aggregated_values = pixels[channel].apply(lambda x: applyAgg(x, agg_func))
-                    
-                    # Store in result dictionary
-                    result_dict[column_name] = aggregated_values
+                    result_dict[column_name] = values
+            
+            # # Original nested loop approach (commented out for reference)
+            # result_dict = {}
+            # for agg_name, agg_func in aggregates_dict.items():
+            #     for channel in _channels:
+            #         # Create descriptive column name
+            #         column_name = f"{name}_ch{channel}_{agg_name}"
+            #         
+            #         # Apply the aggregation function to the channel data
+            #         aggregated_values = pixels[channel].apply(lambda x: applyAgg(x, agg_func))
+            #         
+            #         # Store in result dictionary
+            #         result_dict[column_name] = aggregated_values
 
             return pd.DataFrame(result_dict, index=pixels.index)
 

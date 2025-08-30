@@ -1,5 +1,4 @@
 from enum import StrEnum
-from typing import List
 
 import numpy as np
 import dataclasses
@@ -306,36 +305,9 @@ class Spine(Schema):
     ##
     ## Image based ROI computed stats ##
     ##
-    def _aggList() -> List[str]:
-        # abc 20250806 - Legacy function for backward compatibility
-        # abb was this before 20250825
-        # return ['sum', 'mean', 'min', 'max']
-        
-        # now, 20250825 we want this, on load existing mmMap we get update errrors
-        # e.g. for example, angle and side are not even calculated
-        return ['size','sum', 'mean', 'std', 'min', 'max', 'median']
-
     def _aggDict() -> AggregatesDict:
+        # abc 20250806 - New flexible aggregate system
         return get_spine_aggregates()
-
-    # def _aggDict() -> AggregatesDict:
-    #     # abc 20250806 - New flexible aggregate system
-    #     from mapmanagercore.lazy_geo_pd_images.store import DEFAULT_AGGREGATES
-        
-    #     # Use default aggregates but customize as needed
-    #     custom_aggregates = DEFAULT_AGGREGATES.copy()
-        
-    #     # Example of custom aggregate function
-    #     def _custom_percentile_95(arr: np.ndarray) -> float:
-    #         """95th percentile of the data."""
-    #         if arr.size == 0:
-    #             return float('nan')
-    #         return float(np.percentile(arr, 95))
-        
-    #     # Add custom aggregate
-    #     custom_aggregates["p95"] = _custom_percentile_95
-        
-    #     return custom_aggregates
 
     # union of base (dendrite) and head (spine)
     @computeAggregateImage(title="Roi",
@@ -353,7 +325,7 @@ class Spine(Schema):
     # union
     @computeAggregateImage(title="Background Roi",
                            dependencies=["roiBg", "z"],
-                           aggregate=_aggList(),
+                           aggregate=_aggDict(),  # abc 20250806 - Using new dict system
                            group="ROI Background")
     @timer
     def spineRoiBg(frame: LazyGeoFrame):
@@ -365,7 +337,7 @@ class Spine(Schema):
     # roiBase (segment)
     @computeAggregateImage(title="Segment Roi",
                            dependencies=["roiBase", "z"],
-                           aggregate=_aggList(),
+                           aggregate=_aggDict(),  # abc 20250806 - Using new dict system
                            group="Segment ROI")
     @timer
     def denRoi(frame: LazyGeoFrame):
@@ -374,7 +346,7 @@ class Spine(Schema):
     # roiBase (segment)
     @computeAggregateImage(title="Background Segment Roi",
                            dependencies=["roiBaseBg", "z"],
-                           aggregate=_aggList(),
+                           aggregate=_aggDict(),  # abc 20250806 - Using new dict system
                            group="Segment ROI Background")
     @timer
     def denRoiBg(frame: LazyGeoFrame):

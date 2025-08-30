@@ -35,6 +35,8 @@ DEFAULT_AGGREGATES: AggregatesDict = {
     "cv":    _safe_cv,
 }
 
+
+
 # Schema-specific aggregate presets
 def get_spine_aggregates() -> AggregatesDict:
     """Get aggregate functions specifically for Spine schema."""
