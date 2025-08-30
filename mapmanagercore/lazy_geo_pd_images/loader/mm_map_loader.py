@@ -6,6 +6,7 @@ import os
 from pprint import pprint
 from typing import Optional, List, Tuple, Union, Iterator
 
+from matplotlib import pyplot as plt
 import zarr
 import zipfile
 
@@ -30,7 +31,6 @@ import skimage.draw  # only used for skimage.draw.polygon and skimage.draw.line
 
 def shapeIndexes(d: Union[Polygon, LineString]) -> Tuple[np.ndarray, np.ndarray]:
     """ Get the x and y indexes of the pixels in a shape."""
-
     d = shapely.force_2d(d)
 
     # TODO: fully support multi-polygon
@@ -569,13 +569,16 @@ class mmMapLoader():
                     channelIdx:int,
                     zRange:List[int],
                     threeD: bool = None) -> np.ndarray:
+        """
+        Returns:
+            By Default: 2D array of image volume, where each pixel is the maximum value across all z-slices in the requested range
+            With threeD set to True: return entire 3D array of image volume
+        
+        """
         # channelIdx += 1
         # logger.info(f"entering here for slices")
         _imageChannel = self.getImageChannel(t, channelIdx)
         
-        # _firstSlice = zRange[0]
-        # return _imageChannel.getSlice(_firstSlice)  # lazy
-
         if threeD:
             # Get 3D volume within range for brightest path tracing
             vol = _imageChannel.getVolume(zRange[0], zRange[1])
@@ -619,7 +622,6 @@ class mmMapLoader():
         Returns:
             pd.Series: Series containing the image slices corresponding to the shape.
         """
-        # logger.info('TODO: FIX')
         # print(f'  shape is:')
         # print(shape)
         # print(f'  zSpread:{zSpread}')
@@ -660,83 +662,64 @@ class mmMapLoader():
 
         shape["z"] = shape["z"].astype(int)
 
+        if not isinstance(channel, list):
+            channel = [channel]   # normalize to list
+            single_channel = True
+        else:
+            single_channel = False
+
         _firstTimepointChannels = channel
-        if isinstance(channel, list):
-            # abb does this handle different timepoint with different channels?
-            for (t, z), group in shape.groupby(by=["t", "z"]):
-                # abb only fetch channels that exis
-                # channel list is metadata _possibleChannels
-                # logger.warning(f'(t,z) is t:{t} z:{z}')
-                # abb limit channels to those that exist in timpepoint t
-                _channelKeys = self.metadata.getTimepoint(t).channelKeys
-                # abb
-                _firstTimepointChannels = _channelKeys
-                
-                # abb 202508 constraining zSpead to image shape
-                lower_z = max(z - zSpread, 0)   
-                upper_z = min(z + zSpread + 1, self.getTimepointMetadata(t).shape[0]-1)  # !!!
-                # logger.warning(f'  v1 lower_z:{lower_z} upper_z:{upper_z} zSpread:{zSpread} shape:{self.getTimepointMetadata(t).shape}')
-                images = [self.fetchSlices(
-                    #   t, c, (z - zSpread, z + zSpread + 1)) for c in channel]
-                      t, c, (lower_z, upper_z)) for c in _channelKeys]
+        results = []
+        indexes = []
 
-                for idx, row in group.iterrows():
-                    xLim, yLim = images[0].shape
-                    xs, ys = shapeIndexes(row["shape"])
-                    # Clip the coordinates to the image bounds.
-                    inBounds = (xs >= 0) & (xs < xLim) & (
-                        ys >= 0) & (ys < yLim)
-                    xs = np.clip(xs, 0, xLim - 1)
-                    ys = np.clip(ys, 0, yLim - 1)
-
-                    # inject the nan values where the shape is out of bounds.
-                    results.append(
-                        # [np.where(inBounds, image[xs, ys], np.nan) for image in images])
-                        # abj: accounting for pixels being inverted when plotting by switching ys and xs
-                        [np.where(inBounds, image[ys, xs], np.nan) for image in images]) 
-                    indexes.append(idx)
-            
-            # abb this is tricky, sometimes `channel` is int, sometimes list ???
-            # print(len(results))
-            # print(len(indexes))
-            # print(len(channel))
-            # return pd.DataFrame(results, indexes, columns=channel)
-            # logger.warning(f'  -->> _firstTimepointChannels:{_firstTimepointChannels}')
-            return pd.DataFrame(results, indexes, columns=_firstTimepointChannels)
-
-        # logger.info(f"shape {shape}")
         for (t, z), group in shape.groupby(by=["t", "z"]):
-            # abb
-            # _channelKeys = self.metadata.getTimepoint(t).channelKeys
+            # Use actual available channels at this timepoint
+            _channelKeys = self.metadata.getTimepoint(t).channelKeys
+            _firstTimepointChannels = _channelKeys if not single_channel else channel
 
-            # abb 202508 constraining zSpead to image shape
-            lower_z = max(z - zSpread, 0)   
-            upper_z = min(z + zSpread + 1, self.getTimepointMetadata(t).shape[0]-1)  # !!!
-            # logger.warning(f'  v2 lower_z:{lower_z} upper_z:{upper_z} zSpread:{zSpread} shape:{self.getTimepointMetadata(t).shape}')
+            # constrain zSpread
+            lower_z = max(z - zSpread, 0)
+            upper_z = min(z + zSpread + 1, self.getTimepointMetadata(t).shape[0])
 
-            image = self.fetchSlices(
-                # t, channel, (z - zSpread, z + zSpread + 1))
-                t, channel, (lower_z, upper_z))
+            logger.warning(
+                f'lower_z:{lower_z} upper_z:{upper_z} zSpread:{zSpread} '
+                f'shape:{self.getTimepointMetadata(t).shape}'
+            )
 
-                # t, _channelKeys, (z - zSpread, z + zSpread + 1))
+            # fetch 3D images for each channel
+            images = [
+                self.fetchSlices(t, c, (lower_z, upper_z), threeD=True)
+                for c in _channelKeys
+            ]
 
             for idx, row in group.iterrows():
-                xLim, yLim = image.shape
+                zLim, yLim, xLim = images[0].shape
+                actualZ, actualY, actualX = self.getTimepointMetadata(t).shape
+
                 xs, ys = shapeIndexes(row["shape"])
-                # Clip the coordinates to the image bounds.
-                inBounds = (xs >= 0) & (xs < xLim) & (ys >= 0) & (ys < yLim)
+                inBounds = (
+                    (xs >= 0) & (xs < xLim) &
+                    (ys >= 0) & (ys < yLim) &
+                    (z >= 0) & (z < actualZ)
+                )
+
                 xs = np.clip(xs, 0, xLim - 1)
                 ys = np.clip(ys, 0, yLim - 1)
 
-                # inject the nan values where the shape is out of bounds.
-                # results.append(np.where(inBounds, image[xs, ys], np.nan))
-
-                # abj: accounting for pixels being inverted when plotting by switching ys and xs
-                results.append(np.where(inBounds, image[ys, xs], np.nan)) 
+                # extract values from all channels
+                row_values = [
+                    np.where(inBounds, image[0:upper_z, ys, xs], np.nan)
+                    for image in images
+                ]
+                results.append(row_values if not single_channel else row_values[0])
                 indexes.append(idx)
 
-        return pd.Series(results, indexes, name=channel)
-    
+        # decide return type
+        if single_channel:
+            return pd.Series(results, indexes, name=_firstTimepointChannels[0])
+        else:
+            return pd.DataFrame(results, indexes, columns=_firstTimepointChannels)
+
     # abj
     # trying to give mmMapLoader access to points dataframe
     def _old_setLazyPointsFrame(self, df: "LazyGeoFrame" = None):
@@ -890,7 +873,9 @@ class ImageChannel():
             imgData = self.getSlice(startSlice)
         else:
             # ensure all slices are loaded
-            _sliceRange = np.arange(startSlice,stopSlice+1, 1)  # to include last slice
+            # _sliceRange = np.arange(startSlice,stopSlice+1, 1)  # to include last slice
+            logger.info(f"double checking slice range stopSlice {stopSlice}")
+            _sliceRange = np.arange(startSlice,stopSlice, 1)  # to include last slice
             # logger.warning(f'_sliceRange:{_sliceRange}')
             for _sliceIdx in _sliceRange:
                 # lazy load a slice from zarr
