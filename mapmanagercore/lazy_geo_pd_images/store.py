@@ -264,20 +264,16 @@ class LazyImagesGeoPandas(LazyGeoPandas):
                 
                 pixels = weakSelf().getShapePixels(
                     shapes, channel=channels, zSpread=zSpread)
-
                 
-            # self._recordShapePixels = {"channels": channels, "shapes": shapes, "zSpread": zSpread, "pixels": pixels}
             self._recordShapePixels["pixels"] = pixels
 
             if isinstance(pixels, pd.Series):
-                # one channel was returned
+                # # one channel was returned
                 return pixels.apply(lambda x: pd.Series(
                     {f"{name}_ch{pixels.name}_{agg_name}": applyAgg(x, agg_func) 
                      for agg_name, agg_func in aggregates_dict.items()}), index=pixels.index)
 
             # logger.error(f'REMOVE {channels} -> channels = [1]')
-            # the channels processed by getShapePixels
-            # _channels = list(pixels.columns)
             _channels = channels
 
             # abb 20250825 expanded below for readability
