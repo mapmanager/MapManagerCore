@@ -341,7 +341,7 @@ class SingleTimePointAnnotationsBase(_SingleTimePointAnnotationsBase):
 
     def getShapePixels(self,
                        shapes: gp.GeoDataFrame,
-                       channel: Union[int, List[int]] = 0,
+                       channel: Union[int, List[int]],  # abb removed default 0 (channels are 1 based)
                        zSpread: int = 0,
                        z: int = None) -> pd.Series:
         return self._annotations.getShapePixels(shapes, channel, zSpread, self._t, z=z)

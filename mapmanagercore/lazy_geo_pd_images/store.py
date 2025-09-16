@@ -489,7 +489,7 @@ class LazyImagesGeoPandas(LazyGeoPandas):
 
     def getShapePixels(self,
                        shapes: gp.GeoDataFrame,
-                       channel: Union[int, List[int]] = 0,  # abb 202508 get rid of default, caller has to know
+                       channel: Union[int, List[int]], #  = 0,  # abb 202508 get rid of default, caller has to know
                        zSpread: int = 0,
                        time=None,
                        z: int = None) -> Union[pd.Series, pd.DataFrame]:

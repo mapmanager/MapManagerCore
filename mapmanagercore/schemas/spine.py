@@ -47,6 +47,7 @@ class Spine(Schema):
         categorical=True,
         plot=False
     )
+    
     t: int = field(
         title="Time",
         description="Time of the spine",
@@ -128,6 +129,29 @@ class Spine(Schema):
             True: "circle",
             False: "cross"
         }
+    )
+
+    # trying to bring pymapmanager up to pure lazy loading
+    # ['roiType', 'markerColor', 'mplMarker']
+    roiType: str = field(
+        default="spineROI",
+        title="ROI Type",
+        description="Type of ROI",
+        categorical=True,
+    )
+
+    markerColor: str = field(
+        default="m",
+        title="Marker Color",
+        description="Color of the marker",
+        categorical=True,
+    )
+
+    mplMarker: str = field(
+        default="o",
+        title="MPL Marker",
+        description="Marker of the marker",
+        categorical=True,
     )
 
     # Computed columns

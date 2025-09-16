@@ -581,17 +581,17 @@ class mmMapLoader():
                     t:int,
                     channelIdx:int,
                     zRange:List[int],
-                    threeD: bool = None) -> np.ndarray:
+                    threeD: bool = False) -> np.ndarray:
         """
         Returns:
             By Default: 2D array of image volume, where each pixel is the maximum value across all z-slices in the requested range
             With threeD set to True: return entire 3D array of image volume
         
         """
-        # channelIdx += 1
-        # logger.info(f"entering here for slices")
         _imageChannel = self.getImageChannel(t, channelIdx)
-        
+
+        logger.warning(f'fetchSlices t:{t} channelIdx:{channelIdx} zRange:{zRange} threeD:{threeD} _imageChannel:{_imageChannel}')
+
         if threeD:
             # Get 3D volume within range for brightest path tracing
             vol = _imageChannel.getVolume(zRange[0], zRange[1])
@@ -881,7 +881,14 @@ class ImageChannel():
                 
                 logger.warning(f'lazy loaded sliceIdx:{sliceIdx} channe:{self.channel} min:{_min} max:{_max}')
 
-        return self._imgData[sliceIdx,:,:]
+        _ret = self._imgData[sliceIdx,:,:]
+        logger.warning(f'lazy loaded sliceIdx:{sliceIdx} shape:{_ret.shape} channel:{self.channel} min:{_ret.min()} max:{_ret.max()}')
+
+        # print stack trace
+        import traceback
+        traceback.print_stack()
+
+        return _ret
 
     def getVolume(self,
                   startSlice:int,
@@ -899,6 +906,8 @@ class ImageChannel():
         #     imgData = self.mapLoader.group[self._channelPath][startSlice:stopSlice,:,:]
 
         # option 2
+        logger.info(f'ImageChannel startSlice:{startSlice} stopSlice:{stopSlice}')
+        
         if stopSlice is None:
             imgData = self.getSlice(startSlice)
         else:
@@ -906,12 +915,14 @@ class ImageChannel():
             # _sliceRange = np.arange(startSlice,stopSlice+1, 1)  # to include last slice
             logger.info(f"double checking slice range stopSlice {stopSlice}")
             _sliceRange = np.arange(startSlice,stopSlice, 1)  # to include last slice
-            # logger.warning(f'_sliceRange:{_sliceRange}')
+            logger.warning(f'_sliceRange:{_sliceRange}')
             for _sliceIdx in _sliceRange:
                 # lazy load a slice from zarr
+                logger.info(f'  getting slice {_sliceIdx} {type(_sliceIdx)}')
                 self.getSlice(_sliceIdx)
             imgData = self._imgData[_sliceRange,:,:]
             # logger.warning(f'  imgData.shape:{imgData.shape}')
+        logger.info(f'returning imgData.shape:{imgData.shape}')
         return imgData
     
     def getImageData(self) -> np.ndarray:
